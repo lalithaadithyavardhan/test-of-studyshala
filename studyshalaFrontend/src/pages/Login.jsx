@@ -26,6 +26,12 @@ const Login = () => {
     }
   }, [searchParams]);
 
+
+const handleLogin = (role) => {
+  // Use your BACKEND URL here, not the frontend URL
+  window.location.href = `https://test-of-studyshala.onrender.com/api/auth/google?role=${role}`;
+};
+  
   const handleSignIn = () => {
     if (!selectedRole) {
       setError('Please select whether you are a Student or Faculty first.');
