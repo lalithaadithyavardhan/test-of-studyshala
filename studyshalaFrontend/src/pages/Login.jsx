@@ -12,26 +12,28 @@ const Login = () => {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
 
+  // Redirect user if they are already logged in
   useEffect(() => {
     if (user) {
       if (user.role === 'faculty') navigate('/faculty/dashboard', { replace: true });
       else if (user.role === 'admin') navigate('/admin/dashboard', { replace: true });
       else navigate('/student/enter-code', { replace: true });
     }
-  }, [user]);
+  }, [user, navigate]);
 
+  // Handle authentication errors from the URL params
   useEffect(() => {
     if (searchParams.get('error') === 'auth_failed') {
       setError('Google sign-in failed. Please try again.');
     }
   }, [searchParams]);
 
-
-const handleLogin = (role) => {
-  // Use your BACKEND URL here, not the frontend URL
-  window.location.href = `https://test-of-studyshala.onrender.com/api/auth/google?role=${role}`;
-};
-  
+  /**
+   * IMPORTANT: Full Redirect for Google OAuth
+   * We use window.location.href to the BACKEND URL.
+   * Using a relative path like '/api/...' will fail on Render because 
+   * the frontend doesn't have that route.
+   */
   const handleSignIn = () => {
     if (!selectedRole) {
       setError('Please select whether you are a Student or Faculty first.');
@@ -39,7 +41,10 @@ const handleLogin = (role) => {
     }
     setLoading(true);
     setError('');
-    window.location.href = `/api/auth/google?role=${selectedRole}`;
+    
+    // Deployed Backend URL on Render
+    const BACKEND_URL = 'https://test-of-studyshala.onrender.com';
+    window.location.href = `${BACKEND_URL}/api/auth/google?role=${selectedRole}`;
   };
 
   return (
