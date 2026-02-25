@@ -21,7 +21,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import './styles/global.css';
 
 const Home = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  // जब तक डेटा लोड हो रहा हो, कुछ न दिखाएं ताकि गलत रीडायरेक्ट न हो
+  if (loading) return null; 
+
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'faculty') return <Navigate to="/faculty/dashboard" replace />;
   if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
@@ -36,7 +40,9 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+          
+          {/* ERROR FIXED: Changed '/auth/callback' to '/auth-callback' to match Backend redirect */}
+          <Route path="/auth-callback" element={<AuthCallback />} />
 
           {/* Faculty Routes */}
           <Route path="/faculty/dashboard" element={
