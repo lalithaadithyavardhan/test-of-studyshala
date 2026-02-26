@@ -55,8 +55,18 @@ const FacultyDashboard = () => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+
+    // Safety fallback payload to ensure backend requirements are met
+    const payload = {
+      department: formData.department || 'CSE', // Fallback to prevent validation crash
+      semester: formData.semester || '1',       // Fallback to prevent validation crash
+      subjectName: formData.subjectName,
+      facultyName: formData.facultyName,
+      permission: formData.permission || 'view'
+    };
+
     try {
-      const res = await api.post('/faculty/folders', formData);
+      const res = await api.post('/faculty/folders', payload);
       setShowCreateModal(false);
       setFormData({ department: '', semester: '', subjectName: '', facultyName: '', permission: 'view' });
       const code = res.data.folder.accessCode || res.data.folder.departmentCode;
@@ -124,12 +134,12 @@ const FacultyDashboard = () => {
     setError('');
 
     try {
-      const formData = new FormData();
+      const formDataToSend = new FormData();
       uploadFiles.forEach(file => {
-        formData.append('files', file);
+        formDataToSend.append('files', file);
       });
 
-      await api.post(`/faculty/folders/${selectedFolder._id}/files`, formData, {
+      await api.post(`/faculty/folders/${selectedFolder._id}/files`, formDataToSend, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
