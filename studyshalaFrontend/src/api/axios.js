@@ -5,12 +5,11 @@ import axios from 'axios';
  * Configured for dynamic environment switching (Local Dev vs Production).
  */
 const api = axios.create({
-  // Vite uses import.meta.env.DEV to check if it's running locally.
-  // If local: use '/api' to trigger the vite.config.js proxy.
-  // If production: use the deployed Render URL.
-  baseURL: import.meta.env.DEV 
+  // FIXED: Prioritize environment variables over hardcoded URLs.
+  // Falls back to local proxy '/api' if DEV, otherwise the deployed Render URL if the env var is missing.
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV 
     ? '/api' 
-    : 'https://test-of-studyshala.onrender.com/api',
+    : 'https://test-of-studyshala.onrender.com/api'),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -81,7 +80,12 @@ api.interceptors.response.use(
       } else {
         // Fallback: _navigate not yet injected (very early load). A hard redirect
         // is unavoidable here, but this path should almost never be hit.
-        window.location.href = '/login';
+        // FIXED: Added a check to prevent infinite reload loops if already on the login page.
+        if (window.location.pathname !== '/login') {
+          window.location.href = responseCode === 'TOKEN_EXPIRED' 
+            ? '/login?expired=true' 
+            : '/login';
+        }
       }
     }
 
