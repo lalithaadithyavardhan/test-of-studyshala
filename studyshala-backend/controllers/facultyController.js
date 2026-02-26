@@ -48,11 +48,21 @@ const createFolder = async (req, res) => {
         const { folderId, folderUrl } = await driveService.createFolder(folderName);
         driveUrl = folderUrl;
         driveFolderId = folderId;
-        // Set folder-level permissions once; individual uploaded files are made
-        // public automatically inside driveService.uploadFile, so no duplicate call needed.
+        // Set folder-level permissions once
         await driveService.setFolderPermissions(folderId, permission || 'view');
       } catch (driveErr) {
-        logger.warn(`Drive folder creation skipped: ${driveErr.message}`);
+        logger.error(`Drive folder creation or permission failed: ${driveErr.message}`);
+        
+        // FIXED: Rollback Drive folder if permissions fail so we don't end up with an inaccessible folder
+        if (driveFolderId && !driveFolderId.startsWith('local')) {
+          try {
+            await driveService.deleteFolder(driveFolderId);
+            logger.info(`Rollback: Deleted orphaned Drive folder ${driveFolderId}`);
+          } catch (rollbackErr) {
+            logger.warn(`Rollback failed for Drive folder ${driveFolderId}: ${rollbackErr.message}`);
+          }
+        }
+        return res.status(500).json({ message: 'Failed to create Drive storage folder. Please try again.' });
       }
     }
 
@@ -84,6 +94,9 @@ const createFolder = async (req, res) => {
 };
 
 const uploadFiles = async (req, res) => {
+  // FIXED: Track uploaded IDs in the outer scope to handle DB save failures
+  const uploadedDriveIds = []; 
+
   try {
     const { id } = req.params;
     const folder = await Folder.findOne({ _id: id, facultyId: req.user._id, active: true });
@@ -97,7 +110,6 @@ const uploadFiles = async (req, res) => {
     }
 
     const uploadedFiles = [];
-    const uploadedDriveIds = []; // track for rollback
 
     for (const file of req.files) {
       let driveFileId = null;
@@ -109,8 +121,6 @@ const uploadFiles = async (req, res) => {
         !folder.driveFolderId.startsWith('local')
       ) {
         try {
-          // driveService.uploadFile already sets public reader permission on the file,
-          // so we do NOT call setFolderPermissions again here (removed redundant call).
           const driveResult = await driveService.uploadFile(
             file.buffer,
             file.originalname,
@@ -121,23 +131,9 @@ const uploadFiles = async (req, res) => {
           fileSize = driveResult.size;
           uploadedDriveIds.push(driveFileId);
         } catch (driveErr) {
-          logger.error(
-            `Drive upload failed for ${file.originalname}: ${driveErr.message}. Rolling back ${uploadedDriveIds.length} previously uploaded file(s).`
-          );
-
-          // Rollback: delete any files already uploaded to Drive in this batch
-          for (const orphanId of uploadedDriveIds) {
-            try {
-              await driveService.deleteFile(orphanId);
-              logger.info(`Rollback: deleted orphaned Drive file ${orphanId}`);
-            } catch (rollbackErr) {
-              logger.warn(`Rollback deletion failed for ${orphanId}: ${rollbackErr.message}`);
-            }
-          }
-
-          return res
-            .status(500)
-            .json({ message: `Upload failed for file "${file.originalname}". All changes have been rolled back.` });
+          logger.error(`Drive upload failed for ${file.originalname}: ${driveErr.message}`);
+          // Throwing here triggers the outer catch block to handle the complete rollback
+          throw new Error(`Upload failed for file "${file.originalname}"`); 
         }
       }
 
@@ -155,6 +151,7 @@ const uploadFiles = async (req, res) => {
       uploadedFiles.push(fileDoc);
     }
 
+    // If this DB save fails, the outer catch block will now rollback the Drive uploads
     await folder.save();
 
     await logAction(req, 'UPLOAD_FILES', 'Folder', folder._id, {
@@ -168,8 +165,23 @@ const uploadFiles = async (req, res) => {
       files: uploadedFiles
     });
   } catch (error) {
-    logger.error(`Upload files error: ${error.message}`);
-    res.status(500).json({ message: 'Failed to upload files' });
+    logger.error(`Upload files error: ${error.message}. Executing rollback.`);
+    
+    // FIXED: Comprehensive Rollback covers both Drive upload errors AND Database save errors
+    for (const orphanId of uploadedDriveIds) {
+      try {
+        await driveService.deleteFile(orphanId);
+        logger.info(`Rollback: deleted orphaned Drive file ${orphanId}`);
+      } catch (rollbackErr) {
+        logger.warn(`Rollback deletion failed for ${orphanId}: ${rollbackErr.message}`);
+      }
+    }
+
+    res.status(500).json({ 
+      message: error.message === 'Upload failed for file...' 
+        ? error.message 
+        : 'Failed to complete upload process. All changes have been rolled back.' 
+    });
   }
 };
 
