@@ -16,6 +16,19 @@ class DriveService {
       });
     }
 
+    // Listen for new tokens and persist them dynamically
+    this.oauth2Client.on('tokens', (tokens) => {
+      if (tokens.refresh_token) {
+        process.env.GOOGLE_DRIVE_REFRESH_TOKEN = tokens.refresh_token;
+        logger.info('Google Drive refresh token rotated and updated in memory.');
+        // If you have a config/secrets store, persist here:
+        // e.g. secretsManager.update('GOOGLE_DRIVE_REFRESH_TOKEN', tokens.refresh_token);
+      }
+      if (tokens.access_token) {
+        logger.info('Google Drive access token refreshed.');
+      }
+    });
+
     this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
     this.enabled = !!process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
   }
@@ -67,14 +80,14 @@ class DriveService {
   }
 
   // ── File operations ──────────────────────────────────────────────────────
-  
+
   /**
    * Upload a file to Drive
-   * @param {Object} fileBuffer - File buffer from multer
+   * @param {Buffer} fileBuffer - File buffer from multer
    * @param {string} fileName - Name to save as
    * @param {string} mimeType - MIME type
    * @param {string} folderId - Parent folder ID (optional)
-   * @returns {Promise<{fileId: string, webViewLink: string}>}
+   * @returns {Promise<{fileId: string, webViewLink: string, size: number}>}
    */
   async uploadFile(fileBuffer, fileName, mimeType, folderId = null) {
     try {
@@ -92,7 +105,7 @@ class DriveService {
         fields: 'id, name, webViewLink, size'
       });
 
-      // Make file publicly accessible
+      // Make file publicly accessible (reader only)
       await this.drive.permissions.create({
         fileId: res.data.id,
         requestBody: { role: 'reader', type: 'anyone' }
@@ -111,17 +124,17 @@ class DriveService {
   }
 
   /**
-   * Download a file from Drive as a buffer
+   * Download a file from Drive as a readable stream to avoid OOM issues.
    * @param {string} fileId - Drive file ID
-   * @returns {Promise<Buffer>}
+   * @returns {Promise<stream.Readable>}
    */
   async downloadFile(fileId) {
     try {
       const res = await this.drive.files.get(
         { fileId, alt: 'media' },
-        { responseType: 'arraybuffer' }
+        { responseType: 'stream' }
       );
-      return Buffer.from(res.data);
+      return res.data; // This is a readable stream
     } catch (error) {
       logger.error(`Download file error: ${error.message}`);
       throw error;
