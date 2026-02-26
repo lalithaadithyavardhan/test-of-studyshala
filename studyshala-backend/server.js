@@ -12,6 +12,10 @@ const session    = require('express-session');
 const passport   = require('./config/passport');
 const connectDB  = require('./config/database');
 const logger     = require('./utils/logger');
+// ADDED: Rate limiting module to prevent abuse
+const rateLimit  = require('express-rate-limit');
+// ADDED: Crypto for generating safe temporary local secrets
+const crypto     = require('crypto');
 
 // Routes
 const authRoutes    = require('./routes/authRoutes');
@@ -31,7 +35,21 @@ app.set('trust proxy', 1);
 // Connect to MongoDB
 connectDB();
 
-// ── Middleware ──────────────────────────────────────────────────────────────
+// ── Security & Middleware ───────────────────────────────────────────────────
+
+/**
+ * FIXED: Added Rate Limiting
+ * Protects the API routes from brute force and denial-of-service (DoS) attacks.
+ * Limits each IP to 200 requests per 15-minute window.
+ */
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  message: { message: 'Too many requests from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', apiLimiter);
 
 /**
  * 2. UPDATED CORS
@@ -47,10 +65,24 @@ app.use(express.urlencoded({ extended: true }));
 
 /**
  * 3. UPDATED SESSION CONFIGURATION
- * Optimized for production deployment on Render.
+ * FIXED: Removed the insecure hardcoded fallback string.
+ * It will now securely crash in production if a secret isn't provided, 
+ * or generate a secure random string for local development.
  */
+let sessionSecret = process.env.SESSION_SECRET;
+
+if (!sessionSecret) {
+  if (process.env.NODE_ENV === 'production') {
+    logger.error('FATAL ERROR: SESSION_SECRET is missing in production environment variables.');
+    process.exit(1); // Fail securely instead of allowing easily forgeable cookies
+  } else {
+    sessionSecret = crypto.randomBytes(32).toString('hex');
+    logger.warn('SESSION_SECRET is missing. Auto-generating a temporary secure string for local dev.');
+  }
+}
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'csms-session-secret',
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   proxy: true, 
@@ -85,7 +117,8 @@ app.use('/api/admin',   adminRoutes);
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
 
 app.use((err, req, res, next) => {
-  logger.error(err.message);
+  // Added a fallback for err.message in case the error thrown is a raw string/object
+  logger.error(err.message || 'An unknown error occurred');
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 
