@@ -5,12 +5,6 @@ const savedMaterialSchema = new mongoose.Schema({
   savedAt: { type: Date, default: Date.now }
 });
 
-const accessHistorySchema = new mongoose.Schema({
-  materialId: { type: mongoose.Schema.Types.ObjectId, ref: 'Folder', required: true },
-  accessCode: { type: String, required: true },
-  accessedAt: { type: Date, default: Date.now }
-});
-
 const userSchema = new mongoose.Schema({
   googleId: { type: String, required: true, unique: true },
   name: { type: String, required: true },
@@ -23,11 +17,14 @@ const userSchema = new mongoose.Schema({
   department: String,
   semester: String,
   departmentCode: String,  // legacy - current active code
-  
+
   // Student-specific fields
+  // NOTE: accessHistory has been intentionally removed from the User document.
+  // Storing it as an unbounded array here risks hitting MongoDB's 16 MB document
+  // limit for active users. Access history is now stored in the Log collection
+  // (action: 'ACCESS_MATERIAL') which scales indefinitely.
   savedMaterials: [savedMaterialSchema],
-  accessHistory: [accessHistorySchema],
-  
+
   active: { type: Boolean, default: true },
   profilePicture: String,
   lastLogin: Date
