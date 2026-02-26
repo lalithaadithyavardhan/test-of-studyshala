@@ -1,515 +1,618 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../api/axios';
-import './StudentFileBrowser.css';
+/* ═══════════════════════════════════════════════════════════════════════════
+   StudyShala — StudentFileBrowser Styles  (Dark Theme)
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-const StudentFileBrowser = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.file-browser-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  background-color: #121212;
+  color: #e0e0e0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
 
-  const [material, setMaterial] = useState(null);
-  const [files, setFiles] = useState([]);
-  const [selectedFiles, setSelectedFiles] = useState([]);
+/* ── Loading Screen ─────────────────────────────────────────────────────── */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100vh;
+  font-size: 1.1rem;
+  color: #3b82f6;
+  background-color: #121212;
+}
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [previewFile, setPreviewFile] = useState(null);
-  const [showPreviewPane, setShowPreviewPane] = useState(true);
+/* Spinner animation */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #2a2a2d;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
 
-  // BUG FIX: fullScreenFile was never being cleared after the modal closed
-  // because onDoubleClick fired the click handler first (which just sets
-  // previewFile), then the dblclick handler set fullScreenFile — but the
-  // onClick on the row also fires on double-click.  We now stop propagation
-  // on double-click so only one handler runs.
-  const [fullScreenFile, setFullScreenFile] = useState(null);
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 
-  const [saving, setSaving] = useState(false);
-  const [saveFeedback, setSaveFeedback] = useState(null); // 'success' | 'already' | 'error'
-  const [downloadingIds, setDownloadingIds] = useState([]); // track per-file download state
+/* ── Error / Empty State ────────────────────────────────────────────────── */
+.error-state {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px;
+  max-width: 420px;
+}
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
-  const fetchFilesAndDetails = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+.error-icon {
+  font-size: 48px;
+}
 
-      // Fetch files for this material
-      const fileRes = await api.get(`/student/materials/${id}/files`);
-      const fetchedFiles = fileRes.data.files || [];
-      setFiles(fetchedFiles);
-      setMaterial(fileRes.data.material || null);
+.error-state p {
+  color: #ccc;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+}
 
-      // Set first file as default preview only if preview pane is open
-      if (fetchedFiles.length > 0) {
-        setPreviewFile(fetchedFiles[0]);
-      } else {
-        setPreviewFile(null);
-      }
+/* Inline non-fatal error toast */
+.inline-error-toast {
+  background-color: rgba(239, 68, 68, 0.12);
+  border-left: 3px solid #ef4444;
+  color: #fca5a5;
+  padding: 10px 20px;
+  font-size: 13px;
+}
 
-      // BUG FIX: The original code fetched the full saved-materials list and
-      // searched it to get the material name — this fails if the material isn't
-      // saved yet (e.g. user is viewing via access code, not saved list).
-      // We now rely on the material object returned by the files endpoint above,
-      // and only fall back to the saved list if that field is missing.
-      if (!fileRes.data.material) {
-        try {
-          const savedRes = await api.get('/student/saved-materials');
-          const found = (savedRes.data.materials || []).find(m => m._id === id);
-          if (found) setMaterial(found);
-        } catch {
-          // Non-critical — material name will just show 'Folder'
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching files:', err);
-      if (err.response?.status === 403) {
-        setError('You do not have access to this material. Please use the correct access code first.');
-      } else if (err.response?.status === 404) {
-        setError('This material could not be found or has been removed.');
-      } else {
-        setError('Failed to load files. Please check your connection and try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+/* ── LEFT PANE ──────────────────────────────────────────────────────────── */
+.file-list-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #1a1a1c;
+  border-right: 1px solid #2d2d30;
+  min-width: 0; /* prevent flex overflow */
+}
 
-  useEffect(() => {
-    fetchFilesAndDetails();
-  }, [fetchFilesAndDetails]);
+/* Header bar */
+.file-browser-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  border-bottom: 1px solid #2d2d30;
+  background-color: #1a1a1c;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 
-  // ── Selection helpers ──────────────────────────────────────────────────────
-  const getFileId = (file) => file._id || file.driveFileId;
+/* Breadcrumbs */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #888;
+  min-width: 0;
+}
 
-  const toggleSelection = (fileId) => {
-    setSelectedFiles(prev =>
-      prev.includes(fileId) ? prev.filter(i => i !== fileId) : [...prev, fileId]
-    );
-  };
+.breadcrumb-link {
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
 
-  const handleSelectAll = () => {
-    if (selectedFiles.length === files.length && files.length > 0) {
-      setSelectedFiles([]);
-    } else {
-      setSelectedFiles(files.map(getFileId));
-    }
-  };
+.breadcrumb-link:hover {
+  color: #3b82f6;
+  text-decoration: underline;
+}
 
-  // ── Row click / double-click ───────────────────────────────────────────────
-  const handleRowClick = (file) => {
-    setPreviewFile(file);
-  };
+.breadcrumb-sep {
+  color: #555;
+  font-size: 16px;
+}
 
-  // BUG FIX: onClick was also firing during double-click, causing a state
-  // conflict where previewFile and fullScreenFile were both set simultaneously,
-  // which sometimes prevented the modal from rendering cleanly.
-  // Fix: stopPropagation on dblclick prevents the parent onClick from also firing.
-  const handleDoubleClick = (e, file) => {
-    e.stopPropagation();
-    setFullScreenFile(file);
-  };
+.current-path {
+  color: #f0f0f0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
 
-  const closeFullScreen = () => setFullScreenFile(null);
+/* Action buttons row */
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
 
-  // ── Download ───────────────────────────────────────────────────────────────
-  const handleDownloadSelected = async () => {
-    const filesToDownload = files.filter(f => selectedFiles.includes(getFileId(f)));
+.action-divider {
+  width: 1px;
+  height: 24px;
+  background-color: #3a3a3d;
+  margin: 0 4px;
+}
 
-    for (const file of filesToDownload) {
-      const fileId = getFileId(file);
-      setDownloadingIds(prev => [...prev, fileId]);
-      try {
-        const res = await api.get(
-          `/student/materials/${id}/files/${file._id}/download`,
-          {
-            responseType: 'blob',
-            // BUG FIX: Without specifying the correct blob type, some browsers
-            // would create a generic octet-stream blob and fail to open the file.
-            // Pass the known mimeType so the Blob is constructed correctly.
-          }
-        );
+/* Material meta strip */
+.material-meta-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  background-color: #161618;
+  border-bottom: 1px solid #2d2d30;
+  font-size: 12px;
+  color: #888;
+  overflow-x: auto;
+  white-space: nowrap;
+}
 
-        // Build blob with the correct MIME type from file metadata
-        const blob = new Blob([res.data], { type: file.mimeType || 'application/octet-stream' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', file.name);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error(`Download failed for ${file.name}:`, err);
-        // Show inline error rather than blocking alert()
-        setError(`Download failed for "${file.name}". Please try again.`);
-        // Auto-clear error after 4 seconds
-        setTimeout(() => setError(null), 4000);
-      } finally {
-        setDownloadingIds(prev => prev.filter(i => i !== fileId));
-      }
-    }
-    setSelectedFiles([]);
-  };
+.material-meta-strip span:first-child {
+  color: #bbb;
+  font-weight: 500;
+}
 
-  // ── Save material ──────────────────────────────────────────────────────────
-  const handleSaveMaterial = async () => {
-    try {
-      setSaving(true);
-      setSaveFeedback(null);
-      const res = await api.post('/student/save-material', { materialId: id });
-      if (res.data?.alreadySaved) {
-        setSaveFeedback('already');
-      } else {
-        setSaveFeedback('success');
-      }
-    } catch (err) {
-      setSaveFeedback('error');
-    } finally {
-      setSaving(false);
-      // Auto-clear feedback after 3 seconds
-      setTimeout(() => setSaveFeedback(null), 3000);
-    }
-  };
+.meta-sep {
+  color: #444;
+}
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const formatSize = (bytes) => {
-    if (!bytes || bytes === 0) return '—';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn-outline {
+  background: transparent;
+  border: 1px solid #484848;
+  color: #ccc;
+  padding: 7px 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
 
-  const getFileIcon = (mimeType) => {
-    if (!mimeType) return '📄';
-    if (mimeType.includes('pdf')) return '📕';
-    if (mimeType.includes('image')) return '🖼️';
-    if (mimeType.includes('word') || mimeType.includes('document')) return '📘';
-    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return '📙';
-    if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return '📗';
-    if (mimeType.includes('zip') || mimeType.includes('compressed')) return '🗜️';
-    if (mimeType.includes('text')) return '📃';
-    return '📄';
-  };
+.btn-outline:hover:not(:disabled) {
+  background: #272729;
+  border-color: #777;
+  color: #fff;
+}
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    try {
-      return new Date(dateStr).toLocaleDateString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric'
-      });
-    } catch {
-      return '—';
-    }
-  };
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border: none;
+  color: #fff;
+  padding: 7px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
 
-  // ── Render: loading ────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-spinner"></div>
-        <span>Loading Files...</span>
-      </div>
-    );
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+/* Save feedback variants */
+.btn-success {
+  background: linear-gradient(135deg, #16a34a, #15803d) !important;
+}
+
+.btn-muted {
+  background: #374151 !important;
+}
+
+button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.fullscreen-hint-btn {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+/* ── File list column headers ───────────────────────────────────────────── */
+.file-list-header {
+  display: flex;
+  align-items: center;
+  padding: 9px 24px;
+  background-color: #161618;
+  border-bottom: 1px solid #2d2d30;
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  user-select: none;
+}
+
+.master-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+/* Column widths */
+.col-checkbox { width: 40px; flex-shrink: 0; display: flex; align-items: center; }
+.col-icon     { width: 52px; flex-shrink: 0; text-align: center; }
+.col-name     { flex: 2; min-width: 0; }
+.col-date     { flex: 1; min-width: 90px; }
+.col-size     { width: 90px; flex-shrink: 0; text-align: right; }
+
+/* ── File rows ──────────────────────────────────────────────────────────── */
+.file-list-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 14px 20px;
+}
+
+/* Scrollbar styling */
+.file-list-container::-webkit-scrollbar { width: 6px; }
+.file-list-container::-webkit-scrollbar-track { background: transparent; }
+.file-list-container::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.file-list-container::-webkit-scrollbar-thumb:hover { background: #555; }
+
+.file-row {
+  display: flex;
+  align-items: center;
+  padding: 11px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s, border-left 0.15s;
+  border-left: 3px solid transparent;
+  user-select: none;
+}
+
+.file-row:hover {
+  background-color: #222224;
+}
+
+.file-row.selected {
+  background-color: rgba(37, 99, 235, 0.13);
+}
+
+.file-row.active-preview {
+  background-color: #242427;
+  border-left: 3px solid #3b82f6;
+}
+
+.file-row.downloading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Checkbox inside row */
+.col-checkbox input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.file-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e8e8e8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-badge {
+  font-size: 11px;
+  color: #60a5fa;
+  margin-left: 8px;
+  font-weight: 400;
+}
+
+.col-date {
+  font-size: 12px;
+  color: #888;
+}
+
+.col-size {
+  font-size: 12px;
+  color: #888;
+  text-align: right;
+}
+
+/* Empty folder */
+.empty-folder {
+  text-align: center;
+  margin-top: 80px;
+  color: #555;
+}
+
+.empty-icon {
+  font-size: 52px;
+  margin-bottom: 14px;
+}
+
+.empty-folder p {
+  font-size: 15px;
+  color: #666;
+}
+
+/* ── RIGHT PANE (Preview) ───────────────────────────────────────────────── */
+.file-preview-pane {
+  width: 380px;
+  flex-shrink: 0;
+  background-color: #1c1c1f;
+  border-left: 1px solid #2d2d30;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 18px;
+  border-bottom: 1px solid #2d2d30;
+  background-color: #161618;
+  flex-shrink: 0;
+}
+
+.preview-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ccc;
+  letter-spacing: 0.3px;
+}
+
+.close-preview {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 17px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.close-preview:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.preview-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.preview-iframe {
+  width: 100%;
+  /* BUG FIX: Original height was fixed at 350px. When the preview pane is
+     taller than that, the iframe didn't fill the space. Now it uses flex-grow
+     so it expands to fill available height. */
+  flex: 1;
+  min-height: 200px;
+  border: none;
+  border-bottom: 1px solid #2d2d30;
+  background-color: #fff; /* White background for transparent PDFs */
+}
+
+.preview-details {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.preview-details h4 {
+  margin: 0 0 14px 0;
+  color: #eee;
+  font-size: 14px;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.preview-details p {
+  display: flex;
+  gap: 8px;
+  color: #999;
+  font-size: 12px;
+  margin: 6px 0;
+  border-bottom: 1px solid #2a2a2d;
+  padding-bottom: 6px;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #666;
+  min-width: 56px;
+}
+
+.empty-preview,
+.no-preview-available {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  padding: 30px 20px;
+  text-align: center;
+  gap: 10px;
+}
+
+.empty-preview-icon,
+.no-preview-icon {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.empty-preview p,
+.no-preview-available p {
+  font-size: 14px;
+  color: #777;
+  margin: 0;
+}
+
+.empty-preview small,
+.no-preview-available small {
+  font-size: 12px;
+  color: #555;
+}
+
+/* ── FULL SCREEN MODAL ──────────────────────────────────────────────────── */
+
+/*
+  BUG FIX: The original .full-screen-modal was a flex column that occupied
+  the whole viewport but had no distinct backdrop / dialog separation.
+  Clicking "outside" did nothing. We now split it into a backdrop (.full-screen-modal)
+  and a centered dialog (.full-screen-dialog) so backdrop clicks close the modal,
+  and the layout is more robust.
+*/
+.full-screen-modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(6, 6, 8, 0.92);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.full-screen-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: 1200px;
+  max-height: calc(100vh - 40px);
+  background-color: #1a1a1c;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.8);
+  animation: slideUp 0.18s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.full-screen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  background-color: #161618;
+  border-bottom: 1px solid #2d2d30;
+  flex-shrink: 0;
+}
+
+.full-screen-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ddd;
+  overflow: hidden;
+}
+
+.full-screen-title span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.full-screen-close {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 7px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.full-screen-close:hover {
+  background: #dc2626;
+}
+
+.full-screen-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.full-screen-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background-color: #fff;
+}
+
+.fullscreen-no-preview {
+  flex: 1;
+  font-size: 16px;
+}
+
+/* ── Responsive adjustments ─────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .file-preview-pane {
+    display: none; /* hide on small screens; use fullscreen instead */
   }
 
-  // ── Render: fatal error ────────────────────────────────────────────────────
-  if (error && files.length === 0) {
-    return (
-      <div className="loading-screen">
-        <div className="error-state">
-          <div className="error-icon">⚠️</div>
-          <p>{error}</p>
-          <button className="btn-outline" onClick={() => navigate(-1)}>← Go Back</button>
-        </div>
-      </div>
-    );
+  .file-browser-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
-  // ── Render: main ──────────────────────────────────────────────────────────
-  return (
-    <div className="file-browser-layout">
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 
-      {/* ── LEFT PANE ── */}
-      <div className="file-list-pane">
+  .current-path {
+    max-width: 160px;
+  }
+}
 
-        {/* Header */}
-        <div className="file-browser-header">
-          <div className="breadcrumbs">
-            <span className="breadcrumb-link" onClick={() => navigate('/student/saved-materials')}>
-              My Materials
-            </span>
-            <span className="breadcrumb-sep"> › </span>
-            <span className="current-path">{material?.subjectName || 'Folder'}</span>
-          </div>
-
-          <div className="header-actions">
-            <button
-              className="btn-outline toggle-preview-btn"
-              onClick={() => setShowPreviewPane(v => !v)}
-            >
-              {showPreviewPane ? '◀ Hide Preview' : '▶ Show Preview'}
-            </button>
-
-            <div className="action-divider" />
-
-            <button className="btn-outline" onClick={handleSelectAll} disabled={files.length === 0}>
-              {selectedFiles.length === files.length && files.length > 0 ? 'Deselect All' : 'Select All'}
-            </button>
-
-            <button
-              className="btn-outline"
-              disabled={selectedFiles.length === 0 || downloadingIds.length > 0}
-              onClick={handleDownloadSelected}
-            >
-              {downloadingIds.length > 0
-                ? `Downloading...`
-                : `⬇ Download${selectedFiles.length > 0 ? ` (${selectedFiles.length})` : ''}`}
-            </button>
-
-            <button
-              className={`btn-primary ${saveFeedback === 'success' ? 'btn-success' : saveFeedback === 'already' ? 'btn-muted' : ''}`}
-              disabled={saving}
-              onClick={handleSaveMaterial}
-            >
-              {saving
-                ? 'Saving...'
-                : saveFeedback === 'success'
-                  ? '✓ Saved!'
-                  : saveFeedback === 'already'
-                    ? '✓ Already Saved'
-                    : saveFeedback === 'error'
-                      ? '✕ Save Failed'
-                      : '💾 Save Material'}
-            </button>
-          </div>
-        </div>
-
-        {/* Inline toast for non-fatal errors */}
-        {error && files.length > 0 && (
-          <div className="inline-error-toast">
-            ⚠️ {error}
-          </div>
-        )}
-
-        {/* Material meta strip */}
-        {material && (
-          <div className="material-meta-strip">
-            <span>📚 {material.subjectName}</span>
-            <span className="meta-sep">·</span>
-            <span>{material.department}</span>
-            <span className="meta-sep">·</span>
-            <span>Sem {material.semester}</span>
-            <span className="meta-sep">·</span>
-            <span>👤 {material.facultyName}</span>
-            <span className="meta-sep">·</span>
-            <span>{files.length} file{files.length !== 1 ? 's' : ''}</span>
-          </div>
-        )}
-
-        {/* Column headers */}
-        <div className="file-list-header">
-          <div className="col-checkbox">
-            {/* Master checkbox */}
-            <input
-              type="checkbox"
-              className="master-checkbox"
-              checked={files.length > 0 && selectedFiles.length === files.length}
-              onChange={handleSelectAll}
-              disabled={files.length === 0}
-            />
-          </div>
-          <div className="col-icon">Type</div>
-          <div className="col-name">Name</div>
-          <div className="col-date">Uploaded</div>
-          <div className="col-size">Size</div>
-        </div>
-
-        {/* File rows */}
-        <div className="file-list-container">
-          {files.length === 0 ? (
-            <div className="empty-folder">
-              <div className="empty-icon">📂</div>
-              <p>This folder has no files yet.</p>
-            </div>
-          ) : (
-            files.map((file) => {
-              const fileId = getFileId(file);
-              const isSelected = selectedFiles.includes(fileId);
-              const isActivePreview = previewFile && getFileId(previewFile) === fileId;
-              const isDownloading = downloadingIds.includes(fileId);
-
-              return (
-                <div
-                  key={fileId}
-                  className={`file-row${isSelected ? ' selected' : ''}${isActivePreview ? ' active-preview' : ''}${isDownloading ? ' downloading' : ''}`}
-                  onClick={() => handleRowClick(file)}
-                  onDoubleClick={(e) => handleDoubleClick(e, file)}
-                  title="Click to preview · Double-click to open fullscreen"
-                >
-                  {/* Checkbox — stop propagation so clicking it doesn't also select the row for preview */}
-                  <div className="col-checkbox" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelection(fileId)}
-                    />
-                  </div>
-
-                  <div className="col-icon">
-                    <span className="file-icon">{getFileIcon(file.mimeType)}</span>
-                  </div>
-
-                  <div className="col-name file-name">
-                    {file.name}
-                    {isDownloading && <span className="download-badge"> ⬇ downloading...</span>}
-                  </div>
-
-                  <div className="col-date">{formatDate(file.uploadedAt)}</div>
-                  <div className="col-size">{formatSize(file.size)}</div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* ── RIGHT PANE (Google Drive Preview) ── */}
-      {showPreviewPane && (
-        <div className="file-preview-pane">
-          <div className="preview-header">
-            <h3>Preview</h3>
-            <button className="close-preview" onClick={() => setShowPreviewPane(false)} title="Close preview">✕</button>
-          </div>
-
-          {previewFile ? (
-            <div className="preview-content">
-              {/* BUG FIX: The original iframe used previewFile.driveFileId which is
-                  undefined when the file object only has _id (the DB id). The backend
-                  stores driveFileId separately. We check both and fall back gracefully. */}
-              {previewFile.driveFileId ? (
-                <>
-                  <iframe
-                    key={previewFile.driveFileId} // force remount when file changes
-                    src={`https://drive.google.com/file/d/${previewFile.driveFileId}/preview`}
-                    className="preview-iframe"
-                    title={`Preview: ${previewFile.name}`}
-                    allow="autoplay"
-                  />
-                  <div className="preview-details">
-                    <h4 title={previewFile.name}>{previewFile.name}</h4>
-                    <p><span className="detail-label">Type</span>{previewFile.mimeType || 'Unknown'}</p>
-                    <p><span className="detail-label">Size</span>{formatSize(previewFile.size)}</p>
-                    <p><span className="detail-label">Uploaded</span>{formatDate(previewFile.uploadedAt)}</p>
-                    <button
-                      className="btn-outline fullscreen-hint-btn"
-                      onClick={() => setFullScreenFile(previewFile)}
-                    >
-                      ⛶ Open Fullscreen
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="no-preview-available">
-                  <span className="no-preview-icon">🔗</span>
-                  <p>Preview not available.</p>
-                  <small>This file has not been synced to Google Drive yet.</small>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="empty-preview">
-              <span className="empty-preview-icon">👆</span>
-              <p>Click any file to preview it here.</p>
-              <small>Double-click to open fullscreen.</small>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── FULL SCREEN MODAL ──
-          BUG FIX 1: The modal was not rendering because fullScreenFile was being
-          set while the click handler simultaneously set previewFile, causing a
-          React render cycle conflict. Fixed by using stopPropagation in dblclick.
-
-          BUG FIX 2: Pressing Escape key should close the modal — added keydown listener.
-
-          BUG FIX 3: Clicking outside the modal content (the dark backdrop) should
-          also close it — added backdrop click handler.
-      ── */}
-      {fullScreenFile && (
-        <FullScreenModal
-          file={fullScreenFile}
-          getFileIcon={getFileIcon}
-          onClose={closeFullScreen}
-        />
-      )}
-    </div>
-  );
-};
-
-// ── FullScreenModal extracted as a separate component ──────────────────────
-// This ensures the keydown event listener is properly managed via useEffect
-// and cleaned up on unmount, preventing memory leaks.
-const FullScreenModal = ({ file, getFileIcon, onClose }) => {
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    // Prevent background scroll while modal is open
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
-    };
-  }, [onClose]);
-
-  // Close on backdrop click
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
-  return (
-    <div className="full-screen-modal" onClick={handleBackdropClick}>
-      <div className="full-screen-dialog">
-        <div className="full-screen-header">
-          <div className="full-screen-title">
-            <span>{getFileIcon(file.mimeType)}</span>
-            <span title={file.name}>{file.name}</span>
-          </div>
-          <button
-            className="full-screen-close"
-            onClick={onClose}
-            title="Close (Esc)"
-          >
-            ✕ Close
-          </button>
-        </div>
-
-        <div className="full-screen-body">
-          {file.driveFileId ? (
-            <iframe
-              key={file.driveFileId}
-              src={`https://drive.google.com/file/d/${file.driveFileId}/preview`}
-              className="full-screen-iframe"
-              title={`Fullscreen: ${file.name}`}
-              allow="autoplay"
-            />
-          ) : (
-            <div className="no-preview-available fullscreen-no-preview">
-              <div className="no-preview-icon">⚠️</div>
-              <p>Fullscreen preview is not available for this file.</p>
-              <small>The file may not have been synced to Google Drive yet.</small>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default StudentFileBrowser;
+@media (max-width: 600px) {
+  .col-date { display: none; }
+  .col-size { display: none; }
+  .file-browser-header { padding: 12px 14px; }
+  .material-meta-strip { padding: 7px 14px; }
+  .file-list-header { padding: 8px 14px; }
+}
