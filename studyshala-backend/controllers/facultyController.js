@@ -156,7 +156,7 @@ const deleteFile = async (req, res) => {
       return res.status(404).json({ message: 'Folder not found' });
     }
 
-    const fileIndex = folder.files.findIndex(f => f._id.toString() === fileId);
+    const fileIndex = folder.files.findIndex(f => String(f._id) === String(fileId));
     if (fileIndex === -1) {
       return res.status(404).json({ message: 'File not found' });
     }
