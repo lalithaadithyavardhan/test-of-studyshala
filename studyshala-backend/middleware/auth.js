@@ -12,17 +12,34 @@ const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = verifyToken(token);
+
+    let decoded;
+    try {
+      decoded = verifyToken(token);
+    } catch (err) {
+      // Distinguish between an expired token and any other invalid token so the
+      // frontend can silently refresh or redirect to login appropriately.
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          message: 'Token expired. Please log in again.',
+          code: 'TOKEN_EXPIRED'
+        });
+      }
+      return res.status(401).json({
+        message: 'Invalid token.',
+        code: 'TOKEN_INVALID'
+      });
+    }
 
     if (!decoded) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
+      return res.status(401).json({ message: 'Invalid or expired token', code: 'TOKEN_INVALID' });
     }
 
     // Get user from database
     const user = await User.findById(decoded.id).select('-__v');
 
     if (!user) {
-      return res.status(401).json({ message: 'User not found' });
+      return res.status(401).json({ message: 'User not found', code: 'USER_NOT_FOUND' });
     }
 
     if (!user.active) {
