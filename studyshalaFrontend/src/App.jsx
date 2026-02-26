@@ -14,6 +14,7 @@ import StudentEnterCode from './pages/StudentEnterCode';
 import StudentMaterialAccess from './pages/StudentMaterialAccess';
 import StudentSavedMaterials from './pages/StudentSavedMaterials';
 import StudentHistory from './pages/StudentHistory';
+import StudentFileBrowser from './pages/StudentFileBrowser'; // <-- NEW IMPORT ADDED HERE
 
 // Admin
 import AdminDashboard from './pages/AdminDashboard';
@@ -75,6 +76,13 @@ function App() {
           <Route path="/student/history" element={
             <ProtectedRoute allowedRoles={['student']}>
               <StudentHistory />
+            </ProtectedRoute>
+          } />
+          
+          {/* NEW ROUTE FOR FULL SCREEN FILE BROWSER */}
+          <Route path="/student/browse/:id" element={
+            <ProtectedRoute allowedRoles={['student']}>
+              <StudentFileBrowser />
             </ProtectedRoute>
           } />
 
