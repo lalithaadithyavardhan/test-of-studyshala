@@ -1,3 +1,5 @@
+/* StudentSavedMaterials.css */
+
 .saved-materials-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -8,6 +10,13 @@
 .saved-material-card {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.saved-material-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .saved-material-header {
@@ -42,6 +51,10 @@
   font-size: 0.875rem;
 }
 
+.detail-row:last-child {
+  border-bottom: none;
+}
+
 .detail-label {
   font-weight: 600;
   color: var(--text-secondary-light);
@@ -49,6 +62,7 @@
 
 .detail-value {
   font-weight: 600;
+  color: var(--text-primary-light);
 }
 
 .saved-material-footer {
@@ -56,4 +70,9 @@
   border-top: 1px solid var(--border-light);
   display: flex;
   gap: 0.5rem;
+}
+
+/* Make the "Browse Files" button take up remaining space, and "Remove" stay small */
+.saved-material-footer button:first-child {
+  flex: 1; 
 }
