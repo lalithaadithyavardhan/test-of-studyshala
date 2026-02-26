@@ -13,25 +13,40 @@ const StudentFileBrowser = () => {
   const [previewFile, setPreviewFile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch material details and files on load
+  // Fetch files on load
   useEffect(() => {
-    const fetchMaterial = async () => {
+    const fetchFilesAndDetails = async () => {
       try {
-        // Replace with your actual endpoint for fetching a single material's files
-        const response = await api.get(`/student/materials/${id}`);
-        setMaterial(response.data.material);
-        setFiles(response.data.material.files);
+        setLoading(true);
+        
+        // 1. Fetch the files using the CORRECT endpoint from your backend
+        const fileRes = await api.get(`/student/materials/${id}/files`);
+        const fetchedFiles = fileRes.data.files || [];
+        setFiles(fetchedFiles);
+        
         // Auto-select the first file for preview if available
-        if (response.data.material.files.length > 0) {
-          setPreviewFile(response.data.material.files[0]);
+        if (fetchedFiles.length > 0) {
+          setPreviewFile(fetchedFiles[0]);
         }
-        setLoading(false);
+
+        // 2. Fetch material details for the header (Subject Name, etc.)
+        // We pull from the saved materials list to get the info
+        const savedRes = await api.get('/student/saved-materials');
+        const allMaterials = savedRes.data.materials || [];
+        const currentMaterial = allMaterials.find(m => m._id === id);
+        
+        if (currentMaterial) {
+          setMaterial(currentMaterial);
+        }
+
       } catch (error) {
-        console.error("Error fetching material:", error);
+        console.error("Error fetching files:", error);
+      } finally {
         setLoading(false);
       }
     };
-    fetchMaterial();
+    
+    fetchFilesAndDetails();
   }, [id]);
 
   // Handle Checkbox Selection
@@ -52,32 +67,45 @@ const StudentFileBrowser = () => {
   };
 
   // Actions
-  const handleDownloadSelected = () => {
+  const handleDownloadSelected = async () => {
     const filesToDownload = files.filter(f => selectedFiles.includes(f._id || f.driveFileId));
-    console.log("Downloading:", filesToDownload);
-    // Add your bulk download logic here (e.g., triggering individual downloads)
-    alert(`Downloading ${filesToDownload.length} files...`);
+    
+    // Trigger download for each selected file using your existing logic
+    for (let file of filesToDownload) {
+      try {
+        const res = await api.get(`/student/materials/${id}/files/${file._id}/download`, {
+          responseType: 'blob'
+        });
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', file.name);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(`Failed to download ${file.name}`);
+      }
+    }
   };
 
   const handleSaveToDrive = () => {
-    // Note: Saving directly to the student's personal Google Drive requires
-    // the backend to request Google Drive scopes during student login.
-    // If you mean saving to "My Materials" in StudyShala, call your save endpoint here.
-    alert(`Saving ${selectedFiles.length} files to Drive/My Materials...`);
+    alert(`This will sync ${selectedFiles.length} files. (Backend implementation required for personal Drive saving)`);
   };
 
   // Formatting helpers
   const formatSize = (bytes) => {
-    if (!bytes) return 'Unknown Size';
+    if (!bytes) return '0 B';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown Date';
-    return new Date(dateString).toLocaleDateString('en-GB'); // DD-MM-YYYY format
+    return new Date(dateString).toLocaleDateString('en-GB'); 
   };
 
   const getFileIcon = (mimeType) => {
@@ -86,7 +114,7 @@ const StudentFileBrowser = () => {
     return '📁 FILE';
   };
 
-  if (loading) return <div className="loading-screen">Loading Files...</div>;
+  if (loading) return <div className="loading-screen" style={{color: 'white', padding: '2rem'}}>Loading Files...</div>;
 
   return (
     <div className="file-browser-layout">
@@ -103,62 +131,69 @@ const StudentFileBrowser = () => {
           
           <div className="header-actions">
             <button className="btn-outline" onClick={handleSelectAll}>
-              {selectedFiles.length === files.length ? '🔓 Deselect All' : '🔒 Select All'}
+              {selectedFiles.length === files.length && files.length > 0 ? '🔓 Deselect All' : '🔒 Select All'}
             </button>
             <button 
               className="btn-outline" 
               disabled={selectedFiles.length === 0}
               onClick={handleDownloadSelected}
             >
-              ⬇️ Download Selected ({selectedFiles.length})
+              ⬇️ Download ({selectedFiles.length})
             </button>
             <button 
               className="btn-primary" 
               disabled={selectedFiles.length === 0}
               onClick={handleSaveToDrive}
             >
-              💾 Save to Drive ({selectedFiles.length})
+              💾 Save ({selectedFiles.length})
             </button>
           </div>
         </div>
 
         {/* File List */}
         <div className="file-list-container">
-          {files.map((file) => {
-            const fileId = file._id || file.driveFileId;
-            const isSelected = selectedFiles.includes(fileId);
-            const isPreviewing = previewFile?._id === file._id;
+          {files.length === 0 ? (
+            <div style={{color: '#888', textAlign: 'center', marginTop: '50px'}}>
+              <h2>📭 No Files Found</h2>
+              <p>There are currently no files uploaded to this material.</p>
+            </div>
+          ) : (
+            files.map((file) => {
+              const fileId = file._id || file.driveFileId;
+              const isSelected = selectedFiles.includes(fileId);
+              const isPreviewing = previewFile?._id === file._id;
 
-            return (
-              <div 
-                key={fileId} 
-                className={`file-row ${isSelected ? 'selected' : ''} ${isPreviewing ? 'active-preview' : ''}`}
-                onClick={() => setPreviewFile(file)}
-              >
-                <div className="checkbox-col" onClick={(e) => e.stopPropagation()}>
-                  <input 
-                    type="checkbox" 
-                    checked={isSelected}
-                    onChange={() => toggleSelection(fileId)}
-                  />
-                </div>
-                
-                <div className="icon-col">
-                  <div className={`file-icon ${file.mimeType?.includes('pdf') ? 'pdf-icon' : 'img-icon'}`}>
-                    {getFileIcon(file.mimeType)}
+              return (
+                <div 
+                  key={fileId} 
+                  className={`file-row ${isSelected ? 'selected' : ''} ${isPreviewing ? 'active-preview' : ''}`}
+                  onClick={() => setPreviewFile(file)}
+                >
+                  <div className="checkbox-col" onClick={(e) => e.stopPropagation()}>
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected}
+                      onChange={() => toggleSelection(fileId)}
+                    />
+                  </div>
+                  
+                  <div className="icon-col">
+                    <div className={`file-icon ${file.mimeType?.includes('pdf') ? 'pdf-icon' : 'img-icon'}`}>
+                      {getFileIcon(file.mimeType)}
+                    </div>
+                  </div>
+                  
+                  <div className="details-col">
+                    <h4 className="file-name">{file.name}</h4>
+                    <div className="file-meta">
+                      <span>Uploaded: {formatDate(file.uploadedAt)}</span>
+                      <span>Size: {formatSize(file.size)}</span>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="details-col">
-                  <h4 className="file-name">{file.name}</h4>
-                  <div className="file-meta">
-                    <span>Date modified: {formatDate(file.uploadedAt)}</span>
-                    <span>Size: {formatSize(file.size)}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
         
         {/* Footer Stats */}
@@ -177,7 +212,6 @@ const StudentFileBrowser = () => {
         
         {previewFile ? (
           <div className="preview-content">
-            {/* Google Drive trick: Use /preview endpoint to embed PDFs and Images securely */}
             {previewFile.driveFileId ? (
               <iframe 
                 src={`https://drive.google.com/file/d/${previewFile.driveFileId}/preview`} 
@@ -188,13 +222,12 @@ const StudentFileBrowser = () => {
             ) : (
               <div className="no-preview-available">
                 <div className="big-icon">{getFileIcon(previewFile.mimeType)}</div>
-                <p>Preview not available for this file type.</p>
+                <p>Preview not available</p>
               </div>
             )}
             
             <div className="preview-details">
               <h4>{previewFile.name}</h4>
-              <p><strong>Type:</strong> {previewFile.mimeType}</p>
               <p><strong>Size:</strong> {formatSize(previewFile.size)}</p>
               <p><strong>Uploaded:</strong> {formatDate(previewFile.uploadedAt)}</p>
             </div>
