@@ -39,35 +39,25 @@ const StudentMaterialAccess = () => {
     }
   };
 
-  const handleDownload = async (fileId, fileName) => {
+  // 🚀 FIXED: Now uses the direct Google Drive link to prevent Backend 404/500 errors!
+  const handleDownload = (fileId, fileName, driveFileId) => {
     setDownloading(fileId);
     setError('');
 
-    try {
-      const res = await api.get(`/student/materials/${id}/files/${fileId}/download`, {
-        responseType: 'blob'
-      });
-
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      setSuccess(`✅ Downloaded: ${fileName}`);
+    if (driveFileId) {
+      // Direct Google Drive download
+      window.open(`https://drive.google.com/uc?export=download&id=${driveFileId}`, '_blank');
+      setSuccess(`✅ Download started: ${fileName}`);
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError('Download failed: ' + (err.response?.data?.message || 'Unknown error'));
-    } finally {
-      setDownloading(null);
+    } else {
+      setError('Download failed: File not synced to Drive properly.');
     }
+    
+    setDownloading(null);
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
+    if (!bytes) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -75,6 +65,7 @@ const StudentMaterialAccess = () => {
   };
 
   const getFileIcon = (mimeType) => {
+    if (!mimeType) return '📄';
     if (mimeType.includes('pdf')) return '📕';
     if (mimeType.includes('word') || mimeType.includes('document')) return '📘';
     if (mimeType.includes('sheet') || mimeType.includes('excel')) return '📊';
@@ -170,7 +161,8 @@ const StudentMaterialAccess = () => {
                         <div className="file-name">{f.name}</div>
                         <div className="file-size">{formatFileSize(f.size)}</div>
                       </div>
-                      <Button size="sm" onClick={() => handleDownload(f._id, f.name)}
+                      {/* FIXED: Passing f.driveFileId here so the function knows what to download */}
+                      <Button size="sm" onClick={() => handleDownload(f._id, f.name, f.driveFileId)}
                         disabled={downloading === f._id}>
                         {downloading === f._id ? '⏳' : '⬇️'}
                       </Button>
