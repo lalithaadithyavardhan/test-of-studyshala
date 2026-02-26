@@ -13,41 +13,66 @@ passport.use(
     },
     async (req, accessToken, refreshToken, profile, done) => {
       try {
-        const chosenRole = req.query.state || 'student'; // 'student' | 'faculty' | 'admin'
+        // 1. Safely extract email and profile picture
+        if (!profile.emails || profile.emails.length === 0) {
+          return done(new Error('No email found in Google profile'), null);
+        }
         const email = profile.emails[0].value.toLowerCase();
+        const profilePicture = profile.photos && profile.photos.length > 0 
+          ? profile.photos[0].value 
+          : '';
 
-        // Admin access guard — only whitelisted emails can be admin
+        // 2. Strictly validate the requested role to prevent CSRF token pollution
+        const rawRole = req.query.role || req.query.state;
+        let chosenRole = ['student', 'faculty', 'admin'].includes(rawRole) 
+          ? rawRole 
+          : 'student';
+
+        // Parse admin whitelist
+        const adminEmails = (process.env.ADMIN_EMAILS || '')
+          .split(',')
+          .map(e => e.trim().toLowerCase())
+          .filter(Boolean);
+
+        // 3. Admin Access Guard & Auto-Upgrade
         if (chosenRole === 'admin') {
-          const adminEmails = (process.env.ADMIN_EMAILS || '')
-            .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-
           if (!adminEmails.includes(email)) {
-            logger.warn(`Blocked admin login attempt: ${email}`);
+            logger.warn(`Blocked unauthorized admin login attempt: ${email}`);
             return done(null, false, { message: 'not_admin' });
           }
+        } else if (adminEmails.includes(email)) {
+          // Automatically upgrade whitelisted emails to admin securely
+          chosenRole = 'admin';
         }
 
-        // Find existing user
+        // 4. Find existing user
         let user = await User.findOne({ googleId: profile.id });
 
         if (user) {
-          // Update role to what they chose (admin only if whitelisted — checked above)
+          // Prevent accidental demotion (e.g., an Admin logging in via the Student portal)
+          if (user.role === 'admin' || (user.role === 'faculty' && chosenRole === 'student')) {
+            chosenRole = user.role;
+          }
+
+          // Update user details
           user.role      = chosenRole;
           user.lastLogin = new Date();
           await user.save();
+          
           logger.info(`Login: ${email} as ${chosenRole}`);
           return done(null, user);
         }
 
-        // New user
+        // 5. Create new user
         user = new User({
           googleId:       profile.id,
           name:           profile.displayName,
-          email:          profile.emails[0].value,
+          email:          email,
           role:           chosenRole,
-          profilePicture: profile.photos[0]?.value,
+          profilePicture: profilePicture,
           lastLogin:      new Date()
         });
+        
         await user.save();
         logger.info(`New user: ${email} as ${chosenRole}`);
         done(null, user);
