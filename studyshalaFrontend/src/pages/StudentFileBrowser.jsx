@@ -15,6 +15,7 @@ const StudentFileBrowser = () => {
   const [previewFile, setPreviewFile] = useState(null);
   const [showPreviewPane, setShowPreviewPane] = useState(true);
   const [fullScreenFile, setFullScreenFile] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchFilesAndDetails = async () => {
@@ -22,17 +23,13 @@ const StudentFileBrowser = () => {
         setLoading(true);
         const fileRes = await api.get(`/student/materials/${id}/files`);
         setFiles(fileRes.data.files || []);
-        
-        if (fileRes.data.files.length > 0) {
-          setPreviewFile(fileRes.data.files[0]);
-        }
+        if (fileRes.data.files.length > 0) setPreviewFile(fileRes.data.files[0]);
 
         const savedRes = await api.get('/student/saved-materials');
         const currentMaterial = (savedRes.data.materials || []).find(m => m._id === id);
         if (currentMaterial) setMaterial(currentMaterial);
-
       } catch (error) {
-        console.error("Error fetching files:", error);
+        console.error("Error:", error);
       } finally {
         setLoading(false);
       }
@@ -41,7 +38,7 @@ const StudentFileBrowser = () => {
   }, [id]);
 
   const toggleSelection = (fileId) => {
-    setSelectedFiles(prev => prev.includes(fileId) ? prev.filter(id => id !== fileId) : [...prev, fileId]);
+    setSelectedFiles(prev => prev.includes(fileId) ? prev.filter(i => i !== fileId) : [...prev, fileId]);
   };
 
   const handleSelectAll = () => {
@@ -49,27 +46,43 @@ const StudentFileBrowser = () => {
     else setSelectedFiles(files.map(f => f._id || f.driveFileId));
   };
 
-  // FIXED: Double-Click opens Google's native secure viewer for all file types
   const handleDoubleClick = (file) => {
     setFullScreenFile(file);
   };
 
-  // FIXED: Bypass Backend to avoid 500 errors. Download directly from Google Drive.
-  const handleDownloadSelected = () => {
+  // PROPER DOWNLOAD TO COMPUTER (Via Backend Proxy)
+  const handleDownloadSelected = async () => {
     const filesToDownload = files.filter(f => selectedFiles.includes(f._id || f.driveFileId));
     
-    filesToDownload.forEach(file => {
-      if (file.driveFileId) {
-        // Direct Google Drive download link
-        const downloadUrl = `https://drive.google.com/uc?export=download&id=${file.driveFileId}`;
-        window.open(downloadUrl, '_blank');
-      } else {
-        alert(`Cannot download ${file.name} - File not synced to Drive properly.`);
+    for (let file of filesToDownload) {
+      try {
+        const res = await api.get(`/student/materials/${id}/files/${file._id}/download`, { responseType: 'blob' });
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', file.name);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(`Download failed for ${file.name}. Ensure backend Drive integration is working.`);
       }
-    });
-    
-    // Deselect after downloading
+    }
     setSelectedFiles([]);
+  };
+
+  // PROPER SAVE TO DASHBOARD
+  const handleSaveMaterial = async () => {
+    try {
+      setSaving(true);
+      await api.post('/student/save-material', { materialId: id });
+      alert("Material successfully saved to your 'My Materials' dashboard!");
+    } catch (err) {
+      alert("Material is already saved or an error occurred.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const formatSize = (bytes) => {
@@ -84,9 +97,7 @@ const StudentFileBrowser = () => {
     if (mimeType.includes('pdf')) return '📕';
     if (mimeType.includes('image')) return '🖼️';
     if (mimeType.includes('word') || mimeType.includes('document')) return '📘';
-    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return '📙';
-    if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return '📊';
-    if (mimeType.includes('zip') || mimeType.includes('compressed')) return '🗜️';
+    if (mimeType.includes('presentation')) return '📙';
     return '📄';
   };
 
@@ -94,7 +105,7 @@ const StudentFileBrowser = () => {
 
   return (
     <div className="file-browser-layout">
-      {/* LEFT PANE: File List */}
+      {/* LEFT PANE */}
       <div className="file-list-pane">
         <div className="file-browser-header">
           <div className="breadcrumbs">
@@ -103,14 +114,17 @@ const StudentFileBrowser = () => {
           </div>
           <div className="header-actions">
             <button className="btn-outline toggle-preview-btn" onClick={() => setShowPreviewPane(!showPreviewPane)}>
-              {showPreviewPane ? 'Hide Preview ✕' : 'Show Preview 👁️'}
+              {showPreviewPane ? 'Hide Details' : 'Show Details'}
             </button>
             <div className="action-divider"></div>
             <button className="btn-outline" onClick={handleSelectAll}>
               {selectedFiles.length === files.length && files.length > 0 ? 'Deselect All' : 'Select All'}
             </button>
-            <button className="btn-primary" disabled={selectedFiles.length === 0} onClick={handleDownloadSelected}>
+            <button className="btn-outline" disabled={selectedFiles.length === 0} onClick={handleDownloadSelected}>
               ⬇️ Download ({selectedFiles.length})
+            </button>
+            <button className="btn-primary" disabled={saving} onClick={handleSaveMaterial}>
+              {saving ? 'Saving...' : '💾 Save Material'}
             </button>
           </div>
         </div>
@@ -124,40 +138,30 @@ const StudentFileBrowser = () => {
         </div>
 
         <div className="file-list-container">
-          {files.length === 0 ? (
-            <div className="empty-folder">
-              <div className="empty-icon">📭</div>
-              <h2>This folder is empty</h2>
-            </div>
-          ) : (
-            files.map((file) => {
-              const fileId = file._id || file.driveFileId;
-              const isSelected = selectedFiles.includes(fileId);
-              const isPreviewing = previewFile?._id === file._id;
-
-              return (
-                <div 
-                  key={fileId} 
-                  className={`file-row ${isSelected ? 'selected' : ''} ${isPreviewing && showPreviewPane ? 'active-preview' : ''}`}
-                  onClick={() => setPreviewFile(file)}
-                  onDoubleClick={() => handleDoubleClick(file)}
-                  title="Double click to open full screen"
-                >
-                  <div className="col-checkbox" onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(fileId)}/>
-                  </div>
-                  <div className="col-icon"><span className="file-icon">{getFileIcon(file.mimeType)}</span></div>
-                  <div className="col-name file-name">{file.name}</div>
-                  <div className="col-date">{new Date(file.uploadedAt).toLocaleDateString()}</div>
-                  <div className="col-size">{formatSize(file.size)}</div>
+          {files.map((file) => {
+            const fileId = file._id || file.driveFileId;
+            const isSelected = selectedFiles.includes(fileId);
+            return (
+              <div 
+                key={fileId} 
+                className={`file-row ${isSelected ? 'selected' : ''}`}
+                onClick={() => setPreviewFile(file)}
+                onDoubleClick={() => handleDoubleClick(file)}
+              >
+                <div className="col-checkbox" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleSelection(fileId)}/>
                 </div>
-              );
-            })
-          )}
+                <div className="col-icon"><span className="file-icon">{getFileIcon(file.mimeType)}</span></div>
+                <div className="col-name file-name">{file.name}</div>
+                <div className="col-date">{new Date(file.uploadedAt).toLocaleDateString()}</div>
+                <div className="col-size">{formatSize(file.size)}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* RIGHT PANE: Live Preview */}
+      {/* RIGHT PANE (Google Drive Preview) */}
       {showPreviewPane && (
         <div className="file-preview-pane">
           <div className="preview-header">
@@ -170,20 +174,14 @@ const StudentFileBrowser = () => {
                 <iframe 
                   src={`https://drive.google.com/file/d/${previewFile.driveFileId}/preview`} 
                   className="preview-iframe"
-                  allow="autoplay"
                   title="File Preview"
                 ></iframe>
               ) : (
-                <div className="no-preview-available">File missing from Drive</div>
+                <div className="no-preview-available">File syncing issue.</div>
               )}
-              <div className="preview-details">
-                <h4>{previewFile.name}</h4>
-                <p><strong>Size:</strong> {formatSize(previewFile.size)}</p>
-                <p><strong>Type:</strong> {previewFile.mimeType ? previewFile.mimeType.split('/')[1] : 'Unknown'}</p>
-              </div>
             </div>
           ) : (
-            <div className="empty-preview"><p>Select a file to preview.</p></div>
+             <div className="empty-preview"><p>Select a file to preview.</p></div>
           )}
         </div>
       )}
@@ -200,7 +198,6 @@ const StudentFileBrowser = () => {
               <iframe 
                 src={`https://drive.google.com/file/d/${fullScreenFile.driveFileId}/preview`} 
                 className="full-screen-iframe"
-                allow="autoplay"
                 title="Full Screen Preview"
               ></iframe>
             ) : (
