@@ -24,6 +24,9 @@ const validateAccessCode = async (req, res) => {
       return res.json({ valid: false, message: 'Code not found or inactive' });
     }
 
+    // BULLETPROOFING: Ensure arrays exist to prevent 500 crashes
+    if (!req.user.accessHistory) req.user.accessHistory = [];
+
     // Add to access history (if not already present)
     const historyExists = req.user.accessHistory.find(
       h => String(h.materialId) === String(folder._id)
@@ -84,6 +87,8 @@ const saveMaterial = async (req, res) => {
       return res.status(404).json({ message: 'Material not found' });
     }
 
+    if (!req.user.savedMaterials) req.user.savedMaterials = [];
+
     // Check if already saved
     const alreadySaved = req.user.savedMaterials.find(
       m => String(m.materialId) === String(materialId)
@@ -111,7 +116,8 @@ const saveMaterial = async (req, res) => {
 // Get saved materials
 const getSavedMaterials = async (req, res) => {
   try {
-    const materialIds = req.user.savedMaterials.map(m => m.materialId);
+    const savedList = req.user.savedMaterials || [];
+    const materialIds = savedList.map(m => m.materialId);
 
     const folders = await Folder.find({
       _id: { $in: materialIds },
@@ -119,9 +125,7 @@ const getSavedMaterials = async (req, res) => {
     }).sort({ createdAt: -1 });
 
     const materials = folders.map(m => {
-      const savedEntry = req.user.savedMaterials.find(
-        s => String(s.materialId) === String(m._id)
-      );
+      const savedEntry = savedList.find(s => String(s.materialId) === String(m._id));
 
       return {
         _id: m._id,
@@ -146,19 +150,19 @@ const getSavedMaterials = async (req, res) => {
 // Get access history
 const getAccessHistory = async (req, res) => {
   try {
-    const materialIds = req.user.accessHistory.map(h => h.materialId);
+    const historyList = req.user.accessHistory || [];
+    const materialIds = historyList.map(h => h.materialId);
 
     const folders = await Folder.find({
       _id: { $in: materialIds },
       active: true
     }).sort({ createdAt: -1 });
 
-    const history = req.user.accessHistory.map(h => {
+    const history = historyList.map(h => {
       const folder = folders.find(f => String(f._id) === String(h.materialId));
-      
       if (!folder) return null;
 
-      const isSaved = req.user.savedMaterials.some(
+      const isSaved = (req.user.savedMaterials || []).some(
         s => String(s.materialId) === String(folder._id)
       );
 
@@ -192,10 +196,13 @@ const getMaterialFiles = async (req, res) => {
       return res.status(404).json({ message: 'Material not found' });
     }
 
+    const savedMaterials = req.user.savedMaterials || [];
+    const accessHistory = req.user.accessHistory || [];
+
     // Check access: must be in savedMaterials or accessHistory
     const hasAccess = 
-      req.user.savedMaterials.some(m => String(m.materialId) === String(id)) ||
-      req.user.accessHistory.some(h => String(h.materialId) === String(id));
+      savedMaterials.some(m => String(m.materialId) === String(id)) ||
+      accessHistory.some(h => String(h.materialId) === String(id));
 
     if (!hasAccess) {
       return res.status(403).json({ message: 'Access denied. You must enter the code first.' });
@@ -210,7 +217,7 @@ const getMaterialFiles = async (req, res) => {
         facultyName: folder.facultyName,
         permission: folder.permission
       },
-      files: folder.files.map(f => ({
+      files: (folder.files || []).map(f => ({
         _id: f._id,
         name: f.name,
         mimeType: f.mimeType,
@@ -234,17 +241,18 @@ const downloadFile = async (req, res) => {
       return res.status(404).json({ message: 'Material not found' });
     }
 
-    // FIXED: Now safely uses String() casting just like getMaterialFiles
+    const savedMaterials = req.user.savedMaterials || [];
+    const accessHistory = req.user.accessHistory || [];
+
     const hasAccess = 
-      req.user.savedMaterials.some(m => String(m.materialId) === String(id)) ||
-      req.user.accessHistory.some(h => String(h.materialId) === String(id));
+      savedMaterials.some(m => String(m.materialId) === String(id)) ||
+      accessHistory.some(h => String(h.materialId) === String(id));
 
     if (!hasAccess) {
       return res.status(403).json({ message: 'Access denied. You must enter the code first.' });
     }
 
-    // FIXED: Safely compare fileIds 
-    const file = folder.files.find(f => String(f._id) === String(fileId));
+    const file = (folder.files || []).find(f => String(f._id) === String(fileId));
     
     if (!file) {
       return res.status(404).json({ message: 'File not found' });
@@ -255,7 +263,7 @@ const downloadFile = async (req, res) => {
         const buffer = await driveService.downloadFile(file.driveFileId);
 
         res.set({
-          'Content-Type': file.mimeType,
+          'Content-Type': file.mimeType || 'application/octet-stream',
           'Content-Disposition': `attachment; filename="${encodeURIComponent(file.name)}"`,
           'Content-Length': buffer.length
         });
@@ -264,11 +272,11 @@ const downloadFile = async (req, res) => {
         return res.send(buffer);
       } catch (driveErr) {
         logger.error(`Drive download failed: ${driveErr.message}`);
-        return res.status(500).json({ message: 'File download failed' });
+        return res.status(500).json({ message: 'Google Drive file download failed.' });
       }
     }
 
-    return res.status(404).json({ message: 'File content not available' });
+    return res.status(404).json({ message: 'File is missing. Google Drive integration is required.' });
   } catch (error) {
     logger.error(`Download file error: ${error.message}`);
     res.status(500).json({ message: 'Failed to download file' });
@@ -280,7 +288,7 @@ const removeSavedMaterial = async (req, res) => {
   try {
     const { id } = req.params;
 
-    req.user.savedMaterials = req.user.savedMaterials.filter(
+    req.user.savedMaterials = (req.user.savedMaterials || []).filter(
       m => String(m.materialId) !== String(id)
     );
     await req.user.save();
