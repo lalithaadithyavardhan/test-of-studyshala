@@ -1,24 +1,23 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // <-- Added for full-screen navigation
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import Modal from '../components/Modal';
 import './StudentSavedMaterials.css';
+// Note: Modal import is removed because we are using full-screen now
 
 const StudentSavedMaterials = () => {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  const [showFilesModal, setShowFilesModal] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState(null);
-  const [files, setFiles] = useState([]);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [downloading, setDownloading] = useState(null);
+  const navigate = useNavigate(); // <-- Initialize navigation
 
-  useEffect(() => { fetchMaterials(); }, []);
+  useEffect(() => { 
+    fetchMaterials(); 
+  }, []);
 
   const fetchMaterials = async () => {
     try {
@@ -32,72 +31,14 @@ const StudentSavedMaterials = () => {
     }
   };
 
-  const openFileBrowser = async (material) => {
-    setSelectedMaterial(material);
-    setFiles([]);
-    setShowFilesModal(true);
-    setLoadingFiles(true);
-
-    try {
-      const res = await api.get(`/student/materials/${material._id}/files`);
-      setFiles(res.data.files || []);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load files');
-    } finally {
-      setLoadingFiles(false);
-    }
-  };
-
-  const handleDownload = async (fileId, fileName) => {
-    setDownloading(fileId);
-    try {
-      const res = await api.get(
-        `/student/materials/${selectedMaterial._id}/files/${fileId}/download`,
-        { responseType: 'blob' }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Download failed');
-    } finally {
-      setDownloading(null);
-    }
-  };
-
   const handleRemove = async (id) => {
     if (!window.confirm('Remove this material from your saved list?')) return;
     try {
       await api.delete(`/student/saved-materials/${id}`);
-      fetchMaterials();
+      fetchMaterials(); // Refresh the list after removing
     } catch (err) {
       setError('Failed to remove material');
     }
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (mimeType) => {
-    if (mimeType.includes('pdf')) return '📕';
-    if (mimeType.includes('word')) return '📘';
-    if (mimeType.includes('sheet')) return '📊';
-    if (mimeType.includes('presentation')) return '📙';
-    if (mimeType.includes('image')) return '🖼️';
-    if (mimeType.includes('video')) return '🎥';
-    if (mimeType.includes('zip')) return '🗜️';
-    return '📄';
   };
 
   return (
@@ -150,7 +91,8 @@ const StudentSavedMaterials = () => {
                     </div>
                   </div>
                   <div className="saved-material-footer">
-                    <Button variant="primary" size="sm" onClick={() => openFileBrowser(m)}>
+                    {/* CHANGED: This button now redirects to the new full-screen File Browser */}
+                    <Button variant="primary" size="sm" onClick={() => navigate(`/student/browse/${m._id}`)}>
                       📂 Browse Files
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => handleRemove(m._id)}>
@@ -163,41 +105,6 @@ const StudentSavedMaterials = () => {
           )}
         </div>
       </div>
-
-      {/* Files Modal */}
-      <Modal isOpen={showFilesModal} onClose={() => setShowFilesModal(false)}
-        title={`📂 ${selectedMaterial?.subjectName || 'Files'}`} size="large">
-        {loadingFiles ? (
-          <div className="loading-container" style={{padding:'2rem'}}>
-            <div className="spinner"></div>
-          </div>
-        ) : files.length === 0 ? (
-          <div className="empty-state" style={{padding:'2rem'}}>
-            <div className="empty-state-icon">📭</div>
-            <h3>No Files</h3>
-            <p>No files available yet</p>
-          </div>
-        ) : (
-          <div className="file-list">
-            {files.map(f => (
-              <div key={f._id} className="file-item">
-                <div className="file-item-icon">{getFileIcon(f.mimeType)}</div>
-                <div className="file-item-info">
-                  <div className="file-item-name">{f.name}</div>
-                  <div className="file-item-meta">
-                    {formatFileSize(f.size)} • {new Date(f.uploadedAt).toLocaleDateString()}
-                  </div>
-                </div>
-                <Button variant="primary" size="sm"
-                  onClick={() => handleDownload(f._id, f.name)}
-                  disabled={downloading === f._id}>
-                  {downloading === f._id ? '⏳' : '⬇️'}
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </Modal>
     </div>
   );
 };
