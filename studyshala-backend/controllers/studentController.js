@@ -63,7 +63,8 @@ const validateAccessCode = async (req, res) => {
           name: f.name,
           mimeType: f.mimeType,
           size: f.size,
-          uploadedAt: f.uploadedAt
+          uploadedAt: f.uploadedAt,
+          driveFileId: f.driveFileId // <--- FIX: EXPOSED FOR DIRECT DOWNLOADS AND PREVIEWS
         }))
       }
     });
@@ -222,7 +223,8 @@ const getMaterialFiles = async (req, res) => {
         name: f.name,
         mimeType: f.mimeType,
         size: f.size,
-        uploadedAt: f.uploadedAt
+        uploadedAt: f.uploadedAt,
+        driveFileId: f.driveFileId // <--- FIX: EXPOSED FOR DIRECT DOWNLOADS AND PREVIEWS
       }))
     });
   } catch (error) {
