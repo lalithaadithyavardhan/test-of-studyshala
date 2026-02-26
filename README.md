@@ -168,6 +168,18 @@ ADMIN_EMAILS=admin@university.edu,admin2@university.edu
 # Server
 PORT=5000
 NODE_ENV=development
+
+# ── Google OAuth (For Student/Faculty Login) ──
+GOOGLE_CLIENT_ID=your_login_client_id
+GOOGLE_CLIENT_SECRET=your_login_client_secret
+GOOGLE_CALLBACK_URL=https://test-of-studyshala.onrender.com/api/auth/google/callback
+
+# ── Google Drive API (For File Storage) ──
+GOOGLE_DRIVE_CLIENT_ID=your_drive_client_id
+GOOGLE_DRIVE_CLIENT_SECRET=your_drive_client_secret
+GOOGLE_DRIVE_REDIRECT_URI=https://developers.google.com/oauthplayground
+GOOGLE_DRIVE_REFRESH_TOKEN=your_generated_refresh_token
+
 ```
 
 **Start the backend:**
