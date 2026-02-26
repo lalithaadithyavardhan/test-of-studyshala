@@ -26,7 +26,7 @@ const validateAccessCode = async (req, res) => {
 
     // Add to access history (if not already present)
     const historyExists = req.user.accessHistory.find(
-      h => h.materialId.toString() === folder._id.toString()
+      h => String(h.materialId) === String(folder._id)
     );
 
     if (!historyExists) {
@@ -86,7 +86,7 @@ const saveMaterial = async (req, res) => {
 
     // Check if already saved
     const alreadySaved = req.user.savedMaterials.find(
-      m => m.materialId.toString() === materialId
+      m => String(m.materialId) === String(materialId)
     );
 
     if (alreadySaved) {
@@ -120,7 +120,7 @@ const getSavedMaterials = async (req, res) => {
 
     const materials = folders.map(m => {
       const savedEntry = req.user.savedMaterials.find(
-        s => s.materialId.toString() === m._id.toString()
+        s => String(s.materialId) === String(m._id)
       );
 
       return {
@@ -154,12 +154,12 @@ const getAccessHistory = async (req, res) => {
     }).sort({ createdAt: -1 });
 
     const history = req.user.accessHistory.map(h => {
-      const folder = folders.find(f => f._id.toString() === h.materialId.toString());
+      const folder = folders.find(f => String(f._id) === String(h.materialId));
       
       if (!folder) return null;
 
       const isSaved = req.user.savedMaterials.some(
-        s => s.materialId.toString() === folder._id.toString()
+        s => String(s.materialId) === String(folder._id)
       );
 
       return {
@@ -193,7 +193,6 @@ const getMaterialFiles = async (req, res) => {
     }
 
     // Check access: must be in savedMaterials or accessHistory
-   // Check access: must be in savedMaterials or accessHistory
     const hasAccess = 
       req.user.savedMaterials.some(m => String(m.materialId) === String(id)) ||
       req.user.accessHistory.some(h => String(h.materialId) === String(id));
@@ -235,15 +234,18 @@ const downloadFile = async (req, res) => {
       return res.status(404).json({ message: 'Material not found' });
     }
 
+    // FIXED: Now safely uses String() casting just like getMaterialFiles
     const hasAccess = 
-      req.user.savedMaterials.some(m => m.materialId.toString() === id) ||
-      req.user.accessHistory.some(h => h.materialId.toString() === id);
+      req.user.savedMaterials.some(m => String(m.materialId) === String(id)) ||
+      req.user.accessHistory.some(h => String(h.materialId) === String(id));
 
     if (!hasAccess) {
-      return res.status(403).json({ message: 'Access denied' });
+      return res.status(403).json({ message: 'Access denied. You must enter the code first.' });
     }
 
-    const file = folder.files.find(f => f._id.toString() === fileId);
+    // FIXED: Safely compare fileIds 
+    const file = folder.files.find(f => String(f._id) === String(fileId));
+    
     if (!file) {
       return res.status(404).json({ message: 'File not found' });
     }
@@ -279,7 +281,7 @@ const removeSavedMaterial = async (req, res) => {
     const { id } = req.params;
 
     req.user.savedMaterials = req.user.savedMaterials.filter(
-      m => m.materialId.toString() !== id
+      m => String(m.materialId) !== String(id)
     );
     await req.user.save();
 
