@@ -193,12 +193,13 @@ const getMaterialFiles = async (req, res) => {
     }
 
     // Check access: must be in savedMaterials or accessHistory
+   // Check access: must be in savedMaterials or accessHistory
     const hasAccess = 
-      req.user.savedMaterials.some(m => m.materialId.toString() === id) ||
-      req.user.accessHistory.some(h => h.materialId.toString() === id);
+      req.user.savedMaterials.some(m => String(m.materialId) === String(id)) ||
+      req.user.accessHistory.some(h => String(h.materialId) === String(id));
 
     if (!hasAccess) {
-      return res.status(403).json({ message: 'Access denied' });
+      return res.status(403).json({ message: 'Access denied. You must enter the code first.' });
     }
 
     res.json({
