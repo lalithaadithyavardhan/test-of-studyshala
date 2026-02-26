@@ -1,5 +1,7 @@
 const { google } = require('googleapis');
 const stream = require('stream');
+const fs = require('fs');
+const path = require('path');
 const logger = require('../utils/logger');
 
 class DriveService {
@@ -21,9 +23,36 @@ class DriveService {
       if (tokens.refresh_token) {
         process.env.GOOGLE_DRIVE_REFRESH_TOKEN = tokens.refresh_token;
         logger.info('Google Drive refresh token rotated and updated in memory.');
-        // If you have a config/secrets store, persist here:
-        // e.g. secretsManager.update('GOOGLE_DRIVE_REFRESH_TOKEN', tokens.refresh_token);
+        
+        // FIXED: Persist the rotated token to the .env file so it survives restarts
+        try {
+          // Resolve the path to the root .env file
+          const envPath = path.resolve(process.cwd(), '.env');
+          
+          if (fs.existsSync(envPath)) {
+            let envContent = fs.readFileSync(envPath, 'utf8');
+            
+            // Regex to match the existing token line
+            const regex = /^GOOGLE_DRIVE_REFRESH_TOKEN=.*$/m;
+            
+            if (regex.test(envContent)) {
+              // Replace existing token
+              envContent = envContent.replace(regex, `GOOGLE_DRIVE_REFRESH_TOKEN=${tokens.refresh_token}`);
+            } else {
+              // Append if it doesn't exist for some reason
+              envContent += `\nGOOGLE_DRIVE_REFRESH_TOKEN=${tokens.refresh_token}\n`;
+            }
+            
+            fs.writeFileSync(envPath, envContent);
+            logger.info('Google Drive refresh token successfully saved to .env file.');
+          } else {
+            logger.warn('No .env file found. Refresh token was not persisted to disk.');
+          }
+        } catch (err) {
+          logger.error(`Failed to write new refresh token to .env file: ${err.message}`);
+        }
       }
+      
       if (tokens.access_token) {
         logger.info('Google Drive access token refreshed.');
       }
