@@ -2,10 +2,15 @@ import axios from 'axios';
 
 /**
  * StudyShala Axios Instance
- * Configured for production deployment on Render.
+ * Configured for dynamic environment switching (Local Dev vs Production).
  */
 const api = axios.create({
-  baseURL: 'https://test-of-studyshala.onrender.com/api',
+  // Vite uses import.meta.env.DEV to check if it's running locally.
+  // If local: use '/api' to trigger the vite.config.js proxy.
+  // If production: use the deployed Render URL.
+  baseURL: import.meta.env.DEV 
+    ? '/api' 
+    : 'https://test-of-studyshala.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -16,15 +21,15 @@ const api = axios.create({
  *
  * Usage in your App.jsx (or main router file):
  *
- *   import { useEffect } from 'react';
- *   import { useNavigate } from 'react-router-dom';
- *   import { injectNavigator } from '../api/axios';
+ * import { useEffect } from 'react';
+ * import { useNavigate } from 'react-router-dom';
+ * import { injectNavigator } from '../api/axios';
  *
- *   function NavigationInjector() {
- *     const navigate = useNavigate();
- *     useEffect(() => { injectNavigator(navigate); }, [navigate]);
- *     return null;
- *   }
+ * function NavigationInjector() {
+ * const navigate = useNavigate();
+ * useEffect(() => { injectNavigator(navigate); }, [navigate]);
+ * return null;
+ * }
  *
  * Then render <NavigationInjector /> as the first child inside <Router>.
  * This gives the interceptor access to React Router's navigate function
