@@ -4,6 +4,8 @@ const passport = require('../config/passport');
 const crypto   = require('crypto');
 const authController = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
+// ADDED: Import the logger to prevent ReferenceError on line 48
+const logger   = require('../utils/logger'); 
 
 // In-memory CSRF state store.
 // For multi-instance deployments, replace this with a shared cache (e.g. Redis)
@@ -55,7 +57,10 @@ router.get('/google/callback', (req, res, next) => {
   const stateData = stateToken ? oauthStateStore.get(stateToken) : null;
 
   if (!stateData) {
-    logger && logger.warn && logger.warn(`OAuth callback: unknown or missing state token`);
+    // FIXED: logger is now defined and can safely log the warning
+    if (logger && logger.warn) {
+      logger.warn(`OAuth callback: unknown or missing state token`);
+    }
     return res.redirect(`${process.env.FRONTEND_URL}/login?error=invalid_state`);
   }
 
