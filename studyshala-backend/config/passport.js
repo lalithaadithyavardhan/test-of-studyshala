@@ -22,8 +22,7 @@ passport.use(
           ? profile.photos[0].value 
           : '';
 
-        // 👇 UPDATED: Read req.oauthRole first to capture the role attached in authRoutes.js
-        // 2. Strictly validate the requested role to prevent CSRF token pollution
+        // 2. Strictly validate the requested role
         const rawRole = req.oauthRole || req.query.role || req.query.state;
         let chosenRole = ['student', 'faculty', 'admin'].includes(rawRole) 
           ? rawRole 
@@ -50,12 +49,14 @@ passport.use(
         let user = await User.findOne({ googleId: profile.id });
 
         if (user) {
-          // Prevent accidental demotion (e.g., an Admin logging in via the Student portal)
-          if (user.role === 'admin' || (user.role === 'faculty' && chosenRole === 'student')) {
-            chosenRole = user.role;
+          // 👇 MODIFIED FOR TESTING: 
+          // Removed the safeguard that prevents switching between Student and Faculty.
+          // We only protect the 'admin' role from being overwritten.
+          if (user.role === 'admin') {
+            chosenRole = 'admin'; 
           }
 
-          // Update user details
+          // Update user details to whatever button was clicked
           user.role      = chosenRole;
           user.lastLogin = new Date();
           await user.save();
