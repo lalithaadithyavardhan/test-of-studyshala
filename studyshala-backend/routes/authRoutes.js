@@ -74,6 +74,9 @@ router.get('/google/callback', (req, res, next) => {
 
   const { role } = stateData;
 
+  // 👇 ADDED THIS LINE: Pass the role to passport
+  req.oauthRole = role;
+
   passport.authenticate('google', (err, user, info) => {
     if (err) return next(err);
 
