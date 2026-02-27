@@ -161,7 +161,7 @@ app.listen(PORT, () => {
 
 process.on('unhandledRejection', (err) => logger.error(`Unhandled Rejection: ${err.message}`));
 process.on('uncaughtException',  (err) => { 
-  logger.error(`Uncaught Exception: ${err.message}`);
+  console.error(`CRITICAL Uncaught Exception: ${err.message}`); // Forced console print
   process.exit(1);
 });
 
