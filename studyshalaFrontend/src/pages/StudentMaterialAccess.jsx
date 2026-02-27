@@ -14,7 +14,6 @@ const StudentMaterialAccess = () => {
   
   const [material, setMaterial] = useState(location.state?.material || null);
   const [saving, setSaving] = useState(false);
-  const [downloading, setDownloading] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -39,49 +38,35 @@ const StudentMaterialAccess = () => {
     }
   };
 
-  const handleDownload = async (fileId, fileName) => {
-    setDownloading(fileId);
-    setError('');
-
-    try {
-      const res = await api.get(`/student/materials/${id}/files/${fileId}/download`, {
-        responseType: 'blob'
-      });
-
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      setSuccess(`✅ Downloaded: ${fileName}`);
+  // Completely simplified: No manual blob fetching anymore!
+  const handleDownload = (downloadLink) => {
+    if (downloadLink) {
+      window.open(downloadLink, "_blank");
+      setSuccess('✅ Download started');
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError('Download failed: ' + (err.response?.data?.message || 'Unknown error'));
-    } finally {
-      setDownloading(null);
+    } else {
+      setError('Download link is not available.');
     }
   };
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  const handlePreview = (previewLink) => {
+    if (previewLink) {
+      window.open(previewLink, "_blank");
+    } else {
+      setError('Preview link is not available.');
+    }
   };
 
-  const getFileIcon = (mimeType) => {
-    if (mimeType.includes('pdf')) return '📕';
-    if (mimeType.includes('word') || mimeType.includes('document')) return '📘';
-    if (mimeType.includes('sheet') || mimeType.includes('excel')) return '📊';
-    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return '📙';
-    if (mimeType.includes('image')) return '🖼️';
-    if (mimeType.includes('video')) return '🎥';
-    if (mimeType.includes('zip') || mimeType.includes('rar')) return '🗜️';
+  // Updated to check file extension instead of mimeType
+  const getFileIcon = (fileName = '') => {
+    const name = fileName.toLowerCase();
+    if (name.includes('.pdf')) return '📕';
+    if (name.includes('.doc') || name.includes('.docx')) return '📘';
+    if (name.includes('.xls') || name.includes('.csv')) return '📊';
+    if (name.includes('.ppt')) return '📙';
+    if (name.match(/\.(jpeg|jpg|png|gif|svg)$/)) return '🖼️';
+    if (name.match(/\.(mp4|webm|avi|mov)$/)) return '🎥';
+    if (name.match(/\.(zip|rar|tar|gz)$/)) return '🗜️';
     return '📄';
   };
 
@@ -157,23 +142,33 @@ const StudentMaterialAccess = () => {
             {/* Download Card */}
             <Card className="action-card action-card--download">
               <div className="action-card-icon">⬇️</div>
-              <h3 className="action-card-title">Download Files</h3>
+              <h3 className="action-card-title">Access Files</h3>
               <p className="action-card-description">
-                Download files directly to your device for offline access.
+                Double-click a file to preview, or use the buttons below.
               </p>
               {material.files && material.files.length > 0 ? (
                 <div className="download-files-list">
                   {material.files.map(f => (
-                    <div key={f._id} className="download-file-item">
-                      <span className="file-icon">{getFileIcon(f.mimeType)}</span>
+                    <div 
+                      key={f._id} 
+                      className="download-file-item" 
+                      onDoubleClick={() => handlePreview(f.previewLink)}
+                      title="Double-click to preview"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <span className="file-icon">{getFileIcon(f.fileName)}</span>
                       <div className="file-info">
-                        <div className="file-name">{f.name}</div>
-                        <div className="file-size">{formatFileSize(f.size)}</div>
+                        <div className="file-name">{f.fileName}</div>
+                        {/* Removed file size here since it is no longer in the schema */}
                       </div>
-                      <Button size="sm" onClick={() => handleDownload(f._id, f.name)}
-                        disabled={downloading === f._id}>
-                        {downloading === f._id ? '⏳' : '⬇️'}
-                      </Button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handlePreview(f.previewLink); }}>
+                          👁️
+                        </Button>
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); handleDownload(f.downloadLink); }}>
+                          ⬇️
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
