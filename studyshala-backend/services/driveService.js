@@ -16,18 +16,28 @@ class DriveService {
       });
     }
 
-    this.drive = google.drive({ version: 'v3', auth: this.oauth2Client });
+    this.drive = google.drive({
+      version: 'v3',
+      auth: this.oauth2Client
+    });
+
     this.enabled = !!process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
   }
 
-  // ── Folder operations ───────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // Folder operations
+  // ─────────────────────────────────────────────
+
   async createFolder(folderName, parentFolderId = null) {
     try {
       const fileMetadata = {
         name: folderName,
         mimeType: 'application/vnd.google-apps.folder'
       };
-      if (parentFolderId) fileMetadata.parents = [parentFolderId];
+
+      if (parentFolderId) {
+        fileMetadata.parents = [parentFolderId];
+      }
 
       const res = await this.drive.files.create({
         resource: fileMetadata,
@@ -35,23 +45,13 @@ class DriveService {
       });
 
       logger.info(`Folder created: ${folderName} (${res.data.id})`);
-      return { folderId: res.data.id, folderUrl: res.data.webViewLink };
+
+      return {
+        folderId: res.data.id,
+        folderUrl: res.data.webViewLink
+      };
     } catch (error) {
       logger.error(`Create folder error: ${error.message}`);
-      throw error;
-    }
-  }
-
-  async setFolderPermissions(folderId, permission = 'view') {
-    try {
-      const role = { view: 'reader', comment: 'commenter', edit: 'writer' }[permission] || 'reader';
-      await this.drive.permissions.create({
-        fileId: folderId,
-        requestBody: { role, type: 'anyone' }
-      });
-      logger.info(`Permissions set: ${folderId} → ${permission}`);
-    } catch (error) {
-      logger.error(`Set permissions error: ${error.message}`);
       throw error;
     }
   }
@@ -66,15 +66,16 @@ class DriveService {
     }
   }
 
-  // ── File operations ──────────────────────────────────────────────────────
-  
+  // ─────────────────────────────────────────────
+  // File operations
+  // ─────────────────────────────────────────────
+
   /**
-   * Upload a file to Drive
-   * @param {Object} fileBuffer - File buffer from multer
-   * @param {string} fileName - Name to save as
-   * @param {string} mimeType - MIME type
-   * @param {string} folderId - Parent folder ID (optional)
-   * @returns {Promise<{fileId: string, webViewLink: string}>}
+   * Upload a file to Google Drive
+   * This version:
+   * - Uploads the file
+   * - Makes it readable by anyone
+   * - Returns preview + download links
    */
   async uploadFile(fileBuffer, fileName, mimeType, folderId = null) {
     try {
@@ -82,27 +83,44 @@ class DriveService {
       bufferStream.end(fileBuffer);
 
       const fileMetadata = { name: fileName };
-      if (folderId) fileMetadata.parents = [folderId];
+      if (folderId) {
+        fileMetadata.parents = [folderId];
+      }
 
-      const media = { mimeType, body: bufferStream };
+      const media = {
+        mimeType,
+        body: bufferStream
+      };
 
       const res = await this.drive.files.create({
         resource: fileMetadata,
         media,
-        fields: 'id, name, webViewLink, size'
+        fields: 'id, name, size'
       });
 
-      // Make file publicly accessible
+      const fileId = res.data.id;
+
+      // ✅ CRITICAL FIX: Make file readable by anyone
       await this.drive.permissions.create({
-        fileId: res.data.id,
-        requestBody: { role: 'reader', type: 'anyone' }
+        fileId,
+        requestBody: {
+          role: 'reader',
+          type: 'anyone'
+        }
       });
 
-      logger.info(`File uploaded: ${fileName} (${res.data.id})`);
+      // ✅ Correct Google Drive links
+      const previewLink = `https://drive.google.com/file/d/${fileId}/preview`;
+      const downloadLink = `https://drive.google.com/uc?id=${fileId}&export=download`;
+
+      logger.info(`File uploaded: ${fileName} (${fileId})`);
+
       return {
-        fileId: res.data.id,
-        webViewLink: res.data.webViewLink,
-        size: parseInt(res.data.size || 0)
+        fileId,
+        fileName,
+        size: parseInt(res.data.size || 0, 10),
+        previewLink,
+        downloadLink
       };
     } catch (error) {
       logger.error(`Upload file error: ${error.message}`);
@@ -111,9 +129,8 @@ class DriveService {
   }
 
   /**
-   * Download a file from Drive as a buffer
-   * @param {string} fileId - Drive file ID
-   * @returns {Promise<Buffer>}
+   * Download file as buffer (optional use)
+   * NOTE: frontend should prefer downloadLink instead
    */
   async downloadFile(fileId) {
     try {
@@ -121,6 +138,7 @@ class DriveService {
         { fileId, alt: 'media' },
         { responseType: 'arraybuffer' }
       );
+
       return Buffer.from(res.data);
     } catch (error) {
       logger.error(`Download file error: ${error.message}`);
@@ -128,17 +146,13 @@ class DriveService {
     }
   }
 
-  /**
-   * Get file metadata
-   * @param {string} fileId - Drive file ID
-   * @returns {Promise<Object>}
-   */
   async getFileMetadata(fileId) {
     try {
       const res = await this.drive.files.get({
         fileId,
         fields: 'id, name, mimeType, size, createdTime, modifiedTime'
       });
+
       return res.data;
     } catch (error) {
       logger.error(`Get file metadata error: ${error.message}`);
@@ -146,11 +160,6 @@ class DriveService {
     }
   }
 
-  /**
-   * List files in a folder
-   * @param {string} folderId - Drive folder ID
-   * @returns {Promise<Array>}
-   */
   async listFiles(folderId) {
     try {
       const res = await this.drive.files.list({
@@ -158,6 +167,7 @@ class DriveService {
         fields: 'files(id, name, mimeType, size, createdTime, modifiedTime)',
         orderBy: 'createdTime desc'
       });
+
       return res.data.files || [];
     } catch (error) {
       logger.error(`List files error: ${error.message}`);
@@ -165,10 +175,6 @@ class DriveService {
     }
   }
 
-  /**
-   * Delete a file
-   * @param {string} fileId - Drive file ID
-   */
   async deleteFile(fileId) {
     try {
       await this.drive.files.delete({ fileId });
