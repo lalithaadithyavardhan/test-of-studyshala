@@ -52,11 +52,34 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 /**
- * 2. UPDATED CORS
- * Uses your environment variable and allows credentials.
+ * 2. UPDATED CORS (Multi-Origin Support)
+ * Safely accepts requests from local dev, your main domain, and your www domain.
  */
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://studyshala.dev',
+  'https://www.studyshala.dev'
+];
+
+// Add the environment variable if it exists and isn't already in the list
+if (process.env.FRONTEND_URL) {
+  const envUrl = process.env.FRONTEND_URL.replace(/\/$/, ''); // removes trailing slash if present
+  if (!allowedOrigins.includes(envUrl)) {
+    allowedOrigins.push(envUrl);
+  }
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps, curl, or server-to-server)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy violation: origin ' + origin + ' is not allowed'));
+    }
+  },
   credentials: true
 }));
 
