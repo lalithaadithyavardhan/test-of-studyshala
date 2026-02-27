@@ -11,25 +11,46 @@ const StudentMaterialAccess = () => {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   const [material, setMaterial] = useState(location.state?.material || null);
+  const [loading, setLoading] = useState(!location.state?.material);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  /* ---------- FETCH MATERIAL IF PAGE REFRESHED ---------- */
+  useEffect(() => {
+    if (!material) {
+      fetchMaterial();
+    }
+  }, [id]);
+
+  const fetchMaterial = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/student/material/${id}`);
+      setMaterial(res.data.material);
+    } catch {
+      setError('Failed to load material');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ---------- SAVE MATERIAL ---------- */
   const handleSave = async () => {
     setSaving(true);
     setError('');
 
     try {
       const res = await api.post('/student/save-material', { materialId: id });
-      
-      if (res.data.alreadySaved) {
-        setSuccess('✅ Already saved! Redirecting to My Materials...');
-      } else {
-        setSuccess('✅ Material saved! Redirecting to My Materials...');
-      }
-      
+
+      setSuccess(
+        res.data.alreadySaved
+          ? 'Already saved. Redirecting...'
+          : 'Material saved successfully. Redirecting...'
+      );
+
       setTimeout(() => navigate('/student/saved-materials'), 2000);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save material');
@@ -38,51 +59,68 @@ const StudentMaterialAccess = () => {
     }
   };
 
-  // Completely simplified: No manual blob fetching anymore!
-  const handleDownload = (downloadLink) => {
-    if (downloadLink) {
-      window.open(downloadLink, "_blank");
-      setSuccess('✅ Download started');
-      setTimeout(() => setSuccess(''), 3000);
-    } else {
-      setError('Download link is not available.');
+  /* ---------- PREVIEW & DOWNLOAD ---------- */
+  const handlePreview = (file) => {
+    const url =
+      file.previewLink ||
+      `${import.meta.env.VITE_API_BASE_URL}/files/preview/${file._id}`;
+
+    if (!url) {
+      setError('Preview is not available for this file');
+      return;
     }
+    window.open(url, '_blank');
   };
 
-  const handlePreview = (previewLink) => {
-    if (previewLink) {
-      window.open(previewLink, "_blank");
-    } else {
-      setError('Preview link is not available.');
+  const handleDownload = (file) => {
+    const url =
+      file.downloadLink ||
+      `${import.meta.env.VITE_API_BASE_URL}/files/download/${file._id}`;
+
+    if (!url) {
+      setError('Download is not available for this file');
+      return;
     }
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.fileName || 'file';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
-  // Updated to check file extension instead of mimeType
+  /* ---------- FILE ICON ---------- */
   const getFileIcon = (fileName = '') => {
     const name = fileName.toLowerCase();
-    if (name.includes('.pdf')) return '📕';
-    if (name.includes('.doc') || name.includes('.docx')) return '📘';
-    if (name.includes('.xls') || name.includes('.csv')) return '📊';
-    if (name.includes('.ppt')) return '📙';
+    if (name.endsWith('.pdf')) return '📕';
+    if (name.match(/\.(doc|docx)$/)) return '📘';
+    if (name.match(/\.(xls|xlsx|csv)$/)) return '📊';
+    if (name.match(/\.(ppt|pptx)$/)) return '📙';
     if (name.match(/\.(jpeg|jpg|png|gif|svg)$/)) return '🖼️';
     if (name.match(/\.(mp4|webm|avi|mov)$/)) return '🎥';
-    if (name.match(/\.(zip|rar|tar|gz)$/)) return '🗜️';
+    if (name.match(/\.(zip|rar|7z|tar|gz)$/)) return '🗜️';
     return '📄';
   };
 
-  if (!material) {
+  /* ---------- LOADING STATE ---------- */
+  if (loading) {
     return (
       <div className="app-container">
         <Sidebar role="student" />
         <div className="main-content">
           <Navbar />
           <div className="page-container">
-            <div className="loading-container"><div className="spinner"></div></div>
+            <div className="loading-container">
+              <div className="spinner"></div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
+
+  if (!material) return null;
 
   return (
     <div className="app-container">
@@ -90,99 +128,79 @@ const StudentMaterialAccess = () => {
       <div className="main-content">
         <Navbar />
         <div className="page-container">
-          
-          {/* Material Info Card */}
-          <Card title="📖 Material Details">
+
+          <Card title="Material Details">
             <div className="material-access-info">
-              <div className="info-row">
-                <span className="info-label">Subject</span>
-                <span className="info-value">{material.subjectName}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Faculty</span>
-                <span className="info-value">{material.facultyName}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Department</span>
-                <span className="info-value">{material.department}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Semester</span>
-                <span className="info-value">Semester {material.semester}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Files</span>
-                <span className="info-value">{material.fileCount} file(s)</span>
-              </div>
+              <div><strong>Subject:</strong> {material.subjectName}</div>
+              <div><strong>Faculty:</strong> {material.facultyName}</div>
+              <div><strong>Department:</strong> {material.department}</div>
+              <div><strong>Semester:</strong> {material.semester}</div>
+              <div><strong>Files:</strong> {material.files?.length || 0}</div>
             </div>
           </Card>
 
-          {error && <div className="alert alert-error" style={{marginTop:'1rem'}}>{error}</div>}
-          {success && <div className="alert alert-success" style={{marginTop:'1rem'}}>{success}</div>}
+          {error && <div className="alert alert-error">{error}</div>}
+          {success && <div className="alert alert-success">{success}</div>}
 
-          {/* Action Cards */}
           <div className="action-cards-grid">
-            {/* Save Card */}
-            <Card className="action-card action-card--save">
-              <div className="action-card-icon">💾</div>
-              <h3 className="action-card-title">Save to My Materials</h3>
-              <p className="action-card-description">
-                Bookmark this material for permanent access. You won't need to enter the code again.
-              </p>
-              <ul className="action-card-benefits">
-                <li>✓ Access anytime from "My Materials"</li>
-                <li>✓ No code required again</li>
-                <li>✓ Download files whenever needed</li>
-              </ul>
-              <Button variant="primary" onClick={handleSave} disabled={saving} className="w-full">
-                {saving ? '⏳ Saving…' : '💾 Save Material'}
+
+            <Card>
+              <h3>Save to My Materials</h3>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Material'}
               </Button>
             </Card>
 
-            {/* Download Card */}
-            <Card className="action-card action-card--download">
-              <div className="action-card-icon">⬇️</div>
-              <h3 className="action-card-title">Access Files</h3>
-              <p className="action-card-description">
-                Double-click a file to preview, or use the buttons below.
-              </p>
-              {material.files && material.files.length > 0 ? (
-                <div className="download-files-list">
-                  {material.files.map(f => (
-                    <div 
-                      key={f._id} 
-                      className="download-file-item" 
-                      onDoubleClick={() => handlePreview(f.previewLink)}
-                      title="Double-click to preview"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <span className="file-icon">{getFileIcon(f.fileName)}</span>
-                      <div className="file-info">
-                        <div className="file-name">{f.fileName}</div>
-                        {/* Removed file size here since it is no longer in the schema */}
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handlePreview(f.previewLink); }}>
-                          👁️
-                        </Button>
-                        <Button size="sm" onClick={(e) => { e.stopPropagation(); handleDownload(f.downloadLink); }}>
-                          ⬇️
-                        </Button>
-                      </div>
+            <Card>
+              <h3>Files</h3>
+
+              {material.files?.length > 0 ? (
+                material.files.map(file => (
+                  <div
+                    key={file._id}
+                    className="download-file-item"
+                    onDoubleClick={() => handlePreview(file)}
+                  >
+                    <span>{getFileIcon(file.fileName)}</span>
+                    <span>{file.fileName}</span>
+
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreview(file);
+                        }}
+                      >
+                        Preview
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(file);
+                        }}
+                      >
+                        Download
+                      </Button>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))
               ) : (
-                <p className="empty-text">No files available yet</p>
+                <p>No files available</p>
               )}
             </Card>
+
           </div>
 
-          <div style={{textAlign:'center',marginTop:'2rem'}}>
+          <div style={{ textAlign: 'center', marginTop: '2rem' }}>
             <Button variant="secondary" onClick={() => navigate('/student/enter-code')}>
-              ← Back to Enter Code
+              Back
             </Button>
           </div>
+
         </div>
       </div>
     </div>
