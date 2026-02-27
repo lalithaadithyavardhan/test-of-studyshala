@@ -16,7 +16,6 @@ const StudentSavedMaterials = () => {
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [files, setFiles] = useState([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
-  const [downloading, setDownloading] = useState(null);
 
   useEffect(() => { fetchMaterials(); }, []);
 
@@ -48,26 +47,19 @@ const StudentSavedMaterials = () => {
     }
   };
 
-  const handleDownload = async (fileId, fileName) => {
-    setDownloading(fileId);
-    try {
-      const res = await api.get(
-        `/student/materials/${selectedMaterial._id}/files/${fileId}/download`,
-        { responseType: 'blob' }
-      );
+  const handleDownload = (downloadLink) => {
+    if (downloadLink) {
+      window.open(downloadLink, "_blank");
+    } else {
+      setError('Download link is not available.');
+    }
+  };
 
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Download failed');
-    } finally {
-      setDownloading(null);
+  const handlePreview = (previewLink) => {
+    if (previewLink) {
+      window.open(previewLink, "_blank");
+    } else {
+      setError('Preview link is not available.');
     }
   };
 
@@ -81,22 +73,16 @@ const StudentSavedMaterials = () => {
     }
   };
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (mimeType) => {
-    if (mimeType.includes('pdf')) return '📕';
-    if (mimeType.includes('word')) return '📘';
-    if (mimeType.includes('sheet')) return '📊';
-    if (mimeType.includes('presentation')) return '📙';
-    if (mimeType.includes('image')) return '🖼️';
-    if (mimeType.includes('video')) return '🎥';
-    if (mimeType.includes('zip')) return '🗜️';
+  // Updated to check file extension instead of mimeType
+  const getFileIcon = (fileName = '') => {
+    const name = fileName.toLowerCase();
+    if (name.includes('.pdf')) return '📕';
+    if (name.includes('.doc') || name.includes('.docx')) return '📘';
+    if (name.includes('.xls') || name.includes('.csv')) return '📊';
+    if (name.includes('.ppt')) return '📙';
+    if (name.match(/\.(jpeg|jpg|png|gif|svg)$/)) return '🖼️';
+    if (name.match(/\.(mp4|webm|avi|mov)$/)) return '🎥';
+    if (name.match(/\.(zip|rar|tar|gz)$/)) return '🗜️';
     return '📄';
   };
 
@@ -180,19 +166,28 @@ const StudentSavedMaterials = () => {
         ) : (
           <div className="file-list">
             {files.map(f => (
-              <div key={f._id} className="file-item">
-                <div className="file-item-icon">{getFileIcon(f.mimeType)}</div>
+              <div 
+                key={f._id} 
+                className="file-item" 
+                onDoubleClick={() => handlePreview(f.previewLink)}
+                title="Double-click to preview"
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="file-item-icon">{getFileIcon(f.fileName)}</div>
                 <div className="file-item-info">
-                  <div className="file-item-name">{f.name}</div>
-                  <div className="file-item-meta">
-                    {formatFileSize(f.size)} • {new Date(f.uploadedAt).toLocaleDateString()}
-                  </div>
+                  <div className="file-item-name">{f.fileName}</div>
+                  {/* Removed size and upload metadata since it is no longer in schema */}
                 </div>
-                <Button variant="primary" size="sm"
-                  onClick={() => handleDownload(f._id, f.name)}
-                  disabled={downloading === f._id}>
-                  {downloading === f._id ? '⏳' : '⬇️'}
-                </Button>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handlePreview(f.previewLink); }}>
+                    👁️
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); handleDownload(f.downloadLink); }}>
+                    ⬇️
+                  </Button>
+                </div>
+
               </div>
             ))}
           </div>
