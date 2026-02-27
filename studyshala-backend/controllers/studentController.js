@@ -52,15 +52,16 @@ const validateAccessCode = async (req, res) => {
         semester: folder.semester,
         facultyName: folder.facultyName,
         accessCode: folder.accessCode || folder.departmentCode,
-        permission: folder.permission,
+        // REMOVED permission
         fileCount: folder.files?.length || 0,
         createdAt: folder.createdAt,
+        // UPDATED to return newly structured file links
         files: folder.files.map(f => ({
           _id: f._id,
-          name: f.name,
-          mimeType: f.mimeType,
-          size: f.size,
-          uploadedAt: f.uploadedAt
+          fileId: f.fileId,
+          fileName: f.fileName,
+          previewLink: f.previewLink,
+          downloadLink: f.downloadLink
         }))
       }
     });
@@ -207,15 +208,16 @@ const getMaterialFiles = async (req, res) => {
         subjectName: folder.subjectName,
         department: folder.department,
         semester: folder.semester,
-        facultyName: folder.facultyName,
-        permission: folder.permission
+        facultyName: folder.facultyName
+        // REMOVED permission
       },
+      // UPDATED to return newly structured file links
       files: folder.files.map(f => ({
         _id: f._id,
-        name: f.name,
-        mimeType: f.mimeType,
-        size: f.size,
-        uploadedAt: f.uploadedAt
+        fileId: f.fileId,
+        fileName: f.fileName,
+        previewLink: f.previewLink,
+        downloadLink: f.downloadLink
       }))
     });
   } catch (error) {
@@ -247,17 +249,19 @@ const downloadFile = async (req, res) => {
       return res.status(404).json({ message: 'File not found' });
     }
 
-    if (file.driveFileId && driveService.enabled) {
+    // UPDATED to use file.fileId instead of file.driveFileId
+    if (file.fileId && driveService.enabled) {
       try {
-        const buffer = await driveService.downloadFile(file.driveFileId);
+        const buffer = await driveService.downloadFile(file.fileId);
 
+        // REMOVED Content-Type since mimeType is no longer stored
+        // UPDATED to use file.fileName instead of file.name
         res.set({
-          'Content-Type': file.mimeType,
-          'Content-Disposition': `attachment; filename="${encodeURIComponent(file.name)}"`,
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(file.fileName)}"`,
           'Content-Length': buffer.length
         });
 
-        await logAction(req, 'DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.name });
+        await logAction(req, 'DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.fileName });
         return res.send(buffer);
       } catch (driveErr) {
         logger.error(`Drive download failed: ${driveErr.message}`);
