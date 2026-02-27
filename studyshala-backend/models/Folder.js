@@ -1,13 +1,11 @@
 const mongoose = require('mongoose');
 
+// Updated to include only the requested fields and links
 const fileSchema = new mongoose.Schema({
-  name:         { type: String, required: true },
-  originalName: { type: String, required: true },
-  mimeType:     { type: String, required: true },
-  size:         { type: Number, required: true },
-  driveFileId:  { type: String },
-  uploadedAt:   { type: Date, default: Date.now },
-  uploadedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  fileId:       { type: String },
+  fileName:     { type: String },
+  previewLink:  { type: String },
+  downloadLink: { type: String }
 });
 
 const folderSchema = new mongoose.Schema({
@@ -24,11 +22,9 @@ const folderSchema = new mongoose.Schema({
   semester:       { type: String, required: true },
   accessCode:     { type: String, index: true },
   departmentCode: { type: String },
-  permission: {
-    type: String,
-    enum: ['view', 'comment', 'edit'],
-    default: 'view'
-  },
+  
+  // NOTE: The permission field has been completely removed
+  
   files:          [fileSchema],
   driveUrl:       { type: String, default: '#' },
   driveFolderId:  { type: String, default: 'local' },
