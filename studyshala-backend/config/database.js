@@ -3,14 +3,13 @@ const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
+    // FIXED: Removed deprecated options (useNewUrlParser, useUnifiedTopology)
+    // Mongoose 6+ no longer requires them and will throw warnings if included.
+    const conn = await mongoose.connect(process.env.MONGO_URI);
+    
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    logger.error(`Error: ${error.message}`);
+    logger.error(`MongoDB connection error: ${error.message}`);
     process.exit(1);
   }
 };
