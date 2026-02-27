@@ -22,8 +22,9 @@ passport.use(
           ? profile.photos[0].value 
           : '';
 
+        // 👇 UPDATED: Read req.oauthRole first to capture the role attached in authRoutes.js
         // 2. Strictly validate the requested role to prevent CSRF token pollution
-        const rawRole = req.query.role || req.query.state;
+        const rawRole = req.oauthRole || req.query.role || req.query.state;
         let chosenRole = ['student', 'faculty', 'admin'].includes(rawRole) 
           ? rawRole 
           : 'student';
