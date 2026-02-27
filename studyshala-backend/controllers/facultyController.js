@@ -29,7 +29,8 @@ const getFolders = async (req, res) => {
 
 const createFolder = async (req, res) => {
   try {
-    const { department, semester, subjectName, facultyName, permission } = req.body;
+    // REMOVED permission from destructured req.body
+    const { department, semester, subjectName, facultyName } = req.body;
 
     if (!department || !semester || !subjectName || !facultyName) {
       return res.status(400).json({ 
@@ -48,7 +49,7 @@ const createFolder = async (req, res) => {
         const { folderId, folderUrl } = await driveService.createFolder(folderName);
         driveUrl = folderUrl;
         driveFolderId = folderId;
-        await driveService.setFolderPermissions(folderId, permission || 'view');
+        // REMOVED driveService.setFolderPermissions call completely
       } catch (driveErr) {
         logger.warn(`Drive folder creation skipped: ${driveErr.message}`);
       }
@@ -62,7 +63,7 @@ const createFolder = async (req, res) => {
       semester,
       accessCode,
       departmentCode: accessCode,
-      permission: permission || 'view',
+      // REMOVED permission field
       driveUrl,
       driveFolderId,
       files: []
@@ -97,32 +98,34 @@ const uploadFiles = async (req, res) => {
     const uploadedFiles = [];
 
     for (const file of req.files) {
-      let driveFileId = null;
-      let fileSize = file.size;
+      let fileId = 'local-' + Date.now() + '-' + Math.round(Math.random() * 1E9);
+      let previewLink = '';
+      let downloadLink = '';
 
       if (driveService.enabled && folder.driveFolderId && !folder.driveFolderId.startsWith('local')) {
         try {
+          // Assuming driveService.uploadFile now returns these links
           const driveResult = await driveService.uploadFile(
             file.buffer,
             file.originalname,
             file.mimetype,
             folder.driveFolderId
           );
-          driveFileId = driveResult.fileId;
-          fileSize = driveResult.size;
+          
+          fileId = driveResult.fileId || fileId;
+          previewLink = driveResult.previewLink || '';
+          downloadLink = driveResult.downloadLink || '';
         } catch (driveErr) {
           logger.warn(`Drive upload failed for ${file.originalname}: ${driveErr.message}`);
         }
       }
 
+      // Updated to strictly match the new Folder schema
       const fileDoc = {
-        name: file.originalname,
-        originalName: file.originalname,
-        mimeType: file.mimetype,
-        size: fileSize,
-        driveFileId,
-        uploadedAt: new Date(),
-        uploadedBy: req.user._id
+        fileId: fileId,
+        fileName: file.originalname,
+        previewLink: previewLink,
+        downloadLink: downloadLink
       };
 
       folder.files.push(fileDoc);
@@ -133,7 +136,8 @@ const uploadFiles = async (req, res) => {
 
     await logAction(req, 'UPLOAD_FILES', 'Folder', folder._id, {
       fileCount: uploadedFiles.length,
-      totalSize: uploadedFiles.reduce((sum, f) => sum + f.size, 0)
+      // Calculate totalSize from req.files since it's no longer stored in fileDoc
+      totalSize: req.files.reduce((sum, f) => sum + f.size, 0)
     });
 
     logger.info(`${uploadedFiles.length} files uploaded to ${folder.subjectName} by ${req.user.email}`);
@@ -163,9 +167,10 @@ const deleteFile = async (req, res) => {
 
     const file = folder.files[fileIndex];
 
-    if (file.driveFileId && driveService.enabled) {
+    // Updated to use the new `fileId` property instead of `driveFileId`
+    if (file.fileId && !file.fileId.startsWith('local') && driveService.enabled) {
       try {
-        await driveService.deleteFile(file.driveFileId);
+        await driveService.deleteFile(file.fileId);
       } catch (driveErr) {
         logger.warn(`Drive file delete failed: ${driveErr.message}`);
       }
@@ -174,7 +179,8 @@ const deleteFile = async (req, res) => {
     folder.files.splice(fileIndex, 1);
     await folder.save();
 
-    await logAction(req, 'DELETE_FILE', 'Folder', folder._id, { fileName: file.name });
+    // Updated to use `fileName` instead of `name`
+    await logAction(req, 'DELETE_FILE', 'Folder', folder._id, { fileName: file.fileName });
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
     logger.error(`Delete file error: ${error.message}`);
