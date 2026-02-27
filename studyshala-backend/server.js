@@ -12,10 +12,9 @@ const session    = require('express-session');
 const passport   = require('./config/passport');
 const connectDB  = require('./config/database');
 const logger     = require('./utils/logger');
-// ADDED: Rate limiting module to prevent abuse
 const rateLimit  = require('express-rate-limit');
-// ADDED: Crypto for generating safe temporary local secrets
 const crypto     = require('crypto');
+const MongoStore = require('connect-mongo'); // Added for production sessions
 
 // Routes
 const authRoutes    = require('./routes/authRoutes');
@@ -38,7 +37,7 @@ connectDB();
 // ── Security & Middleware ───────────────────────────────────────────────────
 
 /**
- * FIXED: Added Rate Limiting
+ * Rate Limiting
  * Protects the API routes from brute force and denial-of-service (DoS) attacks.
  * Limits each IP to 200 requests per 15-minute window.
  */
@@ -87,10 +86,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * 3. UPDATED SESSION CONFIGURATION
- * FIXED: Removed the insecure hardcoded fallback string.
- * It will now securely crash in production if a secret isn't provided, 
- * or generate a secure random string for local development.
+ * 3. UPDATED SESSION CONFIGURATION (Render Friendly)
+ * Uses MongoDB to store sessions so users don't get logged out on server restart!
  */
 let sessionSecret = process.env.SESSION_SECRET;
 
@@ -109,6 +106,12 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   proxy: true, 
+  // Store sessions in MongoDB
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60 // Sessions expire in 24 hours
+  }),
   cookie: {
     // secure: true is required for HTTPS on Render
     secure: process.env.NODE_ENV === 'production',
@@ -140,7 +143,6 @@ app.use('/api/admin',   adminRoutes);
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
 
 app.use((err, req, res, next) => {
-  // Added a fallback for err.message in case the error thrown is a raw string/object
   logger.error(err.message || 'An unknown error occurred');
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
@@ -148,8 +150,13 @@ app.use((err, req, res, next) => {
 // ── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`\n🚀  Server running at http://localhost:${PORT}`);
-  console.log(`❤️   Health check:  http://localhost:${PORT}/health\n`);
+  // Environment-aware console logs
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://test-of-studyshala.onrender.com' 
+    : `http://localhost:${PORT}`;
+
+  console.log(`\n🚀  Server running at ${baseUrl}`);
+  console.log(`❤️   Health check:  ${baseUrl}/health\n`);
 });
 
 process.on('unhandledRejection', (err) => logger.error(`Unhandled Rejection: ${err.message}`));
