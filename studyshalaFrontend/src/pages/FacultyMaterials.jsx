@@ -80,22 +80,16 @@ const FacultyMaterials = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (mimeType) => {
-    if (mimeType.includes('pdf')) return '📕';
-    if (mimeType.includes('word')) return '📘';
-    if (mimeType.includes('sheet')) return '📊';
-    if (mimeType.includes('presentation')) return '📙';
-    if (mimeType.includes('image')) return '🖼️';
-    if (mimeType.includes('video')) return '🎥';
-    if (mimeType.includes('zip')) return '🗜️';
+  // Updated to check file extension instead of mimeType
+  const getFileIcon = (fileName = '') => {
+    const name = fileName.toLowerCase();
+    if (name.includes('.pdf')) return '📕';
+    if (name.includes('.doc') || name.includes('.docx')) return '📘';
+    if (name.includes('.xls') || name.includes('.csv')) return '📊';
+    if (name.includes('.ppt')) return '📙';
+    if (name.match(/\.(jpeg|jpg|png|gif|svg)$/)) return '🖼️';
+    if (name.match(/\.(mp4|webm|avi|mov)$/)) return '🎥';
+    if (name.match(/\.(zip|rar|tar|gz)$/)) return '🗜️';
     return '📄';
   };
 
@@ -168,7 +162,7 @@ const FacultyMaterials = () => {
                     </div>
                     <div className="faculty-material-footer">
                       <Button variant="primary" size="sm" onClick={() => openFiles(m)}>
-                        📂 Preview ({fileCount})
+                        📂 Manage ({fileCount})
                       </Button>
                       <Button variant="danger" size="sm" onClick={() => handleDelete(m._id)}>
                         Delete
@@ -195,18 +189,27 @@ const FacultyMaterials = () => {
           <div className="file-list">
             {files.map(f => (
               <div key={f._id} className="file-item">
-                <div className="file-item-icon">{getFileIcon(f.mimeType)}</div>
+                <div className="file-item-icon">{getFileIcon(f.fileName)}</div>
                 <div className="file-item-info">
-                  <div className="file-item-name">{f.name}</div>
-                  <div className="file-item-meta">
-                    {formatFileSize(f.size)} • {new Date(f.uploadedAt).toLocaleDateString()}
-                  </div>
+                  <div className="file-item-name">{f.fileName}</div>
+                  {/* Removed size and uploadAt since they are no longer in schema */}
                 </div>
-                <Button variant="primary" size="sm"
-                  onClick={() => handleDownload(f._id, f.name)}
-                  disabled={downloading === f._id}>
-                  {downloading === f._id ? '⏳' : '⬇️'}
-                </Button>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {/* New Direct Preview Button */}
+                  {f.previewLink && (
+                    <Button variant="outline" size="sm" onClick={() => window.open(f.previewLink, '_blank')}>
+                      👁️ Preview
+                    </Button>
+                  )}
+                  
+                  {/* Keep backend download, but use f._id and f.fileName */}
+                  <Button variant="primary" size="sm"
+                    onClick={() => handleDownload(f._id, f.fileName)}
+                    disabled={downloading === f._id}>
+                    {downloading === f._id ? '⏳' : '⬇️'}
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
