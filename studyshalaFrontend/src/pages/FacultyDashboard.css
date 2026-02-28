@@ -1,5 +1,5 @@
 /* ================================
-   Faculty Dashboard Layout
+   Faculty Dashboard Page Container
 ================================ */
 
 .page-container {
@@ -8,24 +8,24 @@
 
 .page-container h1 {
   margin-bottom: 20px;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
 }
 
 /* ================================
-   Alerts
+   Alert Messages
 ================================ */
 
 .alert {
-  padding: 12px 16px;
-  margin-bottom: 16px;
+  padding: 10px 14px;
+  margin-bottom: 15px;
   border-radius: 6px;
-  font-weight: 500;
+  font-size: 14px;
 }
 
 .alert-error {
   background-color: #fee2e2;
-  color: #991b1b;
+  color: #b91c1c;
 }
 
 .alert-success {
@@ -34,27 +34,11 @@
 }
 
 /* ================================
-   Card (Folder container)
+   Card Styling (Material Cards)
 ================================ */
 
-.material-card,
 .card {
-  margin-bottom: 20px;
-}
-
-/* ================================
-   Folder Header
-================================ */
-
-.card h3 {
-  font-size: 20px;
-  margin-bottom: 6px;
-}
-
-.card p {
-  font-size: 14px;
-  color: #555;
-  margin-bottom: 12px;
+  margin-top: 16px;
 }
 
 /* ================================
@@ -72,21 +56,24 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  margin-bottom: 8px;
-  background: #f9fafb;
-  border-radius: 6px;
   border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background-color: #fafafa;
+}
+
+.file-item:hover {
+  background-color: #f3f4f6;
 }
 
 /* File name */
 .file-item span {
   font-size: 14px;
   font-weight: 500;
-  color: #111827;
 }
 
 /* ================================
-   File Action Buttons
+   File Actions (Preview + Download buttons)
 ================================ */
 
 .file-actions {
@@ -95,26 +82,24 @@
 }
 
 /* ================================
-   Upload Input
+   Upload Modal File Input
 ================================ */
 
 input[type="file"] {
   width: 100%;
   padding: 10px;
-  margin-top: 10px;
-  border: 1px dashed #ccc;
+  border: 1px dashed #d1d5db;
   border-radius: 6px;
-  cursor: pointer;
   background-color: #fafafa;
+  cursor: pointer;
 }
 
 input[type="file"]:hover {
-  border-color: #2563eb;
-  background-color: #eff6ff;
+  background-color: #f3f4f6;
 }
 
 /* ================================
-   Buttons spacing
+   Button spacing fixes
 ================================ */
 
 button {
@@ -122,21 +107,20 @@ button {
 }
 
 /* ================================
-   Responsive
+   Responsive Fix
 ================================ */
 
 @media (max-width: 768px) {
+
   .file-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 10px;
   }
 
   .file-actions {
     width: 100%;
+    justify-content: flex-end;
   }
 
-  .file-actions button {
-    flex: 1;
-  }
 }
