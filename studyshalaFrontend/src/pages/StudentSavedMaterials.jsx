@@ -2,8 +2,7 @@
  * StudentSavedMaterials
  * =====================
  * Lists all materials a student has saved.
- * "Browse Files" opens the full-screen FileManager.
- * Files are fetched on demand (with previewUrl + downloadUrl) when manager opens.
+ * "Browse Files" fetches files fresh (with downloadUrl) before opening FileManager.
  */
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
@@ -38,13 +37,13 @@ const StudentSavedMaterials = () => {
     }
   };
 
+  // FIX: Always fetch files fresh so downloadUrl/previewUrl are present
   const openFileManager = async (material) => {
     setFmName(material.subjectName);
     setFmFiles([]);
-    setFmOpen(true);
     setFmLoading(true);
+    setFmOpen(true);
     try {
-      // API returns files with previewUrl + downloadUrl included
       const res = await api.get(`/student/materials/${material._id}/files`);
       setFmFiles(res.data.files || []);
     } catch (err) {
@@ -118,7 +117,7 @@ const StudentSavedMaterials = () => {
         </div>
       </div>
 
-      {/* Loading spinner while fetching file list */}
+      {/* Loading overlay while fetching files */}
       {fmOpen && fmLoading && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
