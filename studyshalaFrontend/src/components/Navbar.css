@@ -1,0 +1,243 @@
+.navbar {
+  background-color: var(--surface-light);
+  border-bottom: 1px solid var(--border-light);
+  padding: 0 var(--spacing-xl);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+
+body.dark-mode .navbar {
+  background-color: var(--card-dark);
+  border-bottom-color: var(--border-dark);
+}
+
+.navbar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 70px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.navbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin: 0;
+}
+
+body.dark-mode .navbar-title {
+  color: var(--text-dark);
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.theme-toggle {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle:hover {
+  background-color: var(--background-light);
+}
+
+body.dark-mode .theme-toggle:hover {
+  background-color: var(--surface-dark);
+}
+
+.profile-dropdown {
+  position: relative;
+}
+
+.profile-button {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+}
+
+.profile-button:hover {
+  background-color: var(--background-light);
+}
+
+body.dark-mode .profile-button:hover {
+  background-color: var(--surface-dark);
+}
+
+.profile-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-color) 0%, #1d4ed8 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.profile-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--text-light);
+}
+
+body.dark-mode .profile-name {
+  color: var(--text-dark);
+}
+
+.profile-role {
+  font-size: 0.75rem;
+  color: var(--text-secondary-light);
+  text-transform: capitalize;
+}
+
+body.dark-mode .profile-role {
+  color: var(--text-secondary-dark);
+}
+
+.dropdown-arrow {
+  font-size: 0.625rem;
+  color: var(--text-secondary-light);
+  transition: var(--transition);
+}
+
+body.dark-mode .dropdown-arrow {
+  color: var(--text-secondary-dark);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background-color: var(--surface-light);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
+  z-index: 1000;
+  animation: slideDown 0.2s ease-out;
+}
+
+body.dark-mode .dropdown-menu {
+  background-color: var(--card-dark);
+  border-color: var(--border-dark);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: var(--spacing-md);
+}
+
+.dropdown-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text-light);
+  margin-bottom: var(--spacing-xs);
+}
+
+body.dark-mode .dropdown-name {
+  color: var(--text-dark);
+}
+
+.dropdown-email {
+  font-size: 0.8125rem;
+  color: var(--text-secondary-light);
+  margin: 0;
+}
+
+body.dark-mode .dropdown-email {
+  color: var(--text-secondary-dark);
+}
+
+.dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 0;
+}
+
+body.dark-mode .dropdown-divider {
+  border-top-color: var(--border-dark);
+}
+
+.dropdown-item {
+  width: 100%;
+  padding: var(--spacing-md);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-light);
+  font-size: 0.875rem;
+  transition: var(--transition);
+}
+
+body.dark-mode .dropdown-item {
+  color: var(--text-dark);
+}
+
+.dropdown-item:hover {
+  background-color: var(--background-light);
+}
+
+body.dark-mode .dropdown-item:hover {
+  background-color: var(--surface-dark);
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 var(--spacing-md);
+  }
+  
+  .navbar-title {
+    font-size: 1rem;
+  }
+  
+  .profile-info {
+    display: none;
+  }
+  
+  .dropdown-arrow {
+    display: none;
+  }
+}

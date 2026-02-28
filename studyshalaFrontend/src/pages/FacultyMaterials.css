@@ -1,0 +1,91 @@
+.faculty-materials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.faculty-material-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.faculty-material-header {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  padding: 1.5rem;
+  text-align: center;
+  color: white;
+}
+
+.faculty-material-header .material-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.faculty-material-header .material-title {
+  margin: 0;
+  color: white;
+}
+
+.faculty-material-body {
+  padding: 1.25rem;
+  flex: 1;
+}
+
+.code-display {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--border-light);
+}
+
+.code-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary-light);
+  margin-bottom: 0.5rem;
+}
+
+.code-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.code {
+  flex: 1;
+  font-family: monospace;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 0.5rem;
+  background: #eff6ff;
+  border-radius: 0.375rem;
+}
+
+.copy-btn {
+  padding: 0.5rem;
+  border: 1px solid var(--border-light);
+  background: white;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.copy-btn:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+.copy-btn.copied {
+  background: var(--success-color);
+  color: white;
+}
+
+.faculty-material-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  gap: 0.5rem;
+}
