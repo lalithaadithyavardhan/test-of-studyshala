@@ -3,15 +3,16 @@
  * ============
  * ARCHITECTURE: "anyoneWithLink" at upload time.
  *
- * Every file gets  role:reader / type:anyone  the moment it is uploaded.
- * This replaces the broken per-student permission model entirely.
- *
+ * Every file gets role:reader / type:anyone the moment it is uploaded.
  * Access control lives in MongoDB: a student must validate the correct
- * 8-digit code to learn a fileId.  Without the fileId, the Drive URL is
- * unreachable.
+ * code to learn a fileId. Without the fileId, the Drive URL is unreachable.
  *
  * GOOGLE_DRIVE_REFRESH_TOKEN is needed only for upload/delete.
  * Downloads and previews are direct browser→Drive redirects — no token needed.
+ *
+ * FIX: Drive API uses its own dedicated OAuth2 client (GOOGLE_DRIVE_CLIENT_ID,
+ * GOOGLE_DRIVE_CLIENT_SECRET) — completely separate from the user login OAuth
+ * client (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET). This prevents conflicts.
  */
 
 const { google } = require('googleapis');
@@ -20,6 +21,11 @@ const logger     = require('../utils/logger');
 
 class DriveService {
   constructor () {
+    // FIX: Use dedicated Drive API credentials (separate from login OAuth)
+    // In your .env, GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET
+    // should be from the same Google Cloud project but configured for Drive API,
+    // with GOOGLE_DRIVE_REDIRECT_URI pointing to a separate /api/auth/drive/callback
+    // (or just use urn:ietf:wg:oauth:2.0:oob for offline token generation)
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_DRIVE_CLIENT_ID,
       process.env.GOOGLE_DRIVE_CLIENT_SECRET,
@@ -36,11 +42,12 @@ class DriveService {
     this.enabled = !!process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
 
     if (!this.enabled) {
-      logger.warn('DriveService: REFRESH_TOKEN missing — uploads disabled. Existing file downloads/previews still work.');
+      logger.warn('DriveService: GOOGLE_DRIVE_REFRESH_TOKEN missing — file uploads disabled.');
+      logger.warn('See README for how to generate your refresh token.');
     }
   }
 
-  // ── Folder operations ──────────────────────────────────────────────────
+  // ── Folder operations ───────────────────────────────────────────────────
 
   async createFolder (name, parentId = null) {
     const meta = { name, mimeType: 'application/vnd.google-apps.folder' };
@@ -55,7 +62,7 @@ class DriveService {
     logger.info(`Drive folder deleted: ${folderId}`);
   }
 
-  // ── File operations ────────────────────────────────────────────────────
+  // ── File operations ─────────────────────────────────────────────────────
 
   /**
    * Upload a file to Drive and immediately set anyoneWithLink reader access.
@@ -74,7 +81,7 @@ class DriveService {
       fields:   'id, name, webViewLink, size'
     });
 
-    // Make file publicly accessible — one permission, forever, for all students
+    // Make file publicly accessible — anyoneWithLink reader forever
     await this.drive.permissions.create({
       fileId:      res.data.id,
       requestBody: { role: 'reader', type: 'anyone' }
