@@ -1,4 +1,4 @@
- * FileManager
+/** * FileManager
  * ===========
  * Desktop-style full-screen file browser.
  *
