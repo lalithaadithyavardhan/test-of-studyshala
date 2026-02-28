@@ -1,37 +1,28 @@
 import axios from 'axios';
 
-/**
- * StudyShala Axios Instance
- * Configured for production deployment on Render.
- */
 const api = axios.create({
-  // The baseURL points to your deployed backend service.
-  baseURL: 'https://test-of-studyshala.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to attach JWT token for authenticated routes
+// Attach JWT token to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
-      // Attaches the Bearer token stored during login
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle global errors like unauthorized access
+// Handle 401 (token expired/invalid) globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // If the backend returns 401 (Unauthorized), clear local session and redirect
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
