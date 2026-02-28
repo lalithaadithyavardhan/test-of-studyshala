@@ -247,4 +247,3 @@ const FileManager = ({ files = [], materialName = 'Files', onClose }) => {
 };
 
 export default FileManager;
-find any error and fix it and give me full code
