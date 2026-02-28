@@ -2,7 +2,9 @@
  * StudentHistory
  * ==============
  * Shows all materials a student has previously accessed.
- * "Open" passes full material state to StudentMaterialAccess so it loads instantly.
+ *
+ * FIX: "Open" now navigates with correct material state.
+ * StudentMaterialAccess will fetch fresh files (with downloadUrl) when FileManager opens.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -46,7 +48,7 @@ const StudentHistory = () => {
   };
 
   const openMaterial = (item) => {
-    // Pass full material state so StudentMaterialAccess loads without an extra API call
+    // Pass material info in state — StudentMaterialAccess fetches fresh files on open
     navigate(`/student/material-access/${item._id}`, {
       state: {
         material: {
@@ -56,7 +58,8 @@ const StudentHistory = () => {
           semester:    item.semester,
           facultyName: item.facultyName,
           fileCount:   item.fileCount,
-          files:       []   // StudentMaterialAccess will fetch files when FileManager opens
+          // NOTE: Do NOT pass files here — they'll be fetched fresh with downloadUrl
+          // when the student clicks "Open Files" in StudentMaterialAccess
         }
       }
     });
