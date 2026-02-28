@@ -1,3 +1,10 @@
+/**
+ * StudentSavedMaterials
+ * =====================
+ * Lists all materials a student has saved.
+ * "Browse Files" opens the full-screen FileManager.
+ * Files are fetched on demand (with previewUrl + downloadUrl) when manager opens.
+ */
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
@@ -31,15 +38,15 @@ const StudentSavedMaterials = () => {
     }
   };
 
-  // FIX: opens full-screen FileManager instead of a small modal
   const openFileManager = async (material) => {
     setFmName(material.subjectName);
     setFmFiles([]);
     setFmOpen(true);
     setFmLoading(true);
     try {
+      // API returns files with previewUrl + downloadUrl included
       const res = await api.get(`/student/materials/${material._id}/files`);
-      setFmFiles(res.data.files || []);  // files include downloadUrl + previewUrl
+      setFmFiles(res.data.files || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load files');
       setFmOpen(false);
@@ -64,6 +71,7 @@ const StudentSavedMaterials = () => {
       <div className="main-content">
         <Navbar />
         <div className="page-container">
+
           <div className="page-header">
             <div>
               <h1>My Saved Materials</h1>
@@ -110,21 +118,28 @@ const StudentSavedMaterials = () => {
         </div>
       </div>
 
-      {/* Full-screen FileManager */}
+      {/* Loading spinner while fetching file list */}
+      {fmOpen && fmLoading && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '12px', padding: '2.5rem',
+            textAlign: 'center', minWidth: '200px'
+          }}>
+            <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+            <p style={{ margin: 0, color: '#475569' }}>Loading files…</p>
+          </div>
+        </div>
+      )}
+
       {fmOpen && !fmLoading && (
         <FileManager
           files={fmFiles}
           materialName={fmName}
           onClose={() => { setFmOpen(false); setFmFiles([]); }}
         />
-      )}
-      {fmOpen && fmLoading && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:8000,display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <div style={{background:'#fff',borderRadius:'12px',padding:'2.5rem',textAlign:'center',minWidth:'200px'}}>
-            <div className="spinner" style={{margin:'0 auto 1rem'}}></div>
-            <p style={{margin:0,color:'#475569'}}>Loading files…</p>
-          </div>
-        </div>
       )}
     </div>
   );

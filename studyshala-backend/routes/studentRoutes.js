@@ -6,23 +6,13 @@ const { authenticate, isStudent } = require('../middleware/auth');
 router.use(authenticate);
 router.use(isStudent);
 
-// Access code validation
-router.post('/validate-code', studentController.validateAccessCode);
-
-// Save material
-router.post('/save-material', studentController.saveMaterial);
-
-// Saved materials
-router.get('/saved-materials', studentController.getSavedMaterials);
-router.delete('/saved-materials/:id', studentController.removeSavedMaterial);
-
-// Access history
-router.get('/access-history', studentController.getAccessHistory);
-
-// Material files (for saved or history items)
-router.get('/materials/:id/files', studentController.getMaterialFiles);
-
-// Download
+router.post('/validate-code',              studentController.validateAccessCode);
+router.post('/save-material',              studentController.saveMaterial);
+router.get('/saved-materials',             studentController.getSavedMaterials);
+router.delete('/saved-materials/:id',      studentController.removeSavedMaterial);
+router.get('/access-history',              studentController.getAccessHistory);
+router.get('/materials/:id/files',         studentController.getMaterialFiles);
+// FIX: redirects to Google Drive public URL — no REFRESH_TOKEN needed
 router.get('/materials/:id/files/:fileId/download', studentController.downloadFile);
 
 module.exports = router;

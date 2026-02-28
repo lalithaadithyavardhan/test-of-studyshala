@@ -1,49 +1,54 @@
-const Folder = require('../models/Folder');
-const User   = require('../models/User');
-const { logAction } = require('../middleware/logging');
-const logger = require('../utils/logger');
-
-/*
- * DOWNLOAD STRATEGY (root-cause fix)
- * ────────────────────────────────────
- * The original code tried to proxy the file through the Express server using
- * driveService.downloadFile(). That path returns 404 whenever
- * GOOGLE_DRIVE_REFRESH_TOKEN is not set in Render's environment variables.
+/**
+ * studentController.js
+ * ====================
+ * All download and preview URLs are derived at runtime from driveFileId.
+ * No files are streamed through Express. Downloads and previews are
+ * browser→Drive redirects using Google's public anyoneWithLink URLs.
  *
- * The correct fix: every file is already uploaded to Google Drive with
- * "reader + anyone" permission (set in driveService.uploadFile). That means
- * Google's own public download URL works for every account — or no account.
- *
- * So instead of proxying, we just redirect the browser straight to Google.
- * No REFRESH_TOKEN needed for downloads. No server memory or bandwidth used.
- *
- * Download URL:  https://drive.usercontent.google.com/download?id=FILE_ID&export=download
- * Preview URL:   https://drive.google.com/file/d/FILE_ID/preview
+ * WHY THIS WORKS:
+ *   Every file is uploaded with role:reader / type:anyone in driveService.
+ *   Google's public download URL works for any browser, any account, forever.
+ *   No REFRESH_TOKEN needed on the server for reads.
  */
 
-const driveUrls = (driveFileId) => ({
-  downloadUrl: driveFileId
-    ? `https://drive.usercontent.google.com/download?id=${driveFileId}&export=download&authuser=0`
-    : null,
-  previewUrl: driveFileId
-    ? `https://drive.google.com/file/d/${driveFileId}/preview`
-    : null
-});
+const Folder    = require('../models/Folder');
+const { logAction } = require('../middleware/logging');
+const logger    = require('../utils/logger');
 
-// Shape every file document the same way for the client
+// ── URL helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Build Google Drive public URLs from a fileId.
+ * These work for anyoneWithLink files — no OAuth, no token.
+ *
+ * Preview:  /file/d/ID/preview  → Drive's built-in viewer (PDF, Word, PPT…)
+ * Download: drive.usercontent.google.com  → triggers browser download dialog
+ */
+const buildDriveUrls = (driveFileId) => {
+  if (!driveFileId) return { previewUrl: null, downloadUrl: null };
+  return {
+    previewUrl:  `https://drive.google.com/file/d/${driveFileId}/preview`,
+    downloadUrl: `https://drive.usercontent.google.com/download?id=${driveFileId}&export=download&authuser=0`
+  };
+};
+
+/**
+ * Shape a file document for the client.
+ * Always includes previewUrl and downloadUrl so the frontend never
+ * needs to construct Drive URLs itself.
+ */
 const mapFile = (f) => ({
-  _id:        f._id,
-  name:       f.name,
-  mimeType:   f.mimeType,
-  size:       f.size,
-  uploadedAt: f.uploadedAt,
+  _id:         f._id,
+  name:        f.name,
+  mimeType:    f.mimeType,
+  size:        f.size,
+  uploadedAt:  f.uploadedAt,
   driveFileId: f.driveFileId || null,
-  ...driveUrls(f.driveFileId)
+  ...buildDriveUrls(f.driveFileId)
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validate access code
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Validate access code ───────────────────────────────────────────────────
+
 const validateAccessCode = async (req, res) => {
   try {
     const { accessCode } = req.body;
@@ -57,12 +62,13 @@ const validateAccessCode = async (req, res) => {
 
     if (!folder) return res.json({ valid: false, message: 'Code not found or inactive' });
 
-    // Record history once per material
+    // Record in access history (once per material per student)
     const seen = req.user.accessHistory.find(h => h.materialId.toString() === folder._id.toString());
     if (!seen) {
       req.user.accessHistory.push({ materialId: folder._id, accessCode: code, accessedAt: new Date() });
       await req.user.save();
     }
+
     folder.accessCount += 1;
     await folder.save();
     await logAction(req, 'ACCESS_MATERIAL', 'Folder', folder._id, { code });
@@ -70,7 +76,7 @@ const validateAccessCode = async (req, res) => {
     res.json({
       valid: true,
       material: {
-        _id:        folder._id,
+        _id:         folder._id,
         subjectName: folder.subjectName,
         department:  folder.department,
         semester:    folder.semester,
@@ -78,7 +84,7 @@ const validateAccessCode = async (req, res) => {
         accessCode:  folder.accessCode || folder.departmentCode,
         fileCount:   folder.files?.length || 0,
         createdAt:   folder.createdAt,
-        files:       folder.files.map(mapFile)   // ← includes downloadUrl + previewUrl
+        files:       folder.files.map(mapFile)   // includes previewUrl + downloadUrl
       }
     });
   } catch (err) {
@@ -87,9 +93,8 @@ const validateAccessCode = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Save material
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Save material ──────────────────────────────────────────────────────────
+
 const saveMaterial = async (req, res) => {
   try {
     const { materialId } = req.body;
@@ -99,7 +104,7 @@ const saveMaterial = async (req, res) => {
     if (!folder) return res.status(404).json({ message: 'Material not found' });
 
     const already = req.user.savedMaterials.find(m => m.materialId.toString() === materialId);
-    if (already) return res.json({ message: 'Material already saved', alreadySaved: true });
+    if (already) return res.json({ message: 'Already saved', alreadySaved: true });
 
     req.user.savedMaterials.push({ materialId, savedAt: new Date() });
     await req.user.save();
@@ -111,28 +116,28 @@ const saveMaterial = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Get saved materials list
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Get saved materials list ───────────────────────────────────────────────
+
 const getSavedMaterials = async (req, res) => {
   try {
     const ids     = req.user.savedMaterials.map(m => m.materialId);
     const folders = await Folder.find({ _id: { $in: ids }, active: true }).sort({ createdAt: -1 });
 
-    const materials = folders.map(m => {
-      const entry = req.user.savedMaterials.find(s => s.materialId.toString() === m._id.toString());
+    const materials = folders.map(folder => {
+      const entry = req.user.savedMaterials.find(s => s.materialId.toString() === folder._id.toString());
       return {
-        _id:        m._id,
-        subjectName: m.subjectName,
-        department:  m.department,
-        semester:    m.semester,
-        facultyName: m.facultyName,
-        accessCode:  m.accessCode || m.departmentCode,
-        fileCount:   m.files?.length || 0,
+        _id:         folder._id,
+        subjectName: folder.subjectName,
+        department:  folder.department,
+        semester:    folder.semester,
+        facultyName: folder.facultyName,
+        accessCode:  folder.accessCode || folder.departmentCode,
+        fileCount:   folder.files?.length || 0,
         savedAt:     entry?.savedAt,
-        createdAt:   m.createdAt
+        createdAt:   folder.createdAt
       };
     });
+
     res.json({ materials });
   } catch (err) {
     logger.error(`getSavedMaterials: ${err.message}`);
@@ -140,9 +145,8 @@ const getSavedMaterials = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Get access history
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Get access history ─────────────────────────────────────────────────────
+
 const getAccessHistory = async (req, res) => {
   try {
     const ids     = req.user.accessHistory.map(h => h.materialId);
@@ -153,7 +157,7 @@ const getAccessHistory = async (req, res) => {
       if (!folder) return null;
       const isSaved = req.user.savedMaterials.some(s => s.materialId.toString() === folder._id.toString());
       return {
-        _id:        folder._id,
+        _id:         folder._id,
         subjectName: folder.subjectName,
         department:  folder.department,
         semester:    folder.semester,
@@ -172,30 +176,30 @@ const getAccessHistory = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Get files for a material  (saved or history students only)
-// Returns downloadUrl + previewUrl per file — no proxying needed
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Get files for a material ───────────────────────────────────────────────
+// Returns previewUrl + downloadUrl per file — no proxying required
+
 const getMaterialFiles = async (req, res) => {
   try {
-    const { id }   = req.params;
-    const folder   = await Folder.findOne({ _id: id, active: true });
+    const { id } = req.params;
+    const folder = await Folder.findOne({ _id: id, active: true });
     if (!folder) return res.status(404).json({ message: 'Material not found' });
 
+    // Must have accessed via code or previously saved
     const hasAccess =
       req.user.savedMaterials.some(m => m.materialId.toString() === id) ||
       req.user.accessHistory.some(h => h.materialId.toString() === id);
-    if (!hasAccess) return res.status(403).json({ message: 'Access denied' });
+    if (!hasAccess) return res.status(403).json({ message: 'Access denied. Enter the access code first.' });
 
     res.json({
       material: {
-        _id:        folder._id,
+        _id:         folder._id,
         subjectName: folder.subjectName,
         department:  folder.department,
         semester:    folder.semester,
         facultyName: folder.facultyName
       },
-      files: folder.files.map(mapFile)  // ← includes downloadUrl + previewUrl
+      files: folder.files.map(mapFile)
     });
   } catch (err) {
     logger.error(`getMaterialFiles: ${err.message}`);
@@ -203,9 +207,11 @@ const getMaterialFiles = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Download  — redirect to Google's public URL, no REFRESH_TOKEN needed
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Download a file ────────────────────────────────────────────────────────
+// FIX: redirects to Google Drive's public URL instead of proxying through Express.
+// This works because files have anyoneWithLink reader permission.
+// GOOGLE_DRIVE_REFRESH_TOKEN is NOT required for this route.
+
 const downloadFile = async (req, res) => {
   try {
     const { id, fileId } = req.params;
@@ -218,22 +224,21 @@ const downloadFile = async (req, res) => {
     if (!hasAccess) return res.status(403).json({ message: 'Access denied. Enter the access code first.' });
 
     const file = folder.files.find(f => f._id.toString() === fileId);
-    if (!file)              return res.status(404).json({ message: 'File not found' });
-    if (!file.driveFileId)  return res.status(404).json({ message: 'File has no Drive ID. Contact your faculty to re-upload.' });
+    if (!file)             return res.status(404).json({ message: 'File not found' });
+    if (!file.driveFileId) return res.status(404).json({ message: 'File not on Drive. Ask faculty to re-upload.' });
 
     await logAction(req, 'DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.name });
 
-    // ← THE FIX: redirect instead of proxying
-    return res.redirect(driveUrls(file.driveFileId).downloadUrl);
+    // THE FIX: redirect, don't proxy
+    return res.redirect(buildDriveUrls(file.driveFileId).downloadUrl);
   } catch (err) {
     logger.error(`downloadFile: ${err.message}`);
-    res.status(500).json({ message: 'Failed to download file' });
+    res.status(500).json({ message: 'Failed to process download' });
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Remove saved material
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Remove saved material ──────────────────────────────────────────────────
+
 const removeSavedMaterial = async (req, res) => {
   try {
     const { id } = req.params;

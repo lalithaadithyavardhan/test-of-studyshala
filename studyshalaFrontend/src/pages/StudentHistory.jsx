@@ -1,3 +1,9 @@
+/**
+ * StudentHistory
+ * ==============
+ * Shows all materials a student has previously accessed.
+ * "Open" passes full material state to StudentMaterialAccess so it loads instantly.
+ */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
@@ -11,7 +17,7 @@ const StudentHistory = () => {
   const navigate = useNavigate();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error,   setError]   = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => { fetchHistory(); }, []);
@@ -34,9 +40,26 @@ const StudentHistory = () => {
       setSuccess('✅ Material saved!');
       setTimeout(() => setSuccess(''), 3000);
       fetchHistory();
-    } catch (err) {
+    } catch {
       setError('Failed to save material');
     }
+  };
+
+  const openMaterial = (item) => {
+    // Pass full material state so StudentMaterialAccess loads without an extra API call
+    navigate(`/student/material-access/${item._id}`, {
+      state: {
+        material: {
+          _id:         item._id,
+          subjectName: item.subjectName,
+          department:  item.department,
+          semester:    item.semester,
+          facultyName: item.facultyName,
+          fileCount:   item.fileCount,
+          files:       []   // StudentMaterialAccess will fetch files when FileManager opens
+        }
+      }
+    });
   };
 
   return (
@@ -45,6 +68,7 @@ const StudentHistory = () => {
       <div className="main-content">
         <Navbar />
         <div className="page-container">
+
           <div className="page-header">
             <div>
               <h1>Access History</h1>
@@ -52,7 +76,7 @@ const StudentHistory = () => {
             </div>
           </div>
 
-          {error && <div className="alert alert-error">{error}</div>}
+          {error   && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 
           {loading ? (
@@ -86,20 +110,13 @@ const StudentHistory = () => {
                     </div>
                     <div className="history-actions">
                       {item.isSaved ? (
-                        <Button variant="secondary" size="sm" disabled>
-                          ✓ Saved
-                        </Button>
+                        <Button variant="secondary" size="sm" disabled>✓ Saved</Button>
                       ) : (
                         <Button variant="primary" size="sm" onClick={() => handleSave(item._id)}>
                           💾 Save
                         </Button>
                       )}
-                      <Button variant="primary" size="sm"
-                        onClick={() => navigate(`/student/material-access/${item._id}`, {
-                        state: { material: { _id: item._id, subjectName: item.subjectName,
-                          department: item.department, semester: item.semester,
-                          facultyName: item.facultyName, fileCount: item.fileCount, files: [] } }
-                      })}>
+                      <Button variant="primary" size="sm" onClick={() => openMaterial(item)}>
                         📂 Open
                       </Button>
                     </div>

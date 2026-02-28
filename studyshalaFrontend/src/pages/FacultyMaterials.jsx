@@ -1,3 +1,10 @@
+/**
+ * FacultyMaterials
+ * ================
+ * Shows all materials a faculty member has created.
+ * "Browse" opens the full-screen FileManager — files already include
+ * previewUrl + downloadUrl from getFolders, so no extra API call needed.
+ */
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
@@ -8,20 +15,21 @@ import FileManager from '../components/FileManager';
 import './FacultyMaterials.css';
 
 const FacultyMaterials = () => {
-  const [materials, setMaterials] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
-  const [success,   setSuccess]   = useState('');
-  const [copiedId,  setCopiedId]  = useState(null);
+  const [materials,   setMaterials]   = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
+  const [success,     setSuccess]     = useState('');
+  const [copiedId,    setCopiedId]    = useState(null);
 
-  const [fmOpen,    setFmOpen]    = useState(false);
-  const [fmMaterial,setFmMaterial]= useState(null);
+  const [fmOpen,      setFmOpen]      = useState(false);
+  const [fmMaterial,  setFmMaterial]  = useState(null);
 
   useEffect(() => { fetchMaterials(); }, []);
 
   const fetchMaterials = async () => {
     try {
       setLoading(true);
+      // getFolders returns files with previewUrl + downloadUrl already
       const res = await api.get('/faculty/folders');
       setMaterials(res.data.folders || []);
     } catch (err) {
@@ -55,6 +63,7 @@ const FacultyMaterials = () => {
       <div className="main-content">
         <Navbar />
         <div className="page-container">
+
           <div className="page-header">
             <div>
               <h1>My Materials</h1>
@@ -71,7 +80,7 @@ const FacultyMaterials = () => {
             <div className="empty-state">
               <div className="empty-state-icon">📁</div>
               <h3>No Materials</h3>
-              <p>Create materials from the Dashboard</p>
+              <p>Create materials from the Dashboard to see them here</p>
             </div>
           ) : (
             <div className="faculty-materials-grid">
@@ -90,19 +99,28 @@ const FacultyMaterials = () => {
                       <div className="detail-row"><span className="detail-label">Semester</span><span className="detail-value">{m.semester}</span></div>
                       <div className="detail-row"><span className="detail-label">Files</span><span className="detail-value">{fileCount}</span></div>
                       <div className="detail-row"><span className="detail-label">Views</span><span className="detail-value">{m.accessCount || 0}</span></div>
+
                       <div className="code-display">
                         <span className="code-label">Access Code</span>
                         <div className="code-row">
                           <code className="code">{code}</code>
-                          <button className={`copy-btn ${copiedId===m._id?'copied':''}`} onClick={() => copyCode(code, m._id)}>
-                            {copiedId===m._id ? '✓' : '📋'}
+                          <button
+                            className={`copy-btn ${copiedId === m._id ? 'copied' : ''}`}
+                            onClick={() => copyCode(code, m._id)}
+                          >
+                            {copiedId === m._id ? '✓' : '📋'}
                           </button>
                         </div>
                       </div>
                     </div>
+
                     <div className="faculty-material-footer">
-                      {/* FIX: opens full-screen FileManager */}
-                      <Button variant="primary" size="sm" onClick={() => { setFmMaterial(m); setFmOpen(true); }}>
+                      {/* Opens full-screen FileManager — no extra API call needed */}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => { setFmMaterial(m); setFmOpen(true); }}
+                      >
                         📂 Browse ({fileCount})
                       </Button>
                       <Button variant="danger" size="sm" onClick={() => handleDelete(m._id)}>
@@ -117,7 +135,7 @@ const FacultyMaterials = () => {
         </div>
       </div>
 
-      {/* Full-screen FileManager — files already have downloadUrl from getFolders */}
+      {/* Full-screen FileManager — files already have Drive URLs from getFolders */}
       {fmOpen && fmMaterial && (
         <FileManager
           files={fmMaterial.files || []}
