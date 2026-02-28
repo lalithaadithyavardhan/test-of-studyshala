@@ -1,19 +1,13 @@
-const User = require('../models/User');
+const User   = require('../models/User');
 const Folder = require('../models/Folder');
-const Log = require('../models/Log');
+const Log    = require('../models/Log');
 const { logAction } = require('../middleware/logging');
 const logger = require('../utils/logger');
 
 // Get system statistics
 const getStats = async (req, res) => {
   try {
-    const [
-      totalUsers,
-      totalFaculty,
-      totalStudents,
-      totalMaterials,
-      activeFolders
-    ] = await Promise.all([
+    const [totalUsers, totalFaculty, totalStudents, totalMaterials, activeFolders] = await Promise.all([
       User.countDocuments({ active: true }),
       User.countDocuments({ role: 'faculty', active: true }),
       User.countDocuments({ role: 'student', active: true }),
@@ -21,17 +15,10 @@ const getStats = async (req, res) => {
       Folder.countDocuments({ active: true })
     ]);
 
-    // Get unique departments
-    const departments = await Folder.distinct('department');
+    const departments    = await Folder.distinct('department');
     const totalDepartments = departments.length;
 
-    res.json({
-      totalUsers,
-      totalFaculty,
-      totalStudents,
-      totalDepartments,
-      totalMaterials
-    });
+    res.json({ totalUsers, totalFaculty, totalStudents, totalDepartments, totalMaterials });
   } catch (error) {
     logger.error(`Get stats error: ${error.message}`);
     res.status(500).json({ message: 'Failed to fetch statistics' });
@@ -42,38 +29,25 @@ const getStats = async (req, res) => {
 const getUsers = async (req, res) => {
   try {
     const { search, role, page = 1, limit = 10 } = req.query;
-
     const query = {};
-    
+
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
+        { name:  { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } }
       ];
     }
-
-    if (role) {
-      query.role = role;
-    }
+    if (role) query.role = role;
 
     const skip = (page - 1) * limit;
-
     const [users, total] = await Promise.all([
-      User.find(query)
-        .select('-__v')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
+      User.find(query).select('-__v').sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)),
       User.countDocuments(query)
     ]);
 
-    res.json({ 
+    res.json({
       users,
-      pagination: {
-        total,
-        page: parseInt(page),
-        pages: Math.ceil(total / limit)
-      }
+      pagination: { total, page: parseInt(page), pages: Math.ceil(total / limit) }
     });
   } catch (error) {
     logger.error(`Get users error: ${error.message}`);
@@ -84,7 +58,6 @@ const getUsers = async (req, res) => {
 // Get analytics data
 const getAnalytics = async (req, res) => {
   try {
-    // Most active faculty (by folder count)
     const activeFacultyData = await Folder.aggregate([
       { $match: { active: true } },
       { $group: { _id: '$facultyId', materialsCount: { $sum: 1 } } },
@@ -92,47 +65,28 @@ const getAnalytics = async (req, res) => {
       { $limit: 5 }
     ]);
 
-    // Populate faculty details
     const activeFaculty = await Promise.all(
       activeFacultyData.map(async (item) => {
         const user = await User.findById(item._id).select('name email');
         return {
-          name: user?.name || 'Unknown',
-          email: user?.email || 'Unknown',
+          name:           user?.name || 'Unknown',
+          email:          user?.email || 'Unknown',
           materialsCount: item.materialsCount
         };
       })
     );
 
-    // Most accessed subjects
     const popularSubjects = await Folder.aggregate([
       { $match: { active: true } },
-      { $group: { 
-          _id: '$subjectName', 
-          accessCount: { $sum: '$accessCount' },
-          department: { $first: '$department' }
-        } 
-      },
+      { $group: { _id: '$subjectName', accessCount: { $sum: '$accessCount' }, department: { $first: '$department' } } },
       { $sort: { accessCount: -1 } },
       { $limit: 5 }
     ]);
 
-    const formattedPopularSubjects = popularSubjects.map(s => ({
-      name: s._id,
-      department: s.department,
-      accessCount: s.accessCount
-    }));
-
-    // Daily active users (users who logged in today)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    const dailyActiveUsers = await User.countDocuments({
-      lastLogin: { $gte: today },
-      active: true
-    });
+    const dailyActiveUsers = await User.countDocuments({ lastLogin: { $gte: today }, active: true });
 
-    // Recent activity logs
     const recentActivity = await Log.find()
       .populate('userId', 'name email role')
       .sort({ createdAt: -1 })
@@ -140,7 +94,7 @@ const getAnalytics = async (req, res) => {
 
     res.json({
       activeFaculty,
-      popularSubjects: formattedPopularSubjects,
+      popularSubjects: popularSubjects.map(s => ({ name: s._id, department: s.department, accessCount: s.accessCount })),
       dailyActiveUsers,
       recentActivity
     });
@@ -153,27 +107,13 @@ const getAnalytics = async (req, res) => {
 // Deactivate user
 const deactivateUser = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const user = await User.findById(id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    if (user.role === 'admin') {
-      return res.status(403).json({ message: 'Cannot deactivate admin users' });
-    }
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.role === 'admin') return res.status(403).json({ message: 'Cannot deactivate admin users' });
 
     user.active = false;
     await user.save();
-
-    // Log action
-    await logAction(req, 'DEACTIVATE_USER', 'User', user._id, {
-      userName: user.name,
-      userEmail: user.email
-    });
-
+    await logAction(req, 'DEACTIVATE_USER', 'User', user._id, { userName: user.name, userEmail: user.email });
     logger.info(`User deactivated by ${req.user.email}: ${user.email}`);
     res.json({ message: 'User deactivated successfully' });
   } catch (error) {
@@ -185,23 +125,12 @@ const deactivateUser = async (req, res) => {
 // Activate user
 const activateUser = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const user = await User.findById(id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     user.active = true;
     await user.save();
-
-    // Log action
-    await logAction(req, 'ACTIVATE_USER', 'User', user._id, {
-      userName: user.name,
-      userEmail: user.email
-    });
-
+    await logAction(req, 'ACTIVATE_USER', 'User', user._id, { userName: user.name, userEmail: user.email });
     logger.info(`User activated by ${req.user.email}: ${user.email}`);
     res.json({ message: 'User activated successfully' });
   } catch (error) {
@@ -214,30 +143,34 @@ const activateUser = async (req, res) => {
 const removeUser = async (req, res) => {
   try {
     const { id } = req.params;
-
     const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (user.role === 'admin') return res.status(403).json({ message: 'Cannot remove admin users' });
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    if (user.role === 'admin') {
-      return res.status(403).json({ message: 'Cannot remove admin users' });
-    }
-
-    // If faculty, also delete their folders
     if (user.role === 'faculty') {
-      await Folder.deleteMany({ facultyId: user._id });
+      // FIX: Soft-delete faculty folders (consistent with facultyController.deleteFolder)
+      // Also clean up student savedMaterials and accessHistory for those folders
+      const folders = await Folder.find({ facultyId: user._id, active: true });
+      const folderIds = folders.map(f => f._id);
+
+      if (folderIds.length > 0) {
+        // Remove from all students' saved lists and history
+        await User.updateMany(
+          { 'savedMaterials.materialId': { $in: folderIds } },
+          { $pull: { savedMaterials: { materialId: { $in: folderIds } } } }
+        );
+        await User.updateMany(
+          { 'accessHistory.materialId': { $in: folderIds } },
+          { $pull: { accessHistory: { materialId: { $in: folderIds } } } }
+        );
+
+        // Soft-delete all their folders
+        await Folder.updateMany({ facultyId: user._id }, { $set: { active: false } });
+      }
     }
 
     await User.findByIdAndDelete(id);
-
-    // Log action
-    await logAction(req, 'REMOVE_USER', 'User', user._id, {
-      userName: user.name,
-      userEmail: user.email
-    });
-
+    await logAction(req, 'REMOVE_USER', 'User', user._id, { userName: user.name, userEmail: user.email });
     logger.info(`User removed by ${req.user.email}: ${user.email}`);
     res.json({ message: 'User removed successfully' });
   } catch (error) {
@@ -249,28 +182,17 @@ const removeUser = async (req, res) => {
 // Update user role
 const updateUserRole = async (req, res) => {
   try {
-    const { id } = req.params;
     const { role } = req.body;
-
     if (!['student', 'faculty', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
-    const user = await User.findById(id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     user.role = role;
     await user.save();
-
-    // Log action
-    await logAction(req, 'UPDATE_USER_ROLE', 'User', user._id, {
-      userName: user.name,
-      newRole: role
-    });
-
+    await logAction(req, 'UPDATE_USER_ROLE', 'User', user._id, { userName: user.name, newRole: role });
     logger.info(`User role updated by ${req.user.email}: ${user.email} -> ${role}`);
     res.json({ message: 'User role updated successfully', user });
   } catch (error) {
@@ -279,9 +201,8 @@ const updateUserRole = async (req, res) => {
   }
 };
 
-// Self-promote: lets the first user make themselves admin
-// Only works if ADMIN_EMAILS contains their email
-// Useful when the user was already created before .env was set
+// Self-promote: one-time bootstrap to make yourself admin
+// Only works if your email is already in ADMIN_EMAILS in .env
 const selfPromote = async (req, res) => {
   try {
     const email = req.user.email.toLowerCase();
@@ -290,7 +211,7 @@ const selfPromote = async (req, res) => {
 
     if (!adminEmails.includes(email)) {
       return res.status(403).json({
-        message: `Your email (${email}) is not in the ADMIN_EMAILS list in .env. Add it and restart the backend, then try again.`
+        message: `Your email (${email}) is not in the ADMIN_EMAILS list. Add it to .env and restart the backend.`
       });
     }
 
@@ -303,12 +224,7 @@ const selfPromote = async (req, res) => {
     res.json({
       message: 'You are now an admin!',
       token: newToken,
-      user: {
-        id: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        role: 'admin'
-      }
+      user: { id: req.user._id, name: req.user.name, email: req.user.email, role: 'admin' }
     });
   } catch (error) {
     logger.error(`Self-promote error: ${error.message}`);
@@ -316,13 +232,4 @@ const selfPromote = async (req, res) => {
   }
 };
 
-module.exports = {
-  getStats,
-  getUsers,
-  getAnalytics,
-  deactivateUser,
-  activateUser,
-  removeUser,
-  updateUserRole,
-  selfPromote
-};
+module.exports = { getStats, getUsers, getAnalytics, deactivateUser, activateUser, removeUser, updateUserRole, selfPromote };
