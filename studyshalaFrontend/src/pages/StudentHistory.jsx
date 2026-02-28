@@ -39,24 +39,6 @@ const StudentHistory = () => {
     }
   };
 
-  // FIX: navigate WITH state so StudentMaterialAccess doesn't need to re-fetch
-  // Also gracefully handles the case where state isn't available (fetchMaterial fallback)
-  const handleOpen = (item) => {
-    navigate(`/student/material-access/${item._id}`, {
-      state: {
-        material: {
-          _id: item._id,
-          subjectName: item.subjectName,
-          department: item.department,
-          semester: item.semester,
-          facultyName: item.facultyName,
-          fileCount: item.fileCount,
-          files: [] // files will be fetched fresh on the access page
-        }
-      }
-    });
-  };
-
   return (
     <div className="app-container">
       <Sidebar role="student" />
@@ -112,8 +94,12 @@ const StudentHistory = () => {
                           💾 Save
                         </Button>
                       )}
-                      {/* FIX: Open passes state to avoid blank screen */}
-                      <Button variant="primary" size="sm" onClick={() => handleOpen(item)}>
+                      <Button variant="primary" size="sm"
+                        onClick={() => navigate(`/student/material-access/${item._id}`, {
+                        state: { material: { _id: item._id, subjectName: item.subjectName,
+                          department: item.department, semester: item.semester,
+                          facultyName: item.facultyName, fileCount: item.fileCount, files: [] } }
+                      })}>
                         📂 Open
                       </Button>
                     </div>

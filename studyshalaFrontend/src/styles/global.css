@@ -556,19 +556,3 @@ body.dark-mode .pagination button {
 .mb-md { margin-bottom: var(--spacing-md); }
 .mb-lg { margin-bottom: var(--spacing-lg); }
 .w-full { width: 100%; }
-
-/* ── File item action buttons (preview + download side by side) ─────────── */
-.file-item-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-shrink: 0;
-  align-items: center;
-}
-
-/* File action buttons in FacultyDashboard download section */
-.file-action-btns {
-  display: flex;
-  gap: 0.4rem;
-  flex-shrink: 0;
-  align-items: center;
-}

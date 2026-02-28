@@ -5,120 +5,70 @@ import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import FilePreviewModal from '../components/FilePreviewModal';
+import FileManager from '../components/FileManager';
 import './StudentMaterialAccess.css';
 
 const StudentMaterialAccess = () => {
-  const { id } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
-  
-  const [material, setMaterial] = useState(location.state?.material || null);
-  const [saving, setSaving] = useState(false);
-  const [downloading, setDownloading] = useState(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  // FIX: preview state
-  const [previewFile, setPreviewFile] = useState(null);
+  const { id }       = useParams();
+  const location     = useLocation();
+  const navigate     = useNavigate();
 
-  // FIX: If navigated without state (e.g. from history page), fetch material details
+  // Files come from validate-code response (already include downloadUrl + previewUrl)
+  const [material, setMaterial]   = useState(location.state?.material || null);
+  const [files,    setFiles]      = useState(location.state?.material?.files || []);
+  const [saving,   setSaving]     = useState(false);
+  const [error,    setError]      = useState('');
+  const [success,  setSuccess]    = useState('');
+  const [fmOpen,   setFmOpen]     = useState(false);
+  const [fetching, setFetching]   = useState(false);
+
+  // If arriving from History page (no state), fetch files fresh
   useEffect(() => {
-    if (!material) {
-      fetchMaterial();
-    }
+    if (!material) fetchFiles();
   }, [id]);
 
-  const fetchMaterial = async () => {
+  const fetchFiles = async () => {
+    setFetching(true);
     try {
       const res = await api.get(`/student/materials/${id}/files`);
-      setMaterial({
-        ...res.data.material,
-        files: res.data.files,
-        fileCount: res.data.files.length
-      });
+      setMaterial({ ...res.data.material, fileCount: res.data.files.length });
+      setFiles(res.data.files || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load material');
+      setError(err.response?.data?.message || 'Failed to load material. Enter the access code first.');
+    } finally {
+      setFetching(false);
     }
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     try {
       const res = await api.post('/student/save-material', { materialId: id });
-      if (res.data.alreadySaved) {
-        setSuccess('✅ Already saved! Redirecting to My Materials...');
-      } else {
-        setSuccess('✅ Material saved! Redirecting to My Materials...');
-      }
+      setSuccess(res.data.alreadySaved ? '✅ Already saved!' : '✅ Material saved!');
       setTimeout(() => navigate('/student/saved-materials'), 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save material');
+      setError(err.response?.data?.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDownload = async (fileId, fileName) => {
-    setDownloading(fileId);
-    setError('');
-    try {
-      const res = await api.get(`/student/materials/${id}/files/${fileId}/download`, {
-        responseType: 'blob'
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      setSuccess(`✅ Downloaded: ${fileName}`);
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError('Download failed: ' + (err.response?.data?.message || 'Unknown error'));
-    } finally {
-      setDownloading(null);
-    }
-  };
+  if (fetching) return (
+    <div className="app-container"><Sidebar role="student" /><div className="main-content"><Navbar />
+      <div className="page-container"><div className="loading-container"><div className="spinner"></div></div></div>
+    </div></div>
+  );
 
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (mimeType) => {
-    if (mimeType.includes('pdf')) return '📕';
-    if (mimeType.includes('word') || mimeType.includes('document')) return '📘';
-    if (mimeType.includes('sheet') || mimeType.includes('excel')) return '📊';
-    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return '📙';
-    if (mimeType.includes('image')) return '🖼️';
-    if (mimeType.includes('video')) return '🎥';
-    if (mimeType.includes('zip') || mimeType.includes('rar')) return '🗜️';
-    return '📄';
-  };
-
-  if (!material) {
-    return (
-      <div className="app-container">
-        <Sidebar role="student" />
-        <div className="main-content">
-          <Navbar />
-          <div className="page-container">
-            {error ? (
-              <div className="alert alert-error">{error}</div>
-            ) : (
-              <div className="loading-container"><div className="spinner"></div></div>
-            )}
-          </div>
+  if (!material) return (
+    <div className="app-container"><Sidebar role="student" /><div className="main-content"><Navbar />
+      <div className="page-container">
+        <div className="alert alert-error">{error || 'Material not found. Please enter the access code first.'}</div>
+        <div style={{marginTop:'1rem'}}>
+          <Button onClick={() => navigate('/student/enter-code')}>← Enter Access Code</Button>
         </div>
       </div>
-    );
-  }
+    </div></div>
+  );
 
   return (
     <div className="app-container">
@@ -126,45 +76,30 @@ const StudentMaterialAccess = () => {
       <div className="main-content">
         <Navbar />
         <div className="page-container">
-          
-          {/* Material Info Card */}
+
           <Card title="📖 Material Details">
             <div className="material-access-info">
-              <div className="info-row">
-                <span className="info-label">Subject</span>
-                <span className="info-value">{material.subjectName}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Faculty</span>
-                <span className="info-value">{material.facultyName}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Department</span>
-                <span className="info-value">{material.department}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Semester</span>
-                <span className="info-value">Semester {material.semester}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Files</span>
-                <span className="info-value">{material.fileCount || material.files?.length || 0} file(s)</span>
-              </div>
+              {[['Subject',material.subjectName],['Faculty',material.facultyName],
+                ['Department',material.department],['Semester',`Semester ${material.semester}`],
+                ['Files',`${material.fileCount ?? files.length} file(s)`]
+              ].map(([l,v]) => (
+                <div className="info-row" key={l}>
+                  <span className="info-label">{l}</span>
+                  <span className="info-value">{v}</span>
+                </div>
+              ))}
             </div>
           </Card>
 
-          {error && <div className="alert alert-error" style={{marginTop:'1rem'}}>{error}</div>}
+          {error   && <div className="alert alert-error"   style={{marginTop:'1rem'}}>{error}</div>}
           {success && <div className="alert alert-success" style={{marginTop:'1rem'}}>{success}</div>}
 
-          {/* Action Cards */}
           <div className="action-cards-grid">
-            {/* Save Card */}
+            {/* Save card — unchanged from original */}
             <Card className="action-card action-card--save">
               <div className="action-card-icon">💾</div>
               <h3 className="action-card-title">Save to My Materials</h3>
-              <p className="action-card-description">
-                Bookmark this material for permanent access. No code needed again.
-              </p>
+              <p className="action-card-description">Bookmark this material for permanent access. You won't need to enter the code again.</p>
               <ul className="action-card-benefits">
                 <li>✓ Access anytime from "My Materials"</li>
                 <li>✓ No code required again</li>
@@ -175,40 +110,24 @@ const StudentMaterialAccess = () => {
               </Button>
             </Card>
 
-            {/* FIX: Download + Preview Card */}
+            {/* FIX: Browse files card → opens full-screen FileManager */}
             <Card className="action-card action-card--download">
               <div className="action-card-icon">📂</div>
-              <h3 className="action-card-title">Files</h3>
+              <h3 className="action-card-title">Browse Files</h3>
               <p className="action-card-description">
-                Preview files in-browser or download to your device.
+                Open the file manager to preview or download all files. Double-click any file for full-screen view.
               </p>
-              {material.files && material.files.length > 0 ? (
-                <div className="download-files-list">
-                  {material.files.map(f => (
-                    <div key={f._id} className="download-file-item">
-                      <span className="file-icon">{getFileIcon(f.mimeType)}</span>
-                      <div className="file-info">
-                        <div className="file-name">{f.name}</div>
-                        <div className="file-size">{formatFileSize(f.size)}</div>
-                      </div>
-                      <div className="file-action-btns">
-                        {/* FIX: Preview button */}
-                        {f.driveViewLink && (
-                          <Button size="sm" variant="secondary" onClick={() => setPreviewFile(f)}>
-                            👁️
-                          </Button>
-                        )}
-                        <Button size="sm" onClick={() => handleDownload(f._id, f.name)}
-                          disabled={downloading === f._id}>
-                          {downloading === f._id ? '⏳' : '⬇️'}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="empty-text">No files available yet</p>
-              )}
+              <ul className="action-card-benefits">
+                <li>✓ Grid &amp; list view</li>
+                <li>✓ Preview PDFs, images, videos, docs</li>
+                <li>✓ Direct download to your device</li>
+              </ul>
+              <Button variant="primary"
+                onClick={() => setFmOpen(true)}
+                disabled={!files.length}
+                className="w-full">
+                {files.length ? `📂 Open Files (${files.length})` : 'No files uploaded yet'}
+              </Button>
             </Card>
           </div>
 
@@ -220,9 +139,12 @@ const StudentMaterialAccess = () => {
         </div>
       </div>
 
-      {/* FIX: Full-screen file preview */}
-      {previewFile && (
-        <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
+      {fmOpen && (
+        <FileManager
+          files={files}
+          materialName={material?.subjectName || 'Files'}
+          onClose={() => setFmOpen(false)}
+        />
       )}
     </div>
   );

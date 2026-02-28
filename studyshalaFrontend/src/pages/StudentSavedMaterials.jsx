@@ -4,22 +4,18 @@ import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import Modal from '../components/Modal';
-import FilePreviewModal from '../components/FilePreviewModal';
+import FileManager from '../components/FileManager';
 import './StudentSavedMaterials.css';
 
 const StudentSavedMaterials = () => {
   const [materials, setMaterials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
-  const [showFilesModal, setShowFilesModal] = useState(false);
-  const [selectedMaterial, setSelectedMaterial] = useState(null);
-  const [files, setFiles] = useState([]);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [downloading, setDownloading] = useState(null);
-  // FIX: Preview state
-  const [previewFile, setPreviewFile] = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState('');
+
+  const [fmOpen,    setFmOpen]    = useState(false);
+  const [fmName,    setFmName]    = useState('');
+  const [fmFiles,   setFmFiles]   = useState([]);
+  const [fmLoading, setFmLoading] = useState(false);
 
   useEffect(() => { fetchMaterials(); }, []);
 
@@ -35,40 +31,20 @@ const StudentSavedMaterials = () => {
     }
   };
 
-  const openFileBrowser = async (material) => {
-    setSelectedMaterial(material);
-    setFiles([]);
-    setShowFilesModal(true);
-    setLoadingFiles(true);
+  // FIX: opens full-screen FileManager instead of a small modal
+  const openFileManager = async (material) => {
+    setFmName(material.subjectName);
+    setFmFiles([]);
+    setFmOpen(true);
+    setFmLoading(true);
     try {
       const res = await api.get(`/student/materials/${material._id}/files`);
-      setFiles(res.data.files || []);
+      setFmFiles(res.data.files || []);  // files include downloadUrl + previewUrl
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load files');
+      setFmOpen(false);
     } finally {
-      setLoadingFiles(false);
-    }
-  };
-
-  const handleDownload = async (fileId, fileName) => {
-    setDownloading(fileId);
-    try {
-      const res = await api.get(
-        `/student/materials/${selectedMaterial._id}/files/${fileId}/download`,
-        { responseType: 'blob' }
-      );
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Download failed');
-    } finally {
-      setDownloading(null);
+      setFmLoading(false);
     }
   };
 
@@ -80,25 +56,6 @@ const StudentSavedMaterials = () => {
     } catch (err) {
       setError('Failed to remove material');
     }
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (mimeType) => {
-    if (mimeType.includes('pdf')) return '📕';
-    if (mimeType.includes('word')) return '📘';
-    if (mimeType.includes('sheet')) return '📊';
-    if (mimeType.includes('presentation')) return '📙';
-    if (mimeType.includes('image')) return '🖼️';
-    if (mimeType.includes('video')) return '🎥';
-    if (mimeType.includes('zip')) return '🗜️';
-    return '📄';
   };
 
   return (
@@ -133,25 +90,13 @@ const StudentSavedMaterials = () => {
                     <h3 className="material-title">{m.subjectName}</h3>
                   </div>
                   <div className="saved-material-body">
-                    <div className="detail-row">
-                      <span className="detail-label">Faculty</span>
-                      <span className="detail-value">{m.facultyName}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Department</span>
-                      <span className="detail-value">{m.department}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Semester</span>
-                      <span className="detail-value">Semester {m.semester}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span className="detail-label">Files</span>
-                      <span className="detail-value">{m.fileCount} file(s)</span>
-                    </div>
+                    <div className="detail-row"><span className="detail-label">Faculty</span><span className="detail-value">{m.facultyName}</span></div>
+                    <div className="detail-row"><span className="detail-label">Department</span><span className="detail-value">{m.department}</span></div>
+                    <div className="detail-row"><span className="detail-label">Semester</span><span className="detail-value">Semester {m.semester}</span></div>
+                    <div className="detail-row"><span className="detail-label">Files</span><span className="detail-value">{m.fileCount} file(s)</span></div>
                   </div>
                   <div className="saved-material-footer">
-                    <Button variant="primary" size="sm" onClick={() => openFileBrowser(m)}>
+                    <Button variant="primary" size="sm" onClick={() => openFileManager(m)}>
                       📂 Browse Files
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => handleRemove(m._id)}>
@@ -165,52 +110,21 @@ const StudentSavedMaterials = () => {
         </div>
       </div>
 
-      {/* Files Modal */}
-      <Modal isOpen={showFilesModal} onClose={() => setShowFilesModal(false)}
-        title={`📂 ${selectedMaterial?.subjectName || 'Files'}`} size="large">
-        {loadingFiles ? (
-          <div className="loading-container" style={{padding:'2rem'}}>
-            <div className="spinner"></div>
+      {/* Full-screen FileManager */}
+      {fmOpen && !fmLoading && (
+        <FileManager
+          files={fmFiles}
+          materialName={fmName}
+          onClose={() => { setFmOpen(false); setFmFiles([]); }}
+        />
+      )}
+      {fmOpen && fmLoading && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:8000,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{background:'#fff',borderRadius:'12px',padding:'2.5rem',textAlign:'center',minWidth:'200px'}}>
+            <div className="spinner" style={{margin:'0 auto 1rem'}}></div>
+            <p style={{margin:0,color:'#475569'}}>Loading files…</p>
           </div>
-        ) : files.length === 0 ? (
-          <div className="empty-state" style={{padding:'2rem'}}>
-            <div className="empty-state-icon">📭</div>
-            <h3>No Files</h3>
-            <p>No files available yet</p>
-          </div>
-        ) : (
-          <div className="file-list">
-            {files.map(f => (
-              <div key={f._id} className="file-item">
-                <div className="file-item-icon">{getFileIcon(f.mimeType)}</div>
-                <div className="file-item-info">
-                  <div className="file-item-name">{f.name}</div>
-                  <div className="file-item-meta">
-                    {formatFileSize(f.size)} • {new Date(f.uploadedAt).toLocaleDateString()}
-                  </div>
-                </div>
-                <div className="file-item-actions">
-                  {/* FIX: Preview button */}
-                  {f.driveViewLink && (
-                    <Button variant="secondary" size="sm" onClick={() => setPreviewFile(f)}>
-                      👁️ Preview
-                    </Button>
-                  )}
-                  <Button variant="primary" size="sm"
-                    onClick={() => handleDownload(f._id, f.name)}
-                    disabled={downloading === f._id}>
-                    {downloading === f._id ? '⏳' : '⬇️'}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Modal>
-
-      {/* FIX: Full-screen file preview */}
-      {previewFile && (
-        <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
+        </div>
       )}
     </div>
   );

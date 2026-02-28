@@ -6,7 +6,6 @@ const fileSchema = new mongoose.Schema({
   mimeType:     { type: String, required: true },
   size:         { type: Number, required: true },
   driveFileId:  { type: String },
-  driveViewLink: { type: String },   // FIX: store webViewLink for preview
   uploadedAt:   { type: Date, default: Date.now },
   uploadedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
@@ -17,14 +16,14 @@ const folderSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  // Manual faculty name entry (not auto-pulled from User)
   facultyName:    { type: String, required: true },
+  
   subjectName:    { type: String, required: true },
   department:     { type: String, required: true },
   semester:       { type: String, required: true },
   accessCode:     { type: String, index: true },
   departmentCode: { type: String },
-  // FIX: Permission removed from Folder - always public for anyone with the code
-  // (kept in schema for backward compat but no longer used in logic)
   permission: {
     type: String,
     enum: ['view', 'comment', 'edit'],

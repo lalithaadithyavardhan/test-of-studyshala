@@ -22,7 +22,6 @@ const FacultyDashboard = () => {
   
   const [formData, setFormData] = useState({
     department: '', semester: '', subjectName: '', facultyName: ''
-    // FIX: permission field removed - always public read for anyone with the code
   });
   const [submitting, setSubmitting] = useState(false);
   
@@ -86,25 +85,49 @@ const FacultyDashboard = () => {
     setUploadFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
-  const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
-  const handleDragOver  = (e) => { e.preventDefault(); e.stopPropagation(); };
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   const handleDrop = (e) => {
-    e.preventDefault(); e.stopPropagation(); setIsDragging(false);
-    addFiles(Array.from(e.dataTransfer.files));
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    addFiles(files);
   };
 
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (uploadFiles.length === 0 || !selectedFolder) return;
+
     setUploading(true);
     setError('');
+
     try {
       const formData = new FormData();
-      uploadFiles.forEach(file => formData.append('files', file));
+      uploadFiles.forEach(file => {
+        formData.append('files', file);
+      });
+
       await api.post(`/faculty/folders/${selectedFolder._id}/files`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
+
       setShowUploadModal(false);
       setUploadFiles([]);
       setSelectedFolder(null);
@@ -236,7 +259,7 @@ const FacultyDashboard = () => {
         </div>
       </div>
 
-      {/* Create Modal - FIX: permission field removed */}
+      {/* Create Modal */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)}
         title="Create New Material"
         footer={
@@ -249,7 +272,7 @@ const FacultyDashboard = () => {
         }>
         <form onSubmit={handleCreateSubmit}>
           <p style={{fontSize:'0.875rem',color:'var(--text-secondary-light)',marginBottom:'1rem'}}>
-            A unique access code will be auto-generated. Any student with the code can view & download files.
+            A unique code will be generated for students.
           </p>
 
           <Input label="Faculty Name *" value={formData.facultyName}
@@ -277,9 +300,7 @@ const FacultyDashboard = () => {
           <Input label="Subject Name *" value={formData.subjectName}
             onChange={e => setFormData(p => ({...p, subjectName: e.target.value}))}
             placeholder="e.g., Data Structures" required />
-          
-          {/* FIX: Permission dropdown REMOVED. Access is always open to anyone with the code. */}
-        </form>
+</form>
       </Modal>
 
       {/* Upload Modal with Drag-Drop */}
@@ -302,6 +323,7 @@ const FacultyDashboard = () => {
             Max 50MB per file • Up to 20 files • PDF, DOC, PPT, XLS, images, videos, ZIP
           </p>
 
+          {/* Drag-drop zone */}
           <div 
             className={`drag-drop-zone ${isDragging ? 'drag-drop-zone--active' : ''}`}
             onDragEnter={handleDragEnter}
@@ -318,9 +340,10 @@ const FacultyDashboard = () => {
               multiple
               onChange={handleFilesChange}
               style={{display:'none'}}
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar,.7z,.mp4,.mp3" />
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.zip,.rar,.7z,.mp4,.mp3" />
           </div>
 
+          {/* File list */}
           {uploadFiles.length > 0 && (
             <div className="upload-files-list">
               <div className="upload-files-header">
