@@ -20,6 +20,7 @@ const getFolders = async (req, res) => {
       facultyId: req.user._id,
       active: true
     }).sort({ createdAt: -1 });
+
     res.json({ folders });
   } catch (error) {
     logger.error(`Get folders error: ${error.message}`);
@@ -29,30 +30,26 @@ const getFolders = async (req, res) => {
 
 const createFolder = async (req, res) => {
   try {
-    // REMOVED permission from destructured req.body
     const { department, semester, subjectName, facultyName } = req.body;
 
     if (!department || !semester || !subjectName || !facultyName) {
-      return res.status(400).json({ 
-        message: 'Department, semester, subject name, and faculty name required' 
+      return res.status(400).json({
+        message: 'Department, semester, subject name, and faculty name required'
       });
     }
 
     const accessCode = await generateUniqueCode();
     const folderName = `${department}-S${semester}-${subjectName}`;
 
-    let driveUrl = '#';
-    let driveFolderId = 'local-' + Date.now();
+    let driveFolderId = null;
+    let driveUrl = null;
 
-    if (driveService.enabled) {
-      try {
-        const { folderId, folderUrl } = await driveService.createFolder(folderName);
-        driveUrl = folderUrl;
-        driveFolderId = folderId;
-        // REMOVED driveService.setFolderPermissions call completely
-      } catch (driveErr) {
-        logger.warn(`Drive folder creation skipped: ${driveErr.message}`);
-      }
+    try {
+      const folderId = await driveService.createFolder(folderName);
+      driveFolderId = folderId;
+      driveUrl = `https://drive.google.com/drive/folders/${folderId}`;
+    } catch (err) {
+      logger.warn(`Drive folder creation failed: ${err.message}`);
     }
 
     const folder = new Folder({
@@ -63,18 +60,21 @@ const createFolder = async (req, res) => {
       semester,
       accessCode,
       departmentCode: accessCode,
-      // REMOVED permission field
-      driveUrl,
       driveFolderId,
-      files: []
+      driveUrl,
+      files: [],
+      active: true
     });
 
     await folder.save();
-    await logAction(req, 'CREATE_FOLDER', 'Folder', folder._id, { 
-      subjectName, department, semester, facultyName 
+
+    await logAction(req, 'CREATE_FOLDER', 'Folder', folder._id, {
+      subjectName,
+      department,
+      semester,
+      facultyName
     });
 
-    logger.info(`Folder created: ${folderName} [${accessCode}] by ${req.user.email}`);
     res.status(201).json({ folder });
   } catch (error) {
     logger.error(`Create folder error: ${error.message}`);
@@ -85,7 +85,12 @@ const createFolder = async (req, res) => {
 const uploadFiles = async (req, res) => {
   try {
     const { id } = req.params;
-    const folder = await Folder.findOne({ _id: id, facultyId: req.user._id, active: true });
+
+    const folder = await Folder.findOne({
+      _id: id,
+      facultyId: req.user._id,
+      active: true
+    });
 
     if (!folder) {
       return res.status(404).json({ message: 'Folder not found or access denied' });
@@ -98,35 +103,30 @@ const uploadFiles = async (req, res) => {
     const uploadedFiles = [];
 
     for (const file of req.files) {
-      let fileId = 'local-' + Date.now() + '-' + Math.round(Math.random() * 1E9);
-      let previewLink = '';
-      let downloadLink = '';
-
-      if (driveService.enabled && folder.driveFolderId && !folder.driveFolderId.startsWith('local')) {
-        try {
-          // Assuming driveService.uploadFile now returns these links
-          const driveResult = await driveService.uploadFile(
-            file.buffer,
-            file.originalname,
-            file.mimetype,
-            folder.driveFolderId
-          );
-          
-          fileId = driveResult.fileId || fileId;
-          previewLink = driveResult.previewLink || '';
-          downloadLink = driveResult.downloadLink || '';
-        } catch (driveErr) {
-          logger.warn(`Drive upload failed for ${file.originalname}: ${driveErr.message}`);
-        }
-      }
-
-      // Updated to strictly match the new Folder schema
-      const fileDoc = {
-        fileId: fileId,
+      let fileDoc = {
+        fileId: null,
         fileName: file.originalname,
-        previewLink: previewLink,
-        downloadLink: downloadLink
+        previewLink: '',
+        downloadLink: ''
       };
+
+      try {
+        const driveResult = await driveService.uploadFile(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+          folder.driveFolderId
+        );
+
+        fileDoc = {
+          fileId: driveResult.fileId,
+          fileName: file.originalname,
+          previewLink: driveResult.previewLink,
+          downloadLink: driveResult.downloadLink
+        };
+      } catch (err) {
+        logger.warn(`Drive upload failed for ${file.originalname}: ${err.message}`);
+      }
 
       folder.files.push(fileDoc);
       uploadedFiles.push(fileDoc);
@@ -136,11 +136,9 @@ const uploadFiles = async (req, res) => {
 
     await logAction(req, 'UPLOAD_FILES', 'Folder', folder._id, {
       fileCount: uploadedFiles.length,
-      // Calculate totalSize from req.files since it's no longer stored in fileDoc
       totalSize: req.files.reduce((sum, f) => sum + f.size, 0)
     });
 
-    logger.info(`${uploadedFiles.length} files uploaded to ${folder.subjectName} by ${req.user.email}`);
     res.json({
       message: `${uploadedFiles.length} file(s) uploaded successfully`,
       files: uploadedFiles
@@ -154,33 +152,39 @@ const uploadFiles = async (req, res) => {
 const deleteFile = async (req, res) => {
   try {
     const { id, fileId } = req.params;
-    const folder = await Folder.findOne({ _id: id, facultyId: req.user._id, active: true });
+
+    const folder = await Folder.findOne({
+      _id: id,
+      facultyId: req.user._id,
+      active: true
+    });
 
     if (!folder) {
       return res.status(404).json({ message: 'Folder not found' });
     }
 
-    const fileIndex = folder.files.findIndex(f => f._id.toString() === fileId);
-    if (fileIndex === -1) {
+    const index = folder.files.findIndex(f => f._id.toString() === fileId);
+    if (index === -1) {
       return res.status(404).json({ message: 'File not found' });
     }
 
-    const file = folder.files[fileIndex];
+    const file = folder.files[index];
 
-    // Updated to use the new `fileId` property instead of `driveFileId`
-    if (file.fileId && !file.fileId.startsWith('local') && driveService.enabled) {
+    if (file.fileId) {
       try {
         await driveService.deleteFile(file.fileId);
-      } catch (driveErr) {
-        logger.warn(`Drive file delete failed: ${driveErr.message}`);
+      } catch (err) {
+        logger.warn(`Drive delete failed: ${err.message}`);
       }
     }
 
-    folder.files.splice(fileIndex, 1);
+    folder.files.splice(index, 1);
     await folder.save();
 
-    // Updated to use `fileName` instead of `name`
-    await logAction(req, 'DELETE_FILE', 'Folder', folder._id, { fileName: file.fileName });
+    await logAction(req, 'DELETE_FILE', 'Folder', folder._id, {
+      fileName: file.fileName
+    });
+
     res.json({ message: 'File deleted successfully' });
   } catch (error) {
     logger.error(`Delete file error: ${error.message}`);
@@ -191,20 +195,24 @@ const deleteFile = async (req, res) => {
 const deleteFolder = async (req, res) => {
   try {
     const { id } = req.params;
-    const folder = await Folder.findOne({ _id: id, facultyId: req.user._id });
 
-    if (!folder) return res.status(404).json({ message: 'Folder not found' });
+    const folder = await Folder.findOne({
+      _id: id,
+      facultyId: req.user._id
+    });
 
-    // Delete from Drive
-    if (driveService.enabled && folder.driveFolderId && !folder.driveFolderId.startsWith('local')) {
+    if (!folder) {
+      return res.status(404).json({ message: 'Folder not found' });
+    }
+
+    if (folder.driveFolderId) {
       try {
         await driveService.deleteFolder(folder.driveFolderId);
-      } catch (driveErr) {
-        logger.warn(`Drive folder delete skipped: ${driveErr.message}`);
+      } catch (err) {
+        logger.warn(`Drive folder delete failed: ${err.message}`);
       }
     }
 
-    // Remove from all students' savedMaterials and accessHistory
     await User.updateMany(
       { 'savedMaterials.materialId': id },
       { $pull: { savedMaterials: { materialId: id } } }
@@ -215,14 +223,14 @@ const deleteFolder = async (req, res) => {
       { $pull: { accessHistory: { materialId: id } } }
     );
 
-    // Mark folder as inactive (soft delete)
     folder.active = false;
     await folder.save();
 
-    await logAction(req, 'DELETE_FOLDER', 'Folder', folder._id, { subjectName: folder.subjectName });
-    logger.info(`Folder deleted: ${folder.subjectName} by ${req.user.email}`);
-    
-    res.json({ message: 'Material deleted successfully and removed from all students' });
+    await logAction(req, 'DELETE_FOLDER', 'Folder', folder._id, {
+      subjectName: folder.subjectName
+    });
+
+    res.json({ message: 'Material deleted successfully' });
   } catch (error) {
     logger.error(`Delete folder error: ${error.message}`);
     res.status(500).json({ message: 'Failed to delete folder' });
@@ -237,7 +245,10 @@ const getFolderDetails = async (req, res) => {
       active: true
     });
 
-    if (!folder) return res.status(404).json({ message: 'Folder not found' });
+    if (!folder) {
+      return res.status(404).json({ message: 'Folder not found' });
+    }
+
     res.json({ folder });
   } catch (error) {
     logger.error(`Get folder details error: ${error.message}`);
