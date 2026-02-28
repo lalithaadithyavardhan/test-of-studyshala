@@ -1,10 +1,11 @@
 /**
  * StudentMaterialAccess
  * =====================
- * Shown after a student validates an access code (or arrives from History).
- * 
- * Files come pre-loaded with previewUrl + downloadUrl from the backend.
- * No Axios download calls — all file access is via Google Drive URLs.
+ * Shown after a student validates an access code (or arrives from History/Saved).
+ *
+ * FIX: Files are ALWAYS fetched fresh from the API when FileManager opens.
+ * This guarantees every file has driveFileId, downloadUrl, and previewUrl
+ * regardless of how the student arrived at this page.
  */
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
@@ -17,24 +18,25 @@ import FileManager from '../components/FileManager';
 import './StudentMaterialAccess.css';
 
 const StudentMaterialAccess = () => {
-  const { id }       = useParams();
-  const location     = useLocation();
-  const navigate     = useNavigate();
+  const { id }      = useParams();
+  const location    = useLocation();
+  const navigate    = useNavigate();
 
-  const [material, setMaterial] = useState(location.state?.material || null);
-  const [files,    setFiles]    = useState(location.state?.material?.files || []);
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState('');
-  const [success,  setSuccess]  = useState('');
-  const [fmOpen,   setFmOpen]   = useState(false);
-  const [fetching, setFetching] = useState(false);
+  const [material,  setMaterial]  = useState(location.state?.material || null);
+  const [files,     setFiles]     = useState([]);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState('');
+  const [success,   setSuccess]   = useState('');
+  const [fmOpen,    setFmOpen]    = useState(false);
+  const [fetching,  setFetching]  = useState(false);
+  const [fmLoading, setFmLoading] = useState(false);
 
-  // If arriving without state (e.g. from History page), fetch from API
+  // If no material in location.state (e.g. direct URL visit), fetch it
   useEffect(() => {
-    if (!material) fetchFiles();
+    if (!material) fetchMaterial();
   }, [id]);
 
-  const fetchFiles = async () => {
+  const fetchMaterial = async () => {
     setFetching(true);
     try {
       const res = await api.get(`/student/materials/${id}/files`);
@@ -44,6 +46,24 @@ const StudentMaterialAccess = () => {
       setError(err.response?.data?.message || 'Failed to load material. Enter the access code first.');
     } finally {
       setFetching(false);
+    }
+  };
+
+  // FIX: Always fetch files fresh when opening FileManager.
+  // This ensures downloadUrl and previewUrl are always present —
+  // they are built at API response time from driveFileId, and are
+  // NOT stored in location.state (which could be stale or missing).
+  const openFileManager = async () => {
+    setFmLoading(true);
+    setFmOpen(true);
+    try {
+      const res = await api.get(`/student/materials/${id}/files`);
+      setFiles(res.data.files || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load files. Please try again.');
+      setFmOpen(false);
+    } finally {
+      setFmLoading(false);
     }
   };
 
@@ -156,11 +176,15 @@ const StudentMaterialAccess = () => {
               </ul>
               <Button
                 variant="primary"
-                onClick={() => setFmOpen(true)}
-                disabled={!fileCount}
+                onClick={openFileManager}
+                disabled={!fileCount || fmLoading}
                 className="w-full"
               >
-                {fileCount ? `📂 Open Files (${fileCount})` : 'No files uploaded yet'}
+                {fmLoading
+                  ? '⏳ Loading files…'
+                  : fileCount
+                    ? `📂 Open Files (${fileCount})`
+                    : 'No files uploaded yet'}
               </Button>
             </Card>
 
@@ -175,7 +199,7 @@ const StudentMaterialAccess = () => {
         </div>
       </div>
 
-      {fmOpen && (
+      {fmOpen && !fmLoading && (
         <FileManager
           files={files}
           materialName={material.subjectName}
