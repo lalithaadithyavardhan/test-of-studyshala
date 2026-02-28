@@ -30,29 +30,35 @@ class DriveService {
     try {
       const metadata = {
         name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-        ...(parentFolderId && { parents: [parentFolderId] })
+        mimeType: 'application/vnd.google-apps.folder'
       };
+
+      if (parentFolderId) {
+        metadata.parents = [parentFolderId];
+      }
 
       const res = await this.drive.files.create({
         resource: metadata,
-        fields: 'id'
+        fields: 'id',
+        supportsAllDrives: true
       });
 
       const folderId = res.data.id;
 
-      // ✅ CRITICAL: Make folder public
+      // Make folder public
       await this.drive.permissions.create({
         fileId: folderId,
         requestBody: {
           type: 'anyone',
           role: 'reader'
-        }
+        },
+        supportsAllDrives: true
       });
 
       logger.info(`Folder created & shared: ${folderName} (${folderId})`);
 
       return folderId;
+
     } catch (err) {
       logger.error(`Create folder error: ${err.message}`);
       throw err;
@@ -60,13 +66,25 @@ class DriveService {
   }
 
   async deleteFolder(folderId) {
-    await this.drive.files.delete({ fileId: folderId });
+    try {
+      await this.drive.files.delete({
+        fileId: folderId,
+        supportsAllDrives: true
+      });
+
+      logger.info(`Folder deleted: ${folderId}`);
+
+    } catch (err) {
+      logger.error(`Delete folder error: ${err.message}`);
+      throw err;
+    }
   }
 
   /* ───────────────── File Operations ───────────────── */
 
   async uploadFile(fileBuffer, fileName, mimeType, folderId) {
     try {
+
       const bufferStream = new stream.PassThrough();
       bufferStream.end(fileBuffer);
 
@@ -79,28 +97,29 @@ class DriveService {
           mimeType,
           body: bufferStream
         },
-        fields: 'id, name, size, webViewLink, webContentLink'
+        fields: 'id, name, size, webViewLink, webContentLink',
+        supportsAllDrives: true
       });
 
       const fileId = res.data.id;
 
-      // ✅ CRITICAL: Make file public
+      // Make file public
       await this.drive.permissions.create({
         fileId,
         requestBody: {
           type: 'anyone',
           role: 'reader'
-        }
+        },
+        supportsAllDrives: true
       });
 
-      // ✅ Reliable links
+      // Reliable preview link
       const previewLink =
-        res.data.webViewLink ||
         `https://drive.google.com/file/d/${fileId}/preview`;
 
+      // Reliable download link
       const downloadLink =
-        res.data.webContentLink ||
-        `https://drive.google.com/uc?id=${fileId}&export=download`;
+        `https://drive.google.com/uc?export=download&id=${fileId}`;
 
       logger.info(`File uploaded & shared: ${fileName} (${fileId})`);
 
@@ -111,6 +130,7 @@ class DriveService {
         previewLink,
         downloadLink
       };
+
     } catch (err) {
       logger.error(`Upload file error: ${err.message}`);
       throw err;
@@ -118,16 +138,43 @@ class DriveService {
   }
 
   async downloadFile(fileId) {
-    const res = await this.drive.files.get(
-      { fileId, alt: 'media' },
-      { responseType: 'arraybuffer' }
-    );
-    return Buffer.from(res.data);
+    try {
+
+      const res = await this.drive.files.get(
+        {
+          fileId,
+          alt: 'media',
+          supportsAllDrives: true
+        },
+        {
+          responseType: 'arraybuffer'
+        }
+      );
+
+      return Buffer.from(res.data);
+
+    } catch (err) {
+      logger.error(`Download file error: ${err.message}`);
+      throw err;
+    }
   }
 
   async deleteFile(fileId) {
-    await this.drive.files.delete({ fileId });
+    try {
+
+      await this.drive.files.delete({
+        fileId,
+        supportsAllDrives: true
+      });
+
+      logger.info(`File deleted: ${fileId}`);
+
+    } catch (err) {
+      logger.error(`Delete file error: ${err.message}`);
+      throw err;
+    }
   }
+
 }
 
 module.exports = new DriveService();
