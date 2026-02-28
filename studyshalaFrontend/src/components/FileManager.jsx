@@ -1,29 +1,6 @@
-/**
- * FileManager
- * ===========
- * Desktop-style full-screen file browser.
- *
- * Features:
- * - Grid view (icon tiles) and List view (table), toggleable
- * - Single-click = select file
- * - Double-click = open full-screen preview
- * - Preview button per file
- * - Download button opens Google Drive direct download in new tab
- *   (no Axios, no fetch — browser handles it directly)
- * - Keyboard: Escape closes, Enter opens selected file
- * - Dark mode support
- * - Responsive (mobile goes full-screen)
- *
- * DOWNLOAD APPROACH:
- *   window.open(file.downloadUrl, '_blank')
- *   This redirects the browser directly to Google Drive's anyoneWithLink
- *   download URL. No file data passes through our server at any point.
- */
 import { useState, useEffect } from 'react';
 import FilePreviewModal from './FilePreviewModal';
 import './FileManager.css';
-
-// ── File type metadata ─────────────────────────────────────────────────────
 
 const FILE_META = {
   'application/pdf': { icon: '📕', color: '#ef4444', label: 'PDF' },
@@ -40,10 +17,10 @@ const FILE_META = {
 };
 
 const getFileMeta = (mime = '') => {
-  if (FILE_META[mime])              return FILE_META[mime];
-  if (mime.startsWith('image/'))    return { icon: '🖼️', color: '#06b6d4', label: 'Image' };
-  if (mime.startsWith('video/'))    return { icon: '🎥', color: '#8b5cf6', label: 'Video' };
-  if (mime.startsWith('audio/'))    return { icon: '🎵', color: '#ec4899', label: 'Audio' };
+  if (FILE_META[mime]) return FILE_META[mime];
+  if (mime.startsWith('image/')) return { icon: '🖼️', color: '#06b6d4', label: 'Image' };
+  if (mime.startsWith('video/')) return { icon: '🎥', color: '#8b5cf6', label: 'Video' };
+  if (mime.startsWith('audio/')) return { icon: '🎵', color: '#ec4899', label: 'Audio' };
   return { icon: '📄', color: '#64748b', label: 'File' };
 };
 
@@ -54,12 +31,10 @@ const fmtSize = (bytes) => {
   return (bytes / 1024 ** i).toFixed(1) + ' ' + units[i];
 };
 
-// ── Component ──────────────────────────────────────────────────────────────
-
 const FileManager = ({ files = [], materialName = 'Files', onClose }) => {
-  const [view,      setView]    = useState('grid');
-  const [selected,  setSelected]= useState(null);
-  const [preview,   setPreview] = useState(null);
+  const [view, setView] = useState('grid');
+  const [selected, setSelected] = useState(null);
+  const [preview, setPreview] = useState(null);
 
   useEffect(() => {
     const handler = (e) => {
@@ -80,12 +55,11 @@ const FileManager = ({ files = [], materialName = 'Files', onClose }) => {
 
   const handleDownload = (e, file) => {
     e.stopPropagation();
-    if (!file.downloadUrl) {
+    if (!file.driveDownloadLink && !file.driveViewLink) {
       alert('No download URL. Ask your faculty to re-upload this file.');
       return;
     }
-    // Direct browser → Drive — no server involvement
-    window.open(file.downloadUrl, '_blank', 'noopener');
+    window.open(file.driveDownloadLink || file.driveViewLink, '_blank', 'noopener');
   };
 
   const openPreview = (e, file) => {
@@ -95,13 +69,8 @@ const FileManager = ({ files = [], materialName = 'Files', onClose }) => {
 
   return (
     <>
-      <div
-        className="fm-overlay"
-        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      >
+      <div className="fm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="fm-window">
-
-          {/* ── Title bar ── */}
           <div className="fm-titlebar">
             <div className="fm-titlebar-left">
               <span>📁</span>
@@ -109,28 +78,18 @@ const FileManager = ({ files = [], materialName = 'Files', onClose }) => {
               <span className="fm-count-badge">{files.length} file{files.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="fm-titlebar-right">
-              <button
-                className={`fm-view-btn ${view === 'grid' ? 'active' : ''}`}
-                onClick={() => setView('grid')}
-                title="Grid view"
-              >⊞</button>
-              <button
-                className={`fm-view-btn ${view === 'list' ? 'active' : ''}`}
-                onClick={() => setView('list')}
-                title="List view"
-              >☰</button>
+              <button className={`fm-view-btn ${view === 'grid' ? 'active' : ''}`} onClick={() => setView('grid')} title="Grid view">⊞</button>
+              <button className={`fm-view-btn ${view === 'list' ? 'active' : ''}`} onClick={() => setView('list')} title="List view">☰</button>
               <button className="fm-close-btn" onClick={onClose} title="Close (Esc)">✕</button>
             </div>
           </div>
 
-          {/* ── Hint bar ── */}
           <div className="fm-hintbar">
             {selected
               ? `"${files.find(f => f._id === selected)?.name}" — press Enter to preview`
               : 'Click to select  •  Double-click to preview  •  ⬇ to download'}
           </div>
 
-          {/* ── Files area ── */}
           <div className="fm-body">
             {files.length === 0 ? (
               <div className="fm-empty">
@@ -229,7 +188,6 @@ const FileManager = ({ files = [], materialName = 'Files', onClose }) => {
             )}
           </div>
 
-          {/* ── Status bar ── */}
           <div className="fm-statusbar">
             <span>{files.length} item{files.length !== 1 ? 's' : ''}</span>
             {selected && (() => {
