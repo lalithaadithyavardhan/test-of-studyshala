@@ -2,25 +2,13 @@ const mongoose = require('mongoose');
 
 const fileSchema = new mongoose.Schema({
 
-  fileId: {
-    type: String,
-    required: true
-  },
+  fileId: String,
 
-  fileName: {
-    type: String,
-    required: true
-  },
+  fileName: String,
 
-  previewLink: {
-    type: String,
-    required: true
-  },
+  previewLink: String,
 
-  downloadLink: {
-    type: String,
-    required: true
-  }
+  downloadLink: String
 
 }, { _id: false });
 
@@ -36,53 +24,23 @@ const folderSchema = new mongoose.Schema({
 
   },
 
-  facultyName: {
+  facultyName: String,
 
-    type: String,
+  subjectName: String,
 
-    required: true
+  department: String,
 
-  },
-
-  subjectName: {
-
-    type: String,
-
-    required: true
-
-  },
-
-  department: {
-
-    type: String,
-
-    required: true
-
-  },
-
-  semester: {
-
-    type: String,
-
-    required: true
-
-  },
+  semester: String,
 
   accessCode: {
 
     type: String,
 
-    required: true,
-
     index: true
 
   },
 
-  departmentCode: {
-
-    type: String
-
-  },
+  departmentCode: String,
 
   files: {
 
@@ -92,21 +50,9 @@ const folderSchema = new mongoose.Schema({
 
   },
 
-  driveUrl: {
+  driveUrl: String,
 
-    type: String,
-
-    default: ''
-
-  },
-
-  driveFolderId: {
-
-    type: String,
-
-    default: ''
-
-  },
+  driveFolderId: String,
 
   accessCount: {
 
@@ -130,28 +76,10 @@ const folderSchema = new mongoose.Schema({
 
 });
 
-folderSchema.index({
+folderSchema.index({ facultyId: 1, active: 1 });
 
-  facultyId: 1,
+folderSchema.index({ accessCode: 1, active: 1 });
 
-  active: 1
-
-});
-
-folderSchema.index({
-
-  accessCode: 1,
-
-  active: 1
-
-});
-
-folderSchema.index({
-
-  departmentCode: 1,
-
-  active: 1
-
-});
+folderSchema.index({ departmentCode: 1, active: 1 });
 
 module.exports = mongoose.model('Folder', folderSchema);
