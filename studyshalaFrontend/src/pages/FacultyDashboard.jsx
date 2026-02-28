@@ -15,7 +15,6 @@ const FacultyDashboard = () => {
 
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -28,15 +27,21 @@ const FacultyDashboard = () => {
     department: '',
     semester: '',
     subjectName: '',
-    facultyName: '',
+    facultyName: user?.name || ''
   });
 
   const [uploadFiles, setUploadFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
 
+
+  /* ========================================
+     FETCH MATERIALS
+  ======================================== */
+
   useEffect(() => {
     fetchMaterials();
   }, []);
+
 
   const fetchMaterials = async () => {
 
@@ -50,7 +55,9 @@ const FacultyDashboard = () => {
 
     } catch (err) {
 
-      setError(err.response?.data?.message || 'Failed to fetch materials');
+      console.error(err);
+
+      setError('Failed to load materials');
 
     } finally {
 
@@ -60,6 +67,11 @@ const FacultyDashboard = () => {
 
   };
 
+
+  /* ========================================
+     CREATE MATERIAL
+  ======================================== */
+
   const handleCreateSubmit = async (e) => {
 
     e.preventDefault();
@@ -68,26 +80,33 @@ const FacultyDashboard = () => {
 
       await api.post('/faculty/folders', formData);
 
+      setSuccess('Material created successfully');
+
       setShowCreateModal(false);
 
       setFormData({
         department: '',
         semester: '',
         subjectName: '',
-        facultyName: '',
+        facultyName: user?.name || ''
       });
-
-      setSuccess('Material created successfully');
 
       fetchMaterials();
 
     } catch (err) {
 
-      setError(err.response?.data?.message || 'Failed to create material');
+      console.error(err);
+
+      setError('Failed to create material');
 
     }
 
   };
+
+
+  /* ========================================
+     UPLOAD FILES
+  ======================================== */
 
   const handleUploadSubmit = async () => {
 
@@ -113,17 +132,19 @@ const FacultyDashboard = () => {
         }
       );
 
+      setSuccess('Files uploaded successfully');
+
       setShowUploadModal(false);
 
       setUploadFiles([]);
-
-      setSuccess('Files uploaded successfully');
 
       fetchMaterials();
 
     } catch (err) {
 
-      setError(err.response?.data?.message || 'Upload failed');
+      console.error(err);
+
+      setError('Upload failed');
 
     } finally {
 
@@ -133,12 +154,16 @@ const FacultyDashboard = () => {
 
   };
 
-  // ✅ FIXED PREVIEW (Google Drive direct preview)
+
+  /* ========================================
+     PREVIEW FILE  (FIXED)
+  ======================================== */
+
   const openPreview = (file) => {
 
     if (!file.previewLink) {
 
-      setError('Preview link not available');
+      alert('Preview link not available');
 
       return;
 
@@ -148,20 +173,41 @@ const FacultyDashboard = () => {
 
   };
 
-  // ✅ FIXED DOWNLOAD (Google Drive direct download)
+
+  /* ========================================
+     DOWNLOAD FILE  (FIXED)
+  ======================================== */
+
   const downloadFile = (file) => {
 
     if (!file.downloadLink) {
 
-      setError('Download link not available');
+      alert('Download link not available');
 
       return;
 
     }
 
-    window.open(file.downloadLink, '_blank');
+    const link = document.createElement('a');
+
+    link.href = file.downloadLink;
+
+    link.target = '_blank';
+
+    link.download = file.fileName || 'file';
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
 
   };
+
+
+  /* ========================================
+     UI
+  ======================================== */
 
   return (
 
@@ -177,11 +223,13 @@ const FacultyDashboard = () => {
 
           <h1>Faculty Dashboard</h1>
 
+
           {error && (
             <div className="alert alert-error">
               {error}
             </div>
           )}
+
 
           {success && (
             <div className="alert alert-success">
@@ -189,9 +237,11 @@ const FacultyDashboard = () => {
             </div>
           )}
 
+
           <Button onClick={() => setShowCreateModal(true)}>
             Create Material
           </Button>
+
 
           {loading ? (
 
@@ -209,17 +259,16 @@ const FacultyDashboard = () => {
                   {folder.department} • Semester {folder.semester}
                 </p>
 
+
                 <Button
                   onClick={() => {
-
                     setSelectedFolder(folder);
-
                     setShowUploadModal(true);
-
                   }}
                 >
                   Upload Files
                 </Button>
+
 
                 {folder.files && folder.files.length > 0 ? (
 
@@ -227,13 +276,18 @@ const FacultyDashboard = () => {
 
                     {folder.files.map(file => (
 
-                      <li key={file._id} className="file-item">
+                      <li
+                        key={file.fileId}
+                        className="file-item"
+                      >
 
                         <span>
                           {file.fileName}
                         </span>
 
+
                         <div className="file-actions">
+
 
                           <Button
                             size="sm"
@@ -243,12 +297,14 @@ const FacultyDashboard = () => {
                             Preview
                           </Button>
 
+
                           <Button
                             size="sm"
                             onClick={() => downloadFile(file)}
                           >
                             Download
                           </Button>
+
 
                         </div>
 
@@ -274,7 +330,11 @@ const FacultyDashboard = () => {
 
       </div>
 
-      {/* Create Material Modal */}
+
+
+      {/* ========================================
+          CREATE MATERIAL MODAL
+      ======================================== */}
 
       <Modal
         isOpen={showCreateModal}
@@ -307,6 +367,7 @@ const FacultyDashboard = () => {
           }
         />
 
+
         <Input
           label="Department"
           value={formData.department}
@@ -317,6 +378,7 @@ const FacultyDashboard = () => {
             })
           }
         />
+
 
         <Input
           label="Semester"
@@ -329,6 +391,7 @@ const FacultyDashboard = () => {
           }
         />
 
+
         <Input
           label="Subject Name"
           value={formData.subjectName}
@@ -340,9 +403,14 @@ const FacultyDashboard = () => {
           }
         />
 
+
       </Modal>
 
-      {/* Upload Modal */}
+
+
+      {/* ========================================
+          UPLOAD MODAL
+      ======================================== */}
 
       <Modal
         isOpen={showUploadModal}
@@ -379,10 +447,12 @@ const FacultyDashboard = () => {
 
       </Modal>
 
+
     </div>
 
   );
 
 };
+
 
 export default FacultyDashboard;
