@@ -4,26 +4,14 @@
  * All download and preview URLs are derived at runtime from driveFileId.
  * No files are streamed through Express. Downloads and previews are
  * browser→Drive redirects using Google's public anyoneWithLink URLs.
- *
- * WHY THIS WORKS:
- *   Every file is uploaded with role:reader / type:anyone in driveService.
- *   Google's public download URL works for any browser, any account, forever.
- *   No REFRESH_TOKEN needed on the server for reads.
  */
 
-const Folder    = require('../models/Folder');
+const Folder        = require('../models/Folder');
 const { logAction } = require('../middleware/logging');
-const logger    = require('../utils/logger');
+const logger        = require('../utils/logger');
 
-// ── URL helpers ────────────────────────────────────────────────────────────
+// ── URL helpers ─────────────────────────────────────────────────────────────
 
-/**
- * Build Google Drive public URLs from a fileId.
- * These work for anyoneWithLink files — no OAuth, no token.
- *
- * Preview:  /file/d/ID/preview  → Drive's built-in viewer (PDF, Word, PPT…)
- * Download: drive.usercontent.google.com  → triggers browser download dialog
- */
 const buildDriveUrls = (driveFileId) => {
   if (!driveFileId) return { previewUrl: null, downloadUrl: null };
   return {
@@ -32,11 +20,6 @@ const buildDriveUrls = (driveFileId) => {
   };
 };
 
-/**
- * Shape a file document for the client.
- * Always includes previewUrl and downloadUrl so the frontend never
- * needs to construct Drive URLs itself.
- */
 const mapFile = (f) => ({
   _id:         f._id,
   name:        f.name,
@@ -47,7 +30,7 @@ const mapFile = (f) => ({
   ...buildDriveUrls(f.driveFileId)
 });
 
-// ── Validate access code ───────────────────────────────────────────────────
+// ── Validate access code ─────────────────────────────────────────────────────
 
 const validateAccessCode = async (req, res) => {
   try {
@@ -67,10 +50,12 @@ const validateAccessCode = async (req, res) => {
     if (!seen) {
       req.user.accessHistory.push({ materialId: folder._id, accessCode: code, accessedAt: new Date() });
       await req.user.save();
+
+      // FIX: Only increment accessCount on FIRST access per student (not every validation)
+      folder.accessCount += 1;
+      await folder.save();
     }
 
-    folder.accessCount += 1;
-    await folder.save();
     await logAction(req, 'ACCESS_MATERIAL', 'Folder', folder._id, { code });
 
     res.json({
@@ -84,7 +69,7 @@ const validateAccessCode = async (req, res) => {
         accessCode:  folder.accessCode || folder.departmentCode,
         fileCount:   folder.files?.length || 0,
         createdAt:   folder.createdAt,
-        files:       folder.files.map(mapFile)   // includes previewUrl + downloadUrl
+        files:       folder.files.map(mapFile)
       }
     });
   } catch (err) {
@@ -93,7 +78,7 @@ const validateAccessCode = async (req, res) => {
   }
 };
 
-// ── Save material ──────────────────────────────────────────────────────────
+// ── Save material ────────────────────────────────────────────────────────────
 
 const saveMaterial = async (req, res) => {
   try {
@@ -116,7 +101,7 @@ const saveMaterial = async (req, res) => {
   }
 };
 
-// ── Get saved materials list ───────────────────────────────────────────────
+// ── Get saved materials list ─────────────────────────────────────────────────
 
 const getSavedMaterials = async (req, res) => {
   try {
@@ -145,7 +130,7 @@ const getSavedMaterials = async (req, res) => {
   }
 };
 
-// ── Get access history ─────────────────────────────────────────────────────
+// ── Get access history ───────────────────────────────────────────────────────
 
 const getAccessHistory = async (req, res) => {
   try {
@@ -176,8 +161,7 @@ const getAccessHistory = async (req, res) => {
   }
 };
 
-// ── Get files for a material ───────────────────────────────────────────────
-// Returns previewUrl + downloadUrl per file — no proxying required
+// ── Get files for a material ─────────────────────────────────────────────────
 
 const getMaterialFiles = async (req, res) => {
   try {
@@ -189,6 +173,7 @@ const getMaterialFiles = async (req, res) => {
     const hasAccess =
       req.user.savedMaterials.some(m => m.materialId.toString() === id) ||
       req.user.accessHistory.some(h => h.materialId.toString() === id);
+
     if (!hasAccess) return res.status(403).json({ message: 'Access denied. Enter the access code first.' });
 
     res.json({
@@ -199,7 +184,7 @@ const getMaterialFiles = async (req, res) => {
         semester:    folder.semester,
         facultyName: folder.facultyName
       },
-      files: folder.files.map(mapFile)
+      files: folder.files.map(mapFile)   // always includes downloadUrl + previewUrl
     });
   } catch (err) {
     logger.error(`getMaterialFiles: ${err.message}`);
@@ -207,10 +192,7 @@ const getMaterialFiles = async (req, res) => {
   }
 };
 
-// ── Download a file ────────────────────────────────────────────────────────
-// FIX: redirects to Google Drive's public URL instead of proxying through Express.
-// This works because files have anyoneWithLink reader permission.
-// GOOGLE_DRIVE_REFRESH_TOKEN is NOT required for this route.
+// ── Download a file ──────────────────────────────────────────────────────────
 
 const downloadFile = async (req, res) => {
   try {
@@ -221,6 +203,7 @@ const downloadFile = async (req, res) => {
     const hasAccess =
       req.user.savedMaterials.some(m => m.materialId.toString() === id) ||
       req.user.accessHistory.some(h => h.materialId.toString() === id);
+
     if (!hasAccess) return res.status(403).json({ message: 'Access denied. Enter the access code first.' });
 
     const file = folder.files.find(f => f._id.toString() === fileId);
@@ -229,7 +212,7 @@ const downloadFile = async (req, res) => {
 
     await logAction(req, 'DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.name });
 
-    // THE FIX: redirect, don't proxy
+    // Redirect browser directly to Google Drive — no proxying needed
     return res.redirect(buildDriveUrls(file.driveFileId).downloadUrl);
   } catch (err) {
     logger.error(`downloadFile: ${err.message}`);
@@ -237,11 +220,16 @@ const downloadFile = async (req, res) => {
   }
 };
 
-// ── Remove saved material ──────────────────────────────────────────────────
+// ── Remove saved material ────────────────────────────────────────────────────
 
 const removeSavedMaterial = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // FIX: Check the material actually exists in the saved list before removing
+    const exists = req.user.savedMaterials.some(m => m.materialId.toString() === id);
+    if (!exists) return res.status(404).json({ message: 'Material not found in your saved list' });
+
     req.user.savedMaterials = req.user.savedMaterials.filter(m => m.materialId.toString() !== id);
     await req.user.save();
     await logAction(req, 'REMOVE_SAVED_MATERIAL', 'Folder', id, {});
