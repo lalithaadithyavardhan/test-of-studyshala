@@ -1,0 +1,88 @@
+.faculty-materials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.faculty-material-card { display: flex; flex-direction: column; overflow: hidden; }
+
+.faculty-material-header {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  padding: 1.25rem;
+  text-align: center;
+  color: white;
+}
+.faculty-material-header .material-icon { font-size: 2rem; margin-bottom: 0.4rem; display: flex; justify-content: center; }
+.faculty-material-header .material-title { margin: 0; color: white; font-size: 1.0625rem; font-weight: 700; }
+
+.faculty-material-body { padding: 1.125rem; flex: 1; }
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border-solid);
+  font-size: 0.8375rem;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-label { font-weight: 600; color: var(--text-sub); }
+.detail-value { font-weight: 600; color: var(--text); }
+
+.code-display {
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 2px solid var(--border-solid);
+}
+
+.code-label {
+  display: block;
+  font-size: 0.675rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-sub);
+  margin-bottom: 0.4rem;
+}
+
+.code-row { display: flex; align-items: center; gap: 0.5rem; }
+
+.code {
+  flex: 1;
+  font-family: monospace;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 0.4rem 0.625rem;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  border: 1px solid var(--border-solid);
+}
+
+.copy-btn {
+  display: flex; align-items: center; gap: 0.3rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border-solid);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+.copy-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.copy-btn.copied { background: var(--success); color: #fff; border-color: var(--success); }
+
+.faculty-material-footer {
+  padding: 0.875rem 1.125rem;
+  border-top: 1px solid var(--border-solid);
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .faculty-materials-grid { grid-template-columns: 1fr; }
+}
