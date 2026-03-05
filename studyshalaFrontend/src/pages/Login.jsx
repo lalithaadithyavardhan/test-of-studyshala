@@ -343,10 +343,10 @@ const Login = () => {
                 <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="about-link about-link--github">
                   <FaGithub /> GitHub
                 </a>
-                <a href="https://linkedin.com/in/Borra Adithya" target="_blank" rel="noopener noreferrer" className="about-link about-link--linkedin">
+                <a href="https://linkedin.com/in/borra-adithya-95a885352" target="_blank" rel="noopener noreferrer" className="about-link about-link--linkedin">
                   <FaLinkedin /> LinkedIn
                 </a>
-                <a href="mailto:borraadithya@gmail.com" className="about-link about-link--email">
+                <a href="mailto:adithyasai533@gmail.com" className="about-link about-link--email">
                   <MdEmail /> Contact
                 </a>
               </div>
@@ -369,10 +369,10 @@ const Login = () => {
             <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="footer-social-btn footer-social-btn--github">
               <FaGithub /> GitHub
             </a>
-            <a href="https://linkedin.com/in/Borra Adithya" target="_blank" rel="noopener noreferrer" className="footer-social-btn footer-social-btn--linkedin">
+            <a href="https://linkedin.com/in/borra-adithya-95a885352" target="_blank" rel="noopener noreferrer" className="footer-social-btn footer-social-btn--linkedin">
               <FaLinkedin /> LinkedIn
             </a>
-            <a href="mailto:borraadithya@gmail.com" className="footer-social-btn footer-social-btn--email">
+            <a href="mailto:adithyasai533@gmail.com" className="footer-social-btn footer-social-btn--email">
               <MdEmail /> Email
             </a>
           </div>
