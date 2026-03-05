@@ -314,20 +314,20 @@ const Login = () => {
       {/* ── About ── */}
       <section className="about-section" id="about">
         <div className="section-inner">
-          <h2 className="section-title">About the Creator</h2>
+          <h2 className="section-title">About</h2>
           <p className="section-sub">The person behind StudyShala</p>
           <div className="about-card">
             <div className="about-avatar">
               <img
-                src="https://avatars.githubusercontent.com/YOUR_GITHUB_USERNAME"
+                src="https://avatars.githubusercontent.com/lalithaadithyavardhan"
                 alt="Creator"
                 className="about-avatar-img"
                 onError={e => { e.target.style.display='none'; }}
               />
             </div>
             <div className="about-content">
-              <h3 className="about-name">Your Name Here</h3>
-              <p className="about-role-tag">Full Stack Developer · Student</p>
+              <h3 className="about-name">Borra adithya</h3>
+              <p className="about-role-tag">Student</p>
               <p className="about-bio">
                 Hi! I'm a passionate developer and student who built StudyShala to solve a real
                 problem — making it easy for faculty to share study materials and for students to
@@ -340,13 +340,13 @@ const Login = () => {
                 the community.
               </p>
               <div className="about-links">
-                <a href="https://github.com/YOUR_GITHUB_USERNAME" target="_blank" rel="noopener noreferrer" className="about-link about-link--github">
+                <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="about-link about-link--github">
                   <FaGithub /> GitHub
                 </a>
-                <a href="https://linkedin.com/in/YOUR_LINKEDIN_USERNAME" target="_blank" rel="noopener noreferrer" className="about-link about-link--linkedin">
+                <a href="https://linkedin.com/in/Borra Adithya" target="_blank" rel="noopener noreferrer" className="about-link about-link--linkedin">
                   <FaLinkedin /> LinkedIn
                 </a>
-                <a href="mailto:your.email@example.com" className="about-link about-link--email">
+                <a href="mailto:borraadithya@gmail.com" className="about-link about-link--email">
                   <MdEmail /> Contact
                 </a>
               </div>
@@ -366,20 +366,20 @@ const Login = () => {
           </div>
           <p className="footer-tagline">Empowering education through seamless material sharing</p>
           <div className="footer-social-links">
-            <a href="https://github.com/YOUR_GITHUB_USERNAME" target="_blank" rel="noopener noreferrer" className="footer-social-btn footer-social-btn--github">
+            <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="footer-social-btn footer-social-btn--github">
               <FaGithub /> GitHub
             </a>
-            <a href="https://linkedin.com/in/YOUR_LINKEDIN_USERNAME" target="_blank" rel="noopener noreferrer" className="footer-social-btn footer-social-btn--linkedin">
+            <a href="https://linkedin.com/in/Borra Adithya" target="_blank" rel="noopener noreferrer" className="footer-social-btn footer-social-btn--linkedin">
               <FaLinkedin /> LinkedIn
             </a>
-            <a href="mailto:your.email@example.com" className="footer-social-btn footer-social-btn--email">
+            <a href="mailto:borraadithya@gmail.com" className="footer-social-btn footer-social-btn--email">
               <MdEmail /> Email
             </a>
           </div>
           <p className="footer-made-with">
             Made with <FaHeart className="footer-heart" /> for the community
           </p>
-          <p className="footer-copy">© {new Date().getFullYear()} StudyShala · Built by Your Name · All rights reserved.</p>
+          <p className="footer-copy">© {new Date().getFullYear()} StudyShala · Built by Borra adithya · All rights reserved.</p>
         </div>
       </footer>
 
