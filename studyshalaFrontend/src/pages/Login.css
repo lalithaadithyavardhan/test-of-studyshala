@@ -530,3 +530,175 @@ body.dark-mode .how-step p { color: #94a3b8; }
   .role-cards { grid-template-columns: 1fr; }
   .login-card { padding: 1.25rem; }
 }
+
+/* ══════════════════════════════════════════════════════
+   ABOUT SECTION
+   ══════════════════════════════════════════════════════ */
+.about-section {
+  padding: 5rem 1.5rem;
+  background: #f0f4f8;
+}
+body.dark-mode .about-section { background: #0f172a; }
+
+.about-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 2.5rem;
+  background: #fff;
+  border-radius: 1.25rem;
+  padding: 2.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  max-width: 860px;
+  margin: 0 auto;
+}
+body.dark-mode .about-card { background: #1e293b; border-color: #334155; }
+
+.about-avatar { flex-shrink: 0; }
+
+.about-avatar-img {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #dbeafe;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.18);
+}
+
+.about-content { flex: 1; }
+
+.about-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.25rem;
+}
+body.dark-mode .about-name { color: #f1f5f9; }
+
+.about-role-tag {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2563eb;
+  margin: 0 0 1rem;
+}
+
+.about-bio {
+  font-size: 0.9375rem;
+  color: #475569;
+  line-height: 1.7;
+  margin: 0 0 0.875rem;
+}
+body.dark-mode .about-bio { color: #94a3b8; }
+
+.about-message {
+  font-size: 0.9375rem;
+  color: #475569;
+  line-height: 1.7;
+  margin: 0 0 1.5rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+body.dark-mode .about-message { color: #94a3b8; }
+
+.about-heart {
+  color: #ef4444;
+  display: inline;
+  vertical-align: middle;
+}
+
+.about-links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  border: 2px solid transparent;
+}
+.about-link--github  { background: #0f172a; color: #fff; }
+.about-link--github:hover  { background: #1e293b; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+.about-link--linkedin { background: #0077b5; color: #fff; }
+.about-link--linkedin:hover { background: #005885; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,119,181,0.35); }
+.about-link--email   { background: #fff; color: #374151; border-color: #d1d5db; }
+.about-link--email:hover   { background: #f9fafb; border-color: #9ca3af; transform: translateY(-2px); }
+body.dark-mode .about-link--email { background: #334155; color: #e2e8f0; border-color: #475569; }
+
+@media (max-width: 640px) {
+  .about-card { flex-direction: column; align-items: center; text-align: center; padding: 1.5rem; }
+  .about-links { justify-content: center; }
+  .about-message { justify-content: center; }
+}
+
+/* ══════════════════════════════════════════════════════
+   UPDATED FOOTER
+   ══════════════════════════════════════════════════════ */
+.footer-brand-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.footer-brand {
+  color: #fff !important;
+}
+.footer-brand span { color: #fff; }
+
+.footer-social-links {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin: 1.25rem 0;
+  flex-wrap: wrap;
+}
+
+.footer-social-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.125rem;
+  border-radius: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  color: #cbd5e1;
+  background: rgba(255,255,255,0.06);
+}
+.footer-social-btn:hover { background: rgba(255,255,255,0.14); color: #fff; border-color: rgba(255,255,255,0.3); transform: translateY(-2px); }
+.footer-social-btn--github:hover  { background: rgba(255,255,255,0.15); }
+.footer-social-btn--linkedin:hover{ background: rgba(0,119,181,0.4); border-color: #0077b5; }
+.footer-social-btn--email:hover   { background: rgba(37,99,235,0.3); border-color: #3b82f6; }
+
+.footer-made-with {
+  font-size: 0.9375rem;
+  color: #94a3b8;
+  margin: 0 0 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.footer-heart {
+  color: #ef4444;
+  animation: heartbeat 1.4s ease infinite;
+}
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.3); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.2); }
+  56% { transform: scale(1); }
+}
