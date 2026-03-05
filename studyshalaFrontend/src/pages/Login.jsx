@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 import {
   FaUserGraduate, FaChalkboardTeacher, FaCheck,
   FaBookOpen, FaKey, FaCloudUploadAlt, FaShareAlt,
@@ -115,18 +116,36 @@ const LoginCard = ({ selectedRole, setSelectedRole, onSignIn, loading, error }) 
 const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [selectedRole, setSelectedRole] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({ totalStudents: 0, totalFaculty: 0, totalMaterials: 0, totalVisits: 0 });
+
+  // Fetch real stats from backend
+  useEffect(() => {
+    api.get('/stats')
+      .then(res => setStats(res.data))
+      .catch(() => {}); // silently fail — stats are decorative
+  }, []);
+
+  // While checking existing auth session, show spinner not landing page
+  if (authLoading) {
+    return (
+      <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'#f0f4f8' }}>
+        <div className="spinner" style={{ width:'40px', height:'40px', border:'3px solid #dbeafe', borderTop:'3px solid #2563eb', borderRadius:'50%', animation:'spin 0.9s linear infinite' }}></div>
+      </div>
+    );
+  }
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (authLoading) return;
     if (user) {
       if (user.role === 'faculty') navigate('/faculty/dashboard', { replace: true });
       else if (user.role === 'admin') navigate('/admin/dashboard', { replace: true });
       else navigate('/student/enter-code', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (searchParams.get('error') === 'auth_failed')
@@ -219,12 +238,12 @@ const Login = () => {
       <section className="stats-section" id="stats">
         <div className="section-inner">
           <h2 className="section-title">Trusted by the community</h2>
-          <p className="section-sub">Real numbers from our growing platform</p>
+          <p className="section-sub">Live numbers from our platform</p>
           <div className="stats-grid">
-            <StatCard icon={<FaUserGraduate />} value={1200} label="Students joined"   color="#2563eb" />
-            <StatCard icon={<FaChalkboardTeacher />} value={150} label="Faculty members" color="#059669" />
-            <StatCard icon={<FaFileAlt />}      value={3800} label="Materials shared"  color="#f59e0b" />
-            <StatCard icon={<FaDownload />}     value={24000} label="Files downloaded"  color="#8b5cf6" />
+            <StatCard icon={<FaUserGraduate />}       value={stats.totalStudents}  label="Students joined"   color="#2563eb" />
+            <StatCard icon={<FaChalkboardTeacher />}  value={stats.totalFaculty}   label="Faculty members"  color="#059669" />
+            <StatCard icon={<FaFileAlt />}            value={stats.totalMaterials} label="Materials shared"  color="#f59e0b" />
+            <StatCard icon={<FaDownload />}           value={stats.totalVisits}    label="Total visits"      color="#8b5cf6" />
           </div>
         </div>
       </section>
