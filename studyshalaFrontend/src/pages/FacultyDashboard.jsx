@@ -13,7 +13,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
-import { MdAdd, MdContentCopy, MdCheck, MdDelete, MdUpload, MdBook, MdFolder } from 'react-icons/md';
+import { MdAdd, MdContentCopy, MdCheck, MdDelete, MdUpload, MdBook, MdFolder, MdPerson } from 'react-icons/md';
 import './FacultyDashboard.css';
 
 const FacultyDashboard = () => {
