@@ -7,19 +7,19 @@
   padding: 1.5rem;
   position: relative;
   overflow: hidden;
-  background: var(--background-light, #fdfbf7); 
+  background: var(--background-light, #f5f7fa);
 }
 
 body.dark-mode .login-container {
-  background: var(--background-dark, #121212);
+  background: var(--background-dark, #1e293b);
 }
 
 /* ── Card ────────────────────────────────────────────────────────────────── */
 .login-card {
   background: var(--surface-light, #ffffff);
-  border-radius: 1.25rem;
-  box-shadow: 0 20px 60px rgba(139, 69, 19, 0.08); 
-  max-width: 480px;
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 64px rgba(37, 99, 235, 0.10), 0 2px 8px rgba(0,0,0,0.06);
+  max-width: 460px;
   width: 100%;
   position: relative;
   z-index: 10;
@@ -30,146 +30,181 @@ body.dark-mode .login-container {
 }
 
 body.dark-mode .login-card {
-  background: var(--card-dark, #1e1e1e);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-  border-color: rgba(255,255,255,0.05);
+  background: var(--card-dark, #1e293b);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  border-color: rgba(255,255,255,0.06);
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 .login-header {
-  background: linear-gradient(135deg, #F9F5F0 0%, #F1EAE0 100%); 
-  padding: 2.5rem 2rem 2rem;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 60%, #1e40af 100%);
+  padding: 2.25rem 2rem 1.75rem;
   text-align: center;
-  border-bottom: 1px solid rgba(0,0,0,0.03);
 }
 
-body.dark-mode .login-header {
-  background: linear-gradient(135deg, #2a2624 0%, #1f1c1a 100%);
-  border-bottom-color: rgba(255,255,255,0.05);
+/* Brand row: icon + name */
+.login-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.login-brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 12px;
+  font-size: 1.5rem;
+  color: #ffffff;
+  backdrop-filter: blur(4px);
+}
+
+.login-brand-name {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.5px;
 }
 
 .login-subtitle {
-  font-size: 0.9375rem;
-  color: #6b5c53; 
+  font-size: 0.875rem;
+  color: rgba(255,255,255,0.80);
   margin: 0;
-  font-weight: 500;
+  font-weight: 400;
 }
-
-body.dark-mode .login-subtitle { color: #a39892; }
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
 .login-body {
-  padding: 2.5rem 2rem 1.5rem;
-  flex: 1; /* Allows body to grow if needed */
+  padding: 2rem 2rem 1.5rem;
+  flex: 1;
 }
 
 .login-welcome {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   margin: 0 0 0.25rem;
-  color: var(--text-light, #2d241f); 
+  color: var(--text-light, #111827);
 }
 
-body.dark-mode .login-welcome { color: var(--text-dark, #f5f5f5); }
+body.dark-mode .login-welcome { color: var(--text-dark, #f8fafc); }
 
 .login-description {
-  color: var(--text-secondary-light, #7a706a);
-  font-size: 0.9375rem;
+  color: var(--text-secondary-light, #6b7280);
+  font-size: 0.9rem;
   margin: 0 0 1.5rem;
 }
 
-body.dark-mode .login-description { color: var(--text-secondary-dark, #aaa); }
+body.dark-mode .login-description { color: var(--text-secondary-dark, #94a3b8); }
 
 /* ── Role selector ───────────────────────────────────────────────────────── */
-.role-selector { margin-bottom: 1.75rem; }
+.role-selector { margin-bottom: 1.5rem; }
 
 .role-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.875rem;
 }
 
 .role-card {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.6rem;
-  padding: 1.25rem 1rem;
-  border: 2px solid var(--border-light, #e5e0db);
+  gap: 0.75rem;
+  padding: 1rem 0.875rem;
+  border: 2px solid var(--border-light, #e5e7eb);
   background: var(--surface-light, #ffffff);
-  border-radius: 1rem;
+  border-radius: 0.875rem;
   cursor: pointer;
-  transition: all 0.25s ease;
-  text-align: center;
+  transition: all 0.22s ease;
+  text-align: left;
 }
 
 body.dark-mode .role-card {
-  border-color: var(--border-dark, #333);
-  background: var(--surface-dark, #242424);
+  border-color: var(--border-dark, #334155);
+  background: #0f172a;
 }
 
 .role-card:hover {
-  border-color: #b45309; 
+  border-color: #2563eb;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(180, 83, 9, 0.12);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.14);
 }
 
 .role-card--active {
-  border-color: #b45309;
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); 
-  box-shadow: 0 8px 24px rgba(180, 83, 9, 0.15);
+  border-color: #2563eb;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.16);
 }
 
 body.dark-mode .role-card--active {
-  background: linear-gradient(135deg, #381a03 0%, #451a03 100%); 
-  border-color: #d97706;
+  background: linear-gradient(135deg, #1e3a8a22 0%, #1e3a8a44 100%);
+  border-color: #3b82f6;
 }
 
 .role-card__icon {
-  font-size: 2.25rem;
-  line-height: 1;
+  font-size: 1.6rem;
+  color: #6b7280;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.role-card--active .role-card__icon {
+  color: #2563eb;
+}
+
+body.dark-mode .role-card__icon { color: #94a3b8; }
+body.dark-mode .role-card--active .role-card__icon { color: #60a5fa; }
+
+.role-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .role-card__title {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
-  color: var(--text-light, #2d241f);
+  color: var(--text-light, #111827);
+  display: block;
 }
 
-body.dark-mode .role-card__title { color: var(--text-dark, #fff); }
+body.dark-mode .role-card__title { color: var(--text-dark, #f8fafc); }
 
-.role-card--active .role-card__title {
-  color: #92400e; 
-}
-
-body.dark-mode .role-card--active .role-card__title {
-  color: #fbbf24;
-}
+.role-card--active .role-card__title { color: #1d4ed8; }
+body.dark-mode .role-card--active .role-card__title { color: #93c5fd; }
 
 .role-card__desc {
-  font-size: 0.775rem;
-  color: var(--text-secondary-light, #7a706a);
+  font-size: 0.72rem;
+  color: var(--text-secondary-light, #6b7280);
   line-height: 1.4;
+  display: block;
 }
 
-body.dark-mode .role-card__desc { color: var(--text-secondary-dark, #aaa); }
+body.dark-mode .role-card__desc { color: var(--text-secondary-dark, #94a3b8); }
 
 .role-card__check {
   position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  width: 22px;
-  height: 22px;
-  background: #b45309; 
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 20px;
+  height: 20px;
+  background: #2563eb;
   color: white;
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.625rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 @keyframes popIn {
@@ -177,7 +212,7 @@ body.dark-mode .role-card__desc { color: var(--text-secondary-dark, #aaa); }
   to   { transform: scale(1); opacity: 1; }
 }
 
-/* ── Google sign-in button ───────────────────────────────────────────────── */
+/* ── Google Sign-In button ───────────────────────────────────────────────── */
 .google-btn {
   width: 100%;
   display: flex;
@@ -186,60 +221,57 @@ body.dark-mode .role-card__desc { color: var(--text-secondary-dark, #aaa); }
   gap: 0.75rem;
   padding: 0.875rem 1.5rem;
   border-radius: 0.75rem;
-  border: 1px solid #d4d0cc;
+  border: 1.5px solid #d1d5db;
   background: white;
-  color: #3c4043;
+  color: #374151;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   margin-bottom: 1.25rem;
 }
 
 body.dark-mode .google-btn {
-  background: var(--surface-dark, #242424);
-  color: var(--text-dark, #fff);
-  border-color: var(--border-dark, #444);
+  background: #0f172a;
+  color: var(--text-dark, #f8fafc);
+  border-color: var(--border-dark, #334155);
 }
 
 .google-btn:hover:not(:disabled) {
-  background: #fdfcfb;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: #f9fafb;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.10);
   transform: translateY(-1px);
-  border-color: #c4c0bc;
+  border-color: #9ca3af;
 }
 
 body.dark-mode .google-btn:hover:not(:disabled) {
-  background: #2a2a2a;
-  border-color: #555;
+  background: #1e293b;
+  border-color: #475569;
 }
 
 .google-btn--disabled,
 .google-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
   transform: none !important;
   box-shadow: none !important;
-  background: #f5f4f2;
 }
 
-body.dark-mode .google-btn:disabled { background: #1a1a1a; }
-
 .google-btn__icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
+  font-size: 1.375rem;
 }
 
 .google-btn__spinner {
   width: 18px;
   height: 18px;
-  border: 2.5px solid rgba(180, 83, 9, 0.2);
-  border-top-color: #b45309;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
   flex-shrink: 0;
+  font-size: 1.125rem;
+  animation: spin 0.75s linear infinite;
+  color: #2563eb;
 }
 
 @keyframes spin {
@@ -249,35 +281,68 @@ body.dark-mode .google-btn:disabled { background: #1a1a1a; }
 /* ── Info text ───────────────────────────────────────────────────────────── */
 .login-info {
   text-align: center;
-  font-size: 0.8125rem;
-  color: var(--text-secondary-light, #7a706a);
+  font-size: 0.8rem;
+  color: var(--text-secondary-light, #6b7280);
   margin: 0;
 }
 
-body.dark-mode .login-info { color: var(--text-secondary-dark, #aaa); }
+body.dark-mode .login-info { color: var(--text-secondary-dark, #94a3b8); }
+
+/* ── Admin link ──────────────────────────────────────────────────────────── */
+.admin-link-wrapper {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.admin-link {
+  font-size: 0.75rem;
+  color: var(--text-secondary-light, #9ca3af);
+  text-decoration: none;
+  opacity: 0.65;
+  transition: opacity 0.2s ease;
+}
+
+.admin-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+body.dark-mode .admin-link { color: #64748b; }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 .login-footer {
   padding: 1rem 1.5rem;
-  border-top: 1px solid var(--border-light, #e5e0db);
+  border-top: 1px solid var(--border-light, #e5e7eb);
   text-align: center;
-  background: rgba(0,0,0,0.01);
 }
 
-body.dark-mode .login-footer { 
-  border-top-color: var(--border-dark, #333); 
-  background: rgba(255,255,255,0.01);
-}
+body.dark-mode .login-footer { border-top-color: var(--border-dark, #334155); }
 
 .login-footer p {
   margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-secondary-light, #9a908a);
+  font-size: 0.775rem;
+  color: var(--text-secondary-light, #9ca3af);
 }
 
-body.dark-mode .login-footer p { color: var(--text-secondary-dark, #888); }
+body.dark-mode .login-footer p { color: #475569; }
 
-/* ── Background decorative shapes ───────────────────────────────────────── */
+/* ── Alert ───────────────────────────────────────────────────────────────── */
+.alert-error {
+  background: #fef2f2;
+  color: #991b1b;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #fca5a5;
+}
+
+body.dark-mode .alert-error {
+  background: #7f1d1d33;
+  color: #fca5a5;
+  border-color: #7f1d1d;
+}
+
+/* ── Background shapes ───────────────────────────────────────────────────── */
 .login-background {
   position: absolute;
   inset: 0;
@@ -289,140 +354,90 @@ body.dark-mode .login-footer p { color: var(--text-secondary-dark, #888); }
 .login-shape {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.06; 
-  filter: blur(40px);
+  opacity: 0.07;
+  filter: blur(50px);
 }
 
 .login-shape-1 {
-  width: 500px; height: 500px;
-  background: linear-gradient(135deg, #b45309, #78350f); 
-  top: -200px; right: -200px;
-  animation: float 22s infinite ease-in-out;
+  width: 480px; height: 480px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  top: -180px; right: -180px;
+  animation: floatBlob 22s infinite ease-in-out;
 }
 
 .login-shape-2 {
-  width: 450px; height: 450px;
-  background: linear-gradient(135deg, #d97706, #b45309); 
-  bottom: -200px; left: -200px;
-  animation: float 18s infinite ease-in-out reverse;
+  width: 420px; height: 420px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  bottom: -180px; left: -180px;
+  animation: floatBlob 18s infinite ease-in-out reverse;
 }
 
 .login-shape-3 {
-  width: 350px; height: 350px;
-  background: linear-gradient(135deg, #fcd34d, #d97706); 
+  width: 320px; height: 320px;
+  background: linear-gradient(135deg, #93c5fd, #60a5fa);
   top: 40%; left: 60%;
   transform: translate(-50%, -50%);
-  animation: float 25s infinite ease-in-out;
+  animation: floatBlob 26s infinite ease-in-out;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
-  50%      { transform: translateY(-40px) rotate(15deg) scale(1.05); }
+@keyframes floatBlob {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-35px) scale(1.04); }
 }
 
-/* ── Hidden admin link ───────────────────────────────────────────────────── */
-.admin-link-wrapper {
-  text-align: center;
-  margin-top: 1.5rem;
+/* ── Tablet ──────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .login-card {
+    max-width: 420px;
+  }
+  .login-header {
+    padding: 2rem 1.75rem 1.5rem;
+  }
+  .login-body {
+    padding: 1.75rem 1.75rem 1.25rem;
+  }
 }
 
-.admin-link {
-  font-size: 0.75rem;
-  color: var(--text-secondary-light, #9a908a);
-  text-decoration: none;
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-}
-
-.admin-link:hover {
-  opacity: 1;
-  text-decoration: underline;
-}
-
-body.dark-mode .admin-link { color: var(--text-secondary-dark, #888); }
-
-/* ── Alert Error ─────────────────────────────────────────────────────────── */
-.alert-error {
-  background: #fef2f2;
-  color: #991b1b;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  border: 1px solid #f87171;
-}
-
-/* ── Logo Styling ────────────────────────────────────────────────────────── */
-.login-logo {
-  width: 240px;
-  height: auto;
-  margin-bottom: 0.75rem;
-  object-fit: contain;
-}
-
-
-/* ==========================================================================
-   MOBILE FULL-SCREEN APP VIEW
-   ========================================================================== */
-@media (max-width: 600px) {
-  /* 1. Remove background padding so card touches edges */
-  .login-container { 
-    padding: 0; 
+/* ── Mobile full-screen ──────────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  .login-container {
+    padding: 0;
     background: var(--surface-light, #ffffff);
+    align-items: stretch;
   }
-  
+
   body.dark-mode .login-container {
-    background: var(--card-dark, #1e1e1e);
+    background: var(--card-dark, #1e293b);
   }
 
-  /* 2. Hide background shapes to keep the mobile screen clean */
-  .login-background {
-    display: none;
-  }
+  .login-background { display: none; }
 
-  /* 3. Make the card fill 100% of the screen */
-  .login-card { 
-    max-width: 100%; 
-    min-height: 100dvh; /* dvh ensures it doesn't get cut off by mobile browser bars */
-    border-radius: 0; 
-    border: none; 
+  .login-card {
+    max-width: 100%;
+    min-height: 100dvh;
+    border-radius: 0;
+    border: none;
     box-shadow: none;
   }
 
-  /* 4. Adjust spacing for mobile */
   .login-header {
-    padding: 3rem 1.5rem 2rem; /* More breathing room at the top */
-    border-bottom: none; /* Cleaner native app look */
+    padding: 3rem 1.5rem 2rem;
   }
 
-  .login-logo {
-    width: 200px;
+  .login-body {
+    padding: 1.5rem 1.5rem 1rem;
   }
 
-  .login-body { 
-    padding: 1.5rem; 
-    display: flex;
-    flex-direction: column;
-    justify-content: center; /* Centers the content nicely */
+  .role-cards {
+    grid-template-columns: 1fr;
   }
 
-  .role-cards { 
-    grid-template-columns: 1fr; /* Stack student/faculty vertically */
-  }
-
-  /* 5. Make buttons row-based to save vertical space */
-  .role-card { 
-    flex-direction: row; 
-    text-align: left; 
-    padding: 1.25rem 1.5rem; 
-    gap: 1.25rem;
-  }
-
-  .role-card__icon { 
-    font-size: 2rem; 
+  .role-card {
+    padding: 1rem 1.25rem;
   }
 
   .login-footer {
     border-top: none;
-    padding-bottom: 2rem; /* Add space at the bottom for iPhone home bars */
+    padding-bottom: 2.5rem;
   }
 }
