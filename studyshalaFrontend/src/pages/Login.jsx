@@ -43,7 +43,7 @@ const Login = () => {
     setError('');
     
     // Deployed Backend URL on Render
-    const BACKEND_URL = 'https://test-of-studyshala.onrender.com';
+    const BACKEND_URL = 'https://studyshala-zc6vy.ondigitalocean.app';
     window.location.href = `${BACKEND_URL}/api/auth/google?role=${selectedRole}`;
   };
 
