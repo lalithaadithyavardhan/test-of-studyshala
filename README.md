@@ -2,81 +2,93 @@
 
 **StudyShala** is a modern, cloud-based study material management platform that connects faculty and students seamlessly. Faculty can upload and share educational resources, while students can access, save, and download materials using unique access codes — all without ever seeing Google Drive.
 
-website link : studyshala.dev
-any one can login with the google account
+# 📚 StudyShala
 
+![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![Google Drive API](https://img.shields.io/badge/Google_Drive_API-4285F4?style=for-the-badge&logo=google-drive&logoColor=white)
 
+**StudyShala** is a modern, cloud-based study material management platform that connects faculty and students seamlessly. Faculty can upload and share educational resources, while students can access, save, and download materials using unique access codes — all without ever needing to interact directly with Google Drive.
 
-The home screen is not just for the login clear it is for landing page also our website
-home screan studyshala
-<img width="1919" height="931" alt="Screenshot 2026-03-07 111523" src="https://github.com/user-attachments/assets/e1d8489c-1871-4ba2-b647-b8b8fbfee9ef" />
+🌐 **Live Website:** [studyshala.dev](https://studyshala.dev) *(Login easily using your Google Account)*
 
+---
 
+## 📸 Platform Showcase
 
-Trusted by our community Screen
-<img width="1919" height="927" alt="Screenshot 2026-03-07 112159" src="https://github.com/user-attachments/assets/21c17e9d-ff5e-4dc1-b276-aa6ad66998a7" />
+### 🌍 Landing Page & Website Overview
+<table align="center">
+  <tr>
+    <td align="center"><b>Home / Landing Page</b></td>
+    <td align="center"><b>Trusted By Community</b></td>
+    <td align="center"><b>Platform Features</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/e1d8489c-1871-4ba2-b647-b8b8fbfee9ef" width="280" alt="Home Screen"></td>
+    <td><img src="https://github.com/user-attachments/assets/21c17e9d-ff5e-4dc1-b276-aa6ad66998a7" width="280" alt="Trusted by our community"></td>
+    <td><img src="https://github.com/user-attachments/assets/8ac12f8f-c76d-464d-940d-39d18041009d" width="280" alt="Features"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>How to Use</b></td>
+    <td align="center"><b>About Section</b></td>
+    <td align="center"><b>Footer</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/5a238196-f270-4253-9cd3-ba43ac305ce2" width="280" alt="How to use"></td>
+    <td><img src="https://github.com/user-attachments/assets/5c20b994-713c-4f98-b6e1-e42ec489f541" width="280" alt="About section"></td>
+    <td><img src="https://github.com/user-attachments/assets/7dae9bd7-9862-4a73-8050-300129a9b848" width="280" alt="Footer"></td>
+  </tr>
+</table>
 
+### 👨‍🎓 Student Experience
+<table align="center">
+  <tr>
+    <td align="center"><b>Role-Based Login</b></td>
+    <td align="center"><b>Student Dashboard & Access Code</b></td>
+    <td align="center"><b>View & Download Materials</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/3704ad30-4ea5-404b-9d5a-52ad6540a8ec" width="280" alt="Role Based Login"></td>
+    <td><img src="https://github.com/user-attachments/assets/6111a397-2a24-4da5-86e6-270fe7a1ebce" width="280" alt="Student Dashboard"></td>
+    <td><img src="https://github.com/user-attachments/assets/0b7c266f-b9dd-4a55-9931-fcc23d51e1b6" width="280" alt="Save and Download"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Browse Files Tab</b></td>
+    <td align="center"><b>Student-Friendly View</b></td>
+    <td align="center"><b>Access History</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/2d157db1-356b-421e-a7ff-420275008a4d" width="280" alt="Browse files tab"></td>
+    <td><img src="https://github.com/user-attachments/assets/eb3d5e1f-8529-40ff-aafd-6632b34536ea" width="280" alt="Student friendly view"></td>
+    <td><img src="https://github.com/user-attachments/assets/90a72386-d35b-4ecc-9074-fbd7fa6b664f" width="280" alt="Access history"></td>
+  </tr>
+</table>
 
-
-Futures Power application contains
-
-<img width="1919" height="927" alt="Screenshot 2026-03-07 112219" src="https://github.com/user-attachments/assets/8ac12f8f-c76d-464d-940d-39d18041009d" />
-
-How to use your application
-
-<img width="1919" height="929" alt="Screenshot 2026-03-07 112232" src="https://github.com/user-attachments/assets/5a238196-f270-4253-9cd3-ba43ac305ce2" />
-
-About section inIn the landing page
-<img width="1919" height="928" alt="Screenshot 2026-03-07 112317" src="https://github.com/user-attachments/assets/5c20b994-713c-4f98-b6e1-e42ec489f541" />
-
-
-The footer of our application Landing page
-<img width="1919" height="927" alt="Screenshot 2026-03-07 112330" src="https://github.com/user-attachments/assets/7dae9bd7-9862-4a73-8050-300129a9b848" />
-
-
-Our application is role based. So if we can login a student can access the material, whatever the faculty uploaded And we can login through faculty to create a new material to access due to students
-
-<img width="1919" height="931" alt="Screenshot 2026-03-07 111523" src="https://github.com/user-attachments/assets/3704ad30-4ea5-404b-9d5a-52ad6540a8ec" />
-
-Hits of Study Shala students dashboard. In here, the students have to enter the Axis Code The faculty provides with that access code. The student Can access material, whatever faculty provide with that access code. The student can access the material, whatever faculty provide
-
-<img width="1919" height="927" alt="Screenshot 2026-03-07 111556" src="https://github.com/user-attachments/assets/6111a397-2a24-4da5-86e6-270fe7a1ebce" />
-
-Student can save the material within their drive, or can download that files directly to the directory of computer or mobile phone
-<img width="1919" height="926" alt="Screenshot 2026-03-07 111608" src="https://github.com/user-attachments/assets/0b7c266f-b9dd-4a55-9931-fcc23d51e1b6" />
-
-
-Browse files tab
-<img width="1920" height="1080" alt="Screenshot 2026-02-28 200045" src="https://github.com/user-attachments/assets/2d157db1-356b-421e-a7ff-420275008a4d" />
-
-Student view friendly tab.
-<img width="1920" height="1080" alt="Screenshot 2026-02-28 200035" src="https://github.com/user-attachments/assets/eb3d5e1f-8529-40ff-aafd-6632b34536ea" />
-
-Students access history, he dont need to save. Everything if he acts as one, it dir....er. He can access it whenever he want Everything if he acts as one, it directly save on her. He can access it whenever he want
-
-<img width="1919" height="928" alt="Screenshot 2026-03-07 111621" src="https://github.com/user-attachments/assets/90a72386-d35b-4ecc-9074-fbd7fa6b664f" />
-
-now Now, faculty rule, if I login, I see this dashboard
-
-<img width="1919" height="897" alt="Screenshot 2026-03-07 111937" src="https://github.com/user-attachments/assets/ed091164-26e2-4251-94ec-eb801cce2499" />
-
-Faculty can create material. Entering details in these screens and create material
-
-<img width="1919" height="926" alt="Screenshot 2026-03-07 112009" src="https://github.com/user-attachments/assets/e1c46088-595c-4a2d-bc4e-3077a5f7531f" />
-
-After creating a material faculty can upload any files, documents, images, anything on this folder. With Drag and drop. Future.   And here the facility can see the access code that generated by automatically or application generated. The faculty can share that code with the student to access.
-<img width="1919" height="927" alt="Screenshot 2026-03-07 112127" src="https://github.com/user-attachments/assets/8d00642d-b7ce-433d-93f6-32ec1018207b" />
-
-like this
-<img width="1919" height="923" alt="Screenshot 2026-03-07 112105" src="https://github.com/user-attachments/assets/ce6bdc29-6d1c-4ecd-9f4e-c12006691b3e" />
-
-And faculty also can see Whatever they upload whatever they create file also in the section of my material section.
-
-<img width="1919" height="927" alt="Screenshot 2026-03-07 112127" src="https://github.com/user-attachments/assets/853b0079-1e25-453e-a514-b1727f68a27a" />
-
-
-
-
+### 👨‍🏫 Faculty Experience
+<table align="center">
+  <tr>
+    <td align="center"><b>Faculty Dashboard</b></td>
+    <td align="center"><b>Create Material</b></td>
+    <td align="center"><b>Drag & Drop Upload</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/ed091164-26e2-4251-94ec-eb801cce2499" width="280" alt="Faculty Dashboard"></td>
+    <td><img src="https://github.com/user-attachments/assets/e1c46088-595c-4a2d-bc4e-3077a5f7531f" width="280" alt="Create Material"></td>
+    <td><img src="https://github.com/user-attachments/assets/8d00642d-b7ce-433d-93f6-32ec1018207b" width="280" alt="Upload Files"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Generated Access Code</b></td>
+    <td align="center"><b>My Materials Overview</b></td>
+    <td align="center"></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/ce6bdc29-6d1c-4ecd-9f4e-c12006691b3e" width="280" alt="Access Code Generated"></td>
+    <td><img src="https://github.com/user-attachments/assets/853b0079-1e25-453e-a514-b1727f68a27a" width="280" alt="My Materials"></td>
+    <td></td>
+  </tr>
+</table>
 ---
 
 ## 🌟 Features
