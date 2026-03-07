@@ -4,6 +4,24 @@
 
 ![StudyShala Logo](./csme6.svg)
 
+
+
+<img width="1919" height="931" alt="Screenshot 2026-03-07 111523" src="https://github.com/user-attachments/assets/e1d8489c-1871-4ba2-b647-b8b8fbfee9ef" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## 🌟 Features
