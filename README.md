@@ -1,9 +1,90 @@
 # 📚 StudyShala
 
-**StudyShala** is a modern, cloud-based study material management platform that connects faculty and students seamlessly. Faculty can upload and share educational resources, while students can access, save, and download materials using unique access codes — all without ever seeing Google Drive.
+![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![Google Drive API](https://img.shields.io/badge/Google_Drive_API-4285F4?style=for-the-badge&logo=google-drive&logoColor=white)
 
-![StudyShala Logo](./csme6.svg)
+**StudyShala** is a modern, cloud-based study material management platform that connects faculty and students seamlessly. Faculty can upload and share educational resources, while students can access, save, and download materials using unique access codes — all without ever needing to interact directly with Google Drive.
 
+🌐 **Live Website:** [studyshala.dev](https://studyshala.dev) *(Login easily using your Google Account)*
+
+---
+
+## 📸 Platform Showcase
+
+### 🌍 Landing Page & Website Overview
+<table align="center">
+  <tr>
+    <td align="center"><b>Home / Landing Page</b></td>
+    <td align="center"><b>Trusted By Community</b></td>
+    <td align="center"><b>Platform Features</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/e1d8489c-1871-4ba2-b647-b8b8fbfee9ef" width="280" alt="Home Screen"></td>
+    <td><img src="https://github.com/user-attachments/assets/21c17e9d-ff5e-4dc1-b276-aa6ad66998a7" width="280" alt="Trusted by our community"></td>
+    <td><img src="https://github.com/user-attachments/assets/8ac12f8f-c76d-464d-940d-39d18041009d" width="280" alt="Features"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>How to Use</b></td>
+    <td align="center"><b>About Section</b></td>
+    <td align="center"><b>Footer</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/5a238196-f270-4253-9cd3-ba43ac305ce2" width="280" alt="How to use"></td>
+    <td><img src="https://github.com/user-attachments/assets/5c20b994-713c-4f98-b6e1-e42ec489f541" width="280" alt="About section"></td>
+    <td><img src="https://github.com/user-attachments/assets/7dae9bd7-9862-4a73-8050-300129a9b848" width="280" alt="Footer"></td>
+  </tr>
+</table>
+
+### 👨‍🎓 Student Experience
+<table align="center">
+  <tr>
+    <td align="center"><b>Role-Based Login</b></td>
+    <td align="center"><b>Student Dashboard & Access Code</b></td>
+    <td align="center"><b>View & Download Materials</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/3704ad30-4ea5-404b-9d5a-52ad6540a8ec" width="280" alt="Role Based Login"></td>
+    <td><img src="https://github.com/user-attachments/assets/6111a397-2a24-4da5-86e6-270fe7a1ebce" width="280" alt="Student Dashboard"></td>
+    <td><img src="https://github.com/user-attachments/assets/0b7c266f-b9dd-4a55-9931-fcc23d51e1b6" width="280" alt="Save and Download"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Browse Files Tab</b></td>
+    <td align="center"><b>Student-Friendly View</b></td>
+    <td align="center"><b>Access History</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/2d157db1-356b-421e-a7ff-420275008a4d" width="280" alt="Browse files tab"></td>
+    <td><img src="https://github.com/user-attachments/assets/eb3d5e1f-8529-40ff-aafd-6632b34536ea" width="280" alt="Student friendly view"></td>
+    <td><img src="https://github.com/user-attachments/assets/90a72386-d35b-4ecc-9074-fbd7fa6b664f" width="280" alt="Access history"></td>
+  </tr>
+</table>
+
+### 👨‍🏫 Faculty Experience
+<table align="center">
+  <tr>
+    <td align="center"><b>Faculty Dashboard</b></td>
+    <td align="center"><b>Create Material</b></td>
+    <td align="center"><b>Drag & Drop Upload</b></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/ed091164-26e2-4251-94ec-eb801cce2499" width="280" alt="Faculty Dashboard"></td>
+    <td><img src="https://github.com/user-attachments/assets/e1c46088-595c-4a2d-bc4e-3077a5f7531f" width="280" alt="Create Material"></td>
+    <td><img src="https://github.com/user-attachments/assets/8d00642d-b7ce-433d-93f6-32ec1018207b" width="280" alt="Upload Files"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Generated Access Code</b></td>
+    <td align="center"><b>My Materials Overview</b></td>
+    <td align="center"></td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/ce6bdc29-6d1c-4ecd-9f4e-c12006691b3e" width="280" alt="Access Code Generated"></td>
+    <td><img src="https://github.com/user-attachments/assets/853b0079-1e25-453e-a514-b1727f68a27a" width="280" alt="My Materials"></td>
+    <td></td>
+  </tr>
+</table>
 ---
 
 ## 🌟 Features
@@ -168,6 +249,18 @@ ADMIN_EMAILS=admin@university.edu,admin2@university.edu
 # Server
 PORT=5000
 NODE_ENV=development
+
+# ── Google OAuth (For Student/Faculty Login) ──
+GOOGLE_CLIENT_ID=your_login_client_id
+GOOGLE_CLIENT_SECRET=your_login_client_secret
+GOOGLE_CALLBACK_URL=https://test-of-studyshala.onrender.com/api/auth/google/callback
+
+# ── Google Drive API (For File Storage) ──
+GOOGLE_DRIVE_CLIENT_ID=your_drive_client_id
+GOOGLE_DRIVE_CLIENT_SECRET=your_drive_client_secret
+GOOGLE_DRIVE_REDIRECT_URI=https://developers.google.com/oauthplayground
+GOOGLE_DRIVE_REFRESH_TOKEN=your_generated_refresh_token
+
 ```
 
 **Start the backend:**
@@ -524,8 +617,8 @@ This project is licensed under the **MIT License**.
 
 ## 👥 Authors
 
-- **Your Name** — Initial work and architecture
-- **Contributors** — See [Contributors](https://github.com/yourusername/studyshala/contributors)
+- **BORRA ADHITYA** — Initial work and architecture
+- **Contributors** — See [Contributors](https://github.com/lalithaadithyavardhan/test-of-studyshala/contributors)
 
 ---
 
@@ -540,9 +633,9 @@ This project is licensed under the **MIT License**.
 ## 📞 Support
 
 For issues, questions, or feature requests:
-- 📧 Email: support@studyshala.edu
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/studyshala/issues)
-- 📖 Documentation: [Wiki](https://github.com/yourusername/studyshala/wiki)
+- 📧 Email: adithyasai533@gmail.com
+- 🐛 Issues: [GitHub Issues](https://github.com/lalithaadithyavardhan/test-of-studyshala/issues)
+- 📖 Documentation: [Wiki](https://github.com/lalithaadithyavardhan/test-of-studyshala/wiki)
 
 ---
 
