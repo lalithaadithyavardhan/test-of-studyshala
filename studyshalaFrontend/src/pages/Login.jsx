@@ -66,9 +66,9 @@ const CursorSpotlight = () => {
     window.addEventListener('mousemove', onMove);
 
     const animate = () => {
-      // Trail lags behind cursor with lerp
-      trailPos.current.x += (posRef.current.x - trailPos.current.x) * 0.12;
-      trailPos.current.y += (posRef.current.y - trailPos.current.y) * 0.12;
+      // Trail follows cursor very closely — lerp 0.88 = near-instant
+      trailPos.current.x += (posRef.current.x - trailPos.current.x) * 0.88;
+      trailPos.current.y += (posRef.current.y - trailPos.current.y) * 0.88;
 
       if (spotRef.current) {
         spotRef.current.style.transform =
@@ -273,7 +273,8 @@ const Login = () => {
   const [selectedRole, setSelectedRole] = useState(null);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
-  const [stats,        setStats]        = useState({ totalStudents: 0, totalFaculty: 0, totalMaterials: 0, totalVisits: 0 });
+  /* Fallback numbers shown immediately — replaced with live data once backend wakes */
+  const [stats,        setStats]        = useState({ totalStudents: 120, totalFaculty: 18, totalMaterials: 95, totalVisits: 540 });
   const [navScrolled,  setNavScrolled]  = useState(false);
   const [menuOpen,     setMenuOpen]     = useState(false);
   const [pageReady,    setPageReady]    = useState(false);
@@ -297,7 +298,7 @@ const Login = () => {
         const res = await api.get('/stats');
         if (!cancelled) setStats(res.data);
       } catch {
-        if (attempt < 3 && !cancelled) setTimeout(() => fetch_(attempt + 1), 2000 * attempt);
+        if (attempt < 5 && !cancelled) setTimeout(() => fetch_(attempt + 1), attempt === 1 ? 8000 : 15000);
       }
     };
     fetch_(1);
