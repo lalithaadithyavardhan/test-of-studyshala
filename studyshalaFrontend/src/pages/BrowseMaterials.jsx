@@ -15,13 +15,12 @@ import {
   MdGridView, MdViewList, MdSearch, MdClose, MdFolder, MdFolderOpen,
   MdInsertDriveFile, MdPictureAsPdf, MdImage, MdVideoFile, MdDescription,
   MdDownload, MdPreview, MdDelete, MdEdit, MdUpload, MdArrowBack,
-  MdLightMode, MdDarkMode, MdMoreVert, MdCheck, MdContentCopy,
+  MdLightMode, MdDarkMode, MdCheck, MdContentCopy,
   MdFilterList, MdSort, MdInfo, MdKeyboardArrowRight, MdHome
 } from 'react-icons/md';
 import './BrowseMaterials.css';
 import MessageBanner from '../components/MessageBanner';
 
-// ── File type icon helper ────────────────────────────────────────────────────
 const FileIcon = ({ mimeType, size = 'md' }) => {
   const cls = `bm-file-icon bm-file-icon--${size}`;
   if (!mimeType)                              return <MdInsertDriveFile className={cls} />;
@@ -35,70 +34,51 @@ const FileIcon = ({ mimeType, size = 'md' }) => {
   return <MdInsertDriveFile className={cls} />;
 };
 
-// ── Format file size ─────────────────────────────────────────────────────────
 const fmtSize = (bytes) => {
   if (!bytes) return '—';
-  if (bytes < 1024)       return `${bytes} B`;
-  if (bytes < 1048576)    return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024)    return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1048576).toFixed(1)} MB`;
 };
 
-// ── Format date ──────────────────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Main Component
-// ═══════════════════════════════════════════════════════════════════════════
 const BrowseMaterials = () => {
-  const { user }    = useAuth();
-  const navigate    = useNavigate();
-  const role        = user?.role || 'student';
-  const isFaculty   = role === 'faculty' || role === 'admin';
+  const { user }  = useAuth();
+  const navigate  = useNavigate();
+  const role      = user?.role || 'student';
+  const isFaculty = role === 'faculty' || role === 'admin';
 
-  // ── Data state ──────────────────────────────────────────────────────────
-  const [folders,        setFolders]        = useState([]);   // all folders/materials
+  const [folders,        setFolders]        = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState('');
   const [success,        setSuccess]        = useState('');
-
-  // ── UI state ────────────────────────────────────────────────────────────
-  const [viewMode,       setViewMode]       = useState('grid');   // 'grid' | 'list'
+  const [viewMode,       setViewMode]       = useState('grid');
   const [darkMode,       setDarkMode]       = useState(false);
   const [search,         setSearch]         = useState('');
   const [filterDept,     setFilterDept]     = useState('all');
   const [filterSem,      setFilterSem]      = useState('all');
   const [sortBy,         setSortBy]         = useState('newest');
-
-  // ── Selection & navigation ───────────────────────────────────────────────
-  const [selectedFolder, setSelectedFolder] = useState(null);   // folder object
-  const [selectedFile,   setSelectedFile]   = useState(null);   // file object
-  const [previewFile,    setPreviewFile]     = useState(null);   // file for preview panel
-
-  // ── Modals ───────────────────────────────────────────────────────────────
+  const [selectedFolder, setSelectedFolder] = useState(null);
+  const [selectedFile,   setSelectedFile]   = useState(null);
+  const [previewFile,    setPreviewFile]     = useState(null);
   const [editModal,      setEditModal]      = useState(false);
   const [uploadModal,    setUploadModal]    = useState(false);
   const [editData,       setEditData]       = useState({});
   const [copiedCode,     setCopiedCode]     = useState(null);
-
-  // ── Sidebar panel ────────────────────────────────────────────────────────
   const [infoPanel,      setInfoPanel]      = useState(true);
-
-  // ── In-app preview modal ─────────────────────────────────────────────────
-  const [previewModal,   setPreviewModal]   = useState(null);   // file object
+  const [previewModal,   setPreviewModal]   = useState(null);
+  const [downloads,      setDownloads]      = useState([]);
 
   const searchRef = useRef(null);
 
-  // Close preview on Escape key
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') setPreviewModal(null); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  // ── Fetch data ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -109,7 +89,6 @@ const BrowseMaterials = () => {
         res = await api.get('/faculty/folders');
         setFolders(res.data.folders || []);
       } else {
-        // Students see saved materials ONLY
         res = await api.get('/student/saved-materials');
         setFolders(res.data.materials || []);
       }
@@ -120,7 +99,6 @@ const BrowseMaterials = () => {
     }
   };
 
-  // ── Load files for selected folder ───────────────────────────────────────
   const openFolder = async (folder) => {
     setSelectedFolder({ ...folder, files: [], subFolders: [] });
     setSelectedFile(null);
@@ -143,27 +121,45 @@ const BrowseMaterials = () => {
     }
   };
 
-  // ── Derived lists ────────────────────────────────────────────────────────
-  const departments = ['all', ...new Set(folders.map(f => f.department).filter(Boolean))];
-  const semesters   = ['all', ...new Set(folders.map(f => f.semester).filter(Boolean))];
+  const handleDownload = async (file) => {
+    if (!file.downloadUrl) { setError('No download URL available for this file.'); return; }
+    const dlId = file._id + '_' + Date.now();
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 0, done: false, error: null }]);
+    try {
+      const response = await fetch(file.downloadUrl);
+      if (!response.ok) throw new Error('Download failed');
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total) {
+          const pct = Math.round((received / total) * 100);
+          setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
+        }
+      }
+      const blob = new Blob(chunks);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 4000);
+    } catch (err) {
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'Download failed. Try again.' } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
+    }
+  };
 
-  const filtered = folders
-    .filter(f => {
-      const q = search.toLowerCase();
-      return (
-        (!q || f.subjectName?.toLowerCase().includes(q) || f.facultyName?.toLowerCase().includes(q)) &&
-        (filterDept === 'all' || f.department === filterDept) &&
-        (filterSem  === 'all' || f.semester   === filterSem)
-      );
-    })
-    .sort((a, b) => {
-      if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
-      if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
-      if (sortBy === 'name')   return a.subjectName.localeCompare(b.subjectName);
-      return 0;
-    });
-
-  // ── Actions ──────────────────────────────────────────────────────────────
   const handleDeleteFolder = async (id) => {
     if (!window.confirm('Delete this material? Students will lose access.')) return;
     try {
@@ -218,10 +214,27 @@ const BrowseMaterials = () => {
     }
   };
 
-  // ── Theme class ──────────────────────────────────────────────────────────
+  const departments = ['all', ...new Set(folders.map(f => f.department).filter(Boolean))];
+  const semesters   = ['all', ...new Set(folders.map(f => f.semester).filter(Boolean))];
+
+  const filtered = folders
+    .filter(f => {
+      const q = search.toLowerCase();
+      return (
+        (!q || f.subjectName?.toLowerCase().includes(q) || f.facultyName?.toLowerCase().includes(q)) &&
+        (filterDept === 'all' || f.department === filterDept) &&
+        (filterSem  === 'all' || f.semester   === filterSem)
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
+      if (sortBy === 'oldest') return new Date(a.createdAt) - new Date(b.createdAt);
+      if (sortBy === 'name')   return a.subjectName.localeCompare(b.subjectName);
+      return 0;
+    });
+
   const themeClass = darkMode ? 'bm-dark' : 'bm-light';
 
-  // ── Breadcrumb ───────────────────────────────────────────────────────────
   const Breadcrumb = () => (
     <div className="bm-breadcrumb">
       <button onClick={() => { setSelectedFolder(null); setSelectedFile(null); setPreviewFile(null); }}>
@@ -230,7 +243,26 @@ const BrowseMaterials = () => {
       {selectedFolder && (
         <>
           <MdKeyboardArrowRight className="bm-breadcrumb-sep" />
-          <span>{selectedFolder.subjectName}</span>
+          {selectedFolder._activeSubFolder ? (
+            <button onClick={() => setSelectedFolder(prev => ({
+              ...prev,
+              files: prev._parentFiles || [],
+              subFolders: prev._parentSubFolders || [],
+              _activeSubFolder: null,
+              _parentFiles: null,
+              _parentSubFolders: null
+            }))}>
+              {selectedFolder.subjectName}
+            </button>
+          ) : (
+            <span>{selectedFolder.subjectName}</span>
+          )}
+        </>
+      )}
+      {selectedFolder?._activeSubFolder && (
+        <>
+          <MdKeyboardArrowRight className="bm-breadcrumb-sep" />
+          <span>{selectedFolder._activeSubFolder}</span>
         </>
       )}
       {selectedFile && (
@@ -242,13 +274,10 @@ const BrowseMaterials = () => {
     </div>
   );
 
-  // ════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ════════════════════════════════════════════════════════════════════════
   return (
     <div className={`bm-root ${themeClass}`}>
 
-      {/* ── Top Bar ── */}
+      {/* Top Bar */}
       <div className="bm-topbar">
         <div className="bm-topbar-left">
           <button className="bm-back-btn" onClick={() => navigate(-1)} title="Go back">
@@ -259,9 +288,7 @@ const BrowseMaterials = () => {
           </span>
           <Breadcrumb />
         </div>
-
         <div className="bm-topbar-right">
-          {/* Search */}
           <div className="bm-search-wrap">
             <MdSearch className="bm-search-icon" />
             <input
@@ -273,31 +300,23 @@ const BrowseMaterials = () => {
             />
             {search && <button className="bm-search-clear" onClick={() => setSearch('')}><MdClose /></button>}
           </div>
-
-          {/* View toggle */}
           <div className="bm-view-toggle">
             <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')} title="Grid view"><MdGridView /></button>
             <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')} title="List view"><MdViewList /></button>
           </div>
-
-          {/* Dark mode */}
           <button className="bm-theme-btn" onClick={() => setDarkMode(!darkMode)} title="Toggle theme">
             {darkMode ? <MdLightMode /> : <MdDarkMode />}
           </button>
-
-          {/* Info panel toggle */}
           <button className="bm-theme-btn" onClick={() => setInfoPanel(!infoPanel)} title="Details panel">
             <MdInfo />
           </button>
-
-          {/* Close */}
           <button className="bm-close-btn" onClick={() => navigate(-1)} title="Close">
             <MdClose />
           </button>
         </div>
       </div>
 
-      {/* ── Toolbar (filters + sort) ── */}
+      {/* Toolbar */}
       <div className="bm-toolbar">
         <div className="bm-toolbar-left">
           <MdFilterList className="bm-toolbar-icon" />
@@ -319,20 +338,16 @@ const BrowseMaterials = () => {
         </div>
       </div>
 
-      {/* ── Alerts ── */}
       {error   && <div className="bm-alert bm-alert--error">{error}<button onClick={() => setError('')}><MdClose /></button></div>}
       {success && <div className="bm-alert bm-alert--success">✅ {success}</div>}
 
-      {/* ── Body ── */}
       <div className="bm-body">
-
-        {/* ── Left panel: folder/file list ── */}
         <div className={`bm-main ${infoPanel ? 'bm-main--with-panel' : ''}`}>
 
           {loading ? (
             <div className="bm-empty"><div className="bm-spinner" /><p>Loading materials…</p></div>
           ) : !selectedFolder ? (
-            /* ── Folder listing ── */
+
             filtered.length === 0 ? (
               <div className="bm-empty">
                 <MdFolder className="bm-empty-icon" />
@@ -344,8 +359,8 @@ const BrowseMaterials = () => {
                   <div
                     key={folder._id}
                     className={`bm-folder-card ${selectedFolder?._id === folder._id ? 'selected' : ''}`}
+                    onClick={() => openFolder(folder)}
                     onDoubleClick={() => openFolder(folder)}
-                    onClick={() => setSelectedFolder(prev => prev?._id === folder._id ? prev : { ...folder, files: prev?.files || [] })}
                   >
                     <div className="bm-folder-card-icon">
                       <MdFolder className="bm-folder-icon" />
@@ -369,7 +384,6 @@ const BrowseMaterials = () => {
                 ))}
               </div>
             ) : (
-              /* ── List view ── */
               <table className="bm-table">
                 <thead>
                   <tr>
@@ -384,7 +398,7 @@ const BrowseMaterials = () => {
                 </thead>
                 <tbody>
                   {filtered.map(folder => (
-                    <tr key={folder._id} onDoubleClick={() => openFolder(folder)} className={selectedFolder?._id === folder._id ? 'selected' : ''}>
+                    <tr key={folder._id} onClick={() => openFolder(folder)} onDoubleClick={() => openFolder(folder)} className={selectedFolder?._id === folder._id ? 'selected' : ''}>
                       <td className="bm-table-name">
                         <MdFolder className="bm-folder-icon-sm" />
                         {folder.subjectName}
@@ -406,21 +420,34 @@ const BrowseMaterials = () => {
                 </tbody>
               </table>
             )
+
           ) : (
-            /* ── Files inside folder ── */
+            /* Files inside folder */
             <div>
               <div className="bm-folder-header">
-                <button className="bm-breadcrumb-back" onClick={() => { setSelectedFolder(null); setSelectedFile(null); setPreviewFile(null); }}>
-                  <MdArrowBack /> Back to Materials
-                </button>
-                {isFaculty && (
+                {selectedFolder._activeSubFolder ? (
+                  <button className="bm-breadcrumb-back" onClick={() => setSelectedFolder(prev => ({
+                    ...prev,
+                    files: prev._parentFiles || [],
+                    subFolders: prev._parentSubFolders || [],
+                    _activeSubFolder: null,
+                    _parentFiles: null,
+                    _parentSubFolders: null
+                  }))}>
+                    <MdArrowBack /> Back to {selectedFolder.subjectName}
+                  </button>
+                ) : (
+                  <button className="bm-breadcrumb-back" onClick={() => { setSelectedFolder(null); setSelectedFile(null); setPreviewFile(null); }}>
+                    <MdArrowBack /> Back to Materials
+                  </button>
+                )}
+                {isFaculty && !selectedFolder._activeSubFolder && (
                   <button className="bm-upload-btn" onClick={() => setUploadModal(true)}>
                     <MdUpload /> Upload File
                   </button>
                 )}
               </div>
 
-              {/* Faculty message banner */}
               {selectedFolder.messageToStudents && (
                 <div style={{ margin: '0.5rem 0 0.75rem' }}>
                   <MessageBanner message={selectedFolder.messageToStudents} facultyName={selectedFolder.facultyName} />
@@ -431,7 +458,6 @@ const BrowseMaterials = () => {
                 <div className="bm-empty"><div className="bm-spinner" /></div>
               ) : (
                 <>
-                  {/* Sub-folder tiles */}
                   {(selectedFolder.subFolders || []).length > 0 && (
                     <div style={{ marginBottom: '1rem' }}>
                       <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem', paddingBottom: '0.25rem', borderBottom: '1px solid #e2e8f0' }}>
@@ -444,7 +470,14 @@ const BrowseMaterials = () => {
                             style={{ background: '#fff', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '0.9rem 0.7rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.15s, box-shadow 0.15s' }}
                             onMouseEnter={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#eef2ff'; }}
                             onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
-                            title={sf.name}
+                            onClick={() => setSelectedFolder(prev => ({
+                              ...prev,
+                              files: sf.files || [],
+                              _activeSubFolder: sf.name,
+                              _parentFiles: prev.files,
+                              _parentSubFolders: prev.subFolders
+                            }))}
+                            title={`Open ${sf.name}`}
                           >
                             <MdFolder style={{ fontSize: '2.4rem', color: '#6366f1' }} />
                             <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#334155', wordBreak: 'break-word' }}>{sf.name}</span>
@@ -455,7 +488,6 @@ const BrowseMaterials = () => {
                     </div>
                   )}
 
-                  {/* Root files */}
                   {selectedFolder.files.length === 0 && (selectedFolder.subFolders || []).length === 0 ? (
                     <div className="bm-empty">
                       <MdInsertDriveFile className="bm-empty-icon" />
@@ -469,61 +501,61 @@ const BrowseMaterials = () => {
                         </div>
                       )}
                       {viewMode === 'grid' ? (
-                <div className="bm-grid">
-                  {selectedFolder.files.map(file => (
-                    <div
-                      key={file._id}
-                      className={`bm-file-card ${selectedFile?._id === file._id ? 'selected' : ''}`}
-                      onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
-                      onDoubleClick={() => file.previewUrl && setPreviewModal(file)}
-                    >
-                      <div className="bm-file-card-icon">
-                        <FileIcon mimeType={file.mimeType} size="lg" />
-                      </div>
-                      <span className="bm-file-name" title={file.name}>{file.name}</span>
-                      <span className="bm-file-size">{fmtSize(file.size)}</span>
-                      <div className="bm-file-card-actions" onClick={e => e.stopPropagation()}>
-                        {file.previewUrl  && <button title="Preview"  onClick={() => setPreviewModal(file)}><MdPreview /></button>}
-                        {file.downloadUrl && <button title="Download" onClick={() => window.open(file.downloadUrl, '_blank')}><MdDownload /></button>}
-                        {isFaculty        && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <table className="bm-table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Type</th>
-                      <th>Size</th>
-                      <th>Uploaded</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedFolder.files.map(file => (
-                      <tr
-                        key={file._id}
-                        className={selectedFile?._id === file._id ? 'selected' : ''}
-                        onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
-                      >
-                        <td className="bm-table-name">
-                          <FileIcon mimeType={file.mimeType} size="sm" />
-                          {file.name}
-                        </td>
-                        <td>{file.mimeType?.split('/')[1]?.toUpperCase() || '—'}</td>
-                        <td>{fmtSize(file.size)}</td>
-                        <td>{fmtDate(file.uploadedAt)}</td>
-                        <td className="bm-table-actions" onClick={e => e.stopPropagation()}>
-                          {file.previewUrl  && <button title="Preview"  onClick={() => setPreviewModal(file)}><MdPreview /></button>}
-                          {file.downloadUrl && <button title="Download" onClick={() => window.open(file.downloadUrl, '_blank')}><MdDownload /></button>}
-                          {isFaculty        && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        <div className="bm-grid">
+                          {selectedFolder.files.map(file => (
+                            <div
+                              key={file._id}
+                              className={`bm-file-card ${selectedFile?._id === file._id ? 'selected' : ''}`}
+                              onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
+                              onDoubleClick={() => file.previewUrl && setPreviewModal(file)}
+                            >
+                              <div className="bm-file-card-icon">
+                                <FileIcon mimeType={file.mimeType} size="lg" />
+                              </div>
+                              <span className="bm-file-name" title={file.name}>{file.name}</span>
+                              <span className="bm-file-size">{fmtSize(file.size)}</span>
+                              <div className="bm-file-card-actions" onClick={e => e.stopPropagation()}>
+                                {file.previewUrl  && <button title="Preview"  onClick={() => setPreviewModal(file)}><MdPreview /></button>}
+                                {file.downloadUrl && <button title="Download" onClick={() => handleDownload(file)}><MdDownload /></button>}
+                                {isFaculty        && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <table className="bm-table">
+                          <thead>
+                            <tr>
+                              <th>Name</th>
+                              <th>Type</th>
+                              <th>Size</th>
+                              <th>Uploaded</th>
+                              <th>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedFolder.files.map(file => (
+                              <tr
+                                key={file._id}
+                                className={selectedFile?._id === file._id ? 'selected' : ''}
+                                onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
+                              >
+                                <td className="bm-table-name">
+                                  <FileIcon mimeType={file.mimeType} size="sm" />
+                                  {file.name}
+                                </td>
+                                <td>{file.mimeType?.split('/')[1]?.toUpperCase() || '—'}</td>
+                                <td>{fmtSize(file.size)}</td>
+                                <td>{fmtDate(file.uploadedAt)}</td>
+                                <td className="bm-table-actions" onClick={e => e.stopPropagation()}>
+                                  {file.previewUrl  && <button title="Preview"  onClick={() => setPreviewModal(file)}><MdPreview /></button>}
+                                  {file.downloadUrl && <button title="Download" onClick={() => handleDownload(file)}><MdDownload /></button>}
+                                  {isFaculty        && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       )}
                     </>
                   ) : null}
@@ -533,7 +565,7 @@ const BrowseMaterials = () => {
           )}
         </div>
 
-        {/* ── Right: Details / Preview panel ── */}
+        {/* Right: Details panel */}
         {infoPanel && (
           <div className="bm-panel">
             {previewFile ? (
@@ -558,9 +590,9 @@ const BrowseMaterials = () => {
                   <div className="bm-panel-row"><span>Uploaded</span><span>{fmtDate(previewFile.uploadedAt)}</span></div>
                 </div>
                 <div className="bm-panel-actions">
-                  {previewFile.previewUrl  && <button className="bm-panel-btn bm-panel-btn--primary"  onClick={() => setPreviewModal(previewFile)}><MdPreview /> Preview</button>}
-                  {previewFile.downloadUrl && <button className="bm-panel-btn bm-panel-btn--secondary" onClick={() => window.open(previewFile.downloadUrl, '_blank')}><MdDownload /> Download</button>}
-                  {isFaculty               && <button className="bm-panel-btn bm-panel-btn--danger"   onClick={() => handleDeleteFile(selectedFolder._id, previewFile._id)}><MdDelete /> Delete</button>}
+                  {previewFile.previewUrl  && <button className="bm-panel-btn bm-panel-btn--primary"   onClick={() => setPreviewModal(previewFile)}><MdPreview /> Preview</button>}
+                  {previewFile.downloadUrl && <button className="bm-panel-btn bm-panel-btn--secondary" onClick={() => handleDownload(previewFile)}><MdDownload /> Download</button>}
+                  {isFaculty               && <button className="bm-panel-btn bm-panel-btn--danger"    onClick={() => handleDeleteFile(selectedFolder._id, previewFile._id)}><MdDelete /> Delete</button>}
                 </div>
               </>
             ) : selectedFolder ? (
@@ -588,8 +620,8 @@ const BrowseMaterials = () => {
                 </div>
                 {isFaculty && (
                   <div className="bm-panel-actions">
-                    <button className="bm-panel-btn bm-panel-btn--primary"    onClick={() => openEdit(selectedFolder)}><MdEdit /> Edit Details</button>
-                    <button className="bm-panel-btn bm-panel-btn--danger"     onClick={() => handleDeleteFolder(selectedFolder._id)}><MdDelete /> Delete</button>
+                    <button className="bm-panel-btn bm-panel-btn--primary" onClick={() => openEdit(selectedFolder)}><MdEdit /> Edit Details</button>
+                    <button className="bm-panel-btn bm-panel-btn--danger"  onClick={() => handleDeleteFolder(selectedFolder._id)}><MdDelete /> Delete</button>
                   </div>
                 )}
               </>
@@ -603,7 +635,7 @@ const BrowseMaterials = () => {
         )}
       </div>
 
-      {/* ── Edit Modal ── */}
+      {/* Edit Modal */}
       {editModal && (
         <div className="bm-modal-overlay" onClick={() => setEditModal(false)}>
           <div className="bm-modal" onClick={e => e.stopPropagation()}>
@@ -627,7 +659,7 @@ const BrowseMaterials = () => {
         </div>
       )}
 
-      {/* ── Upload notice modal (redirect to full upload page) ── */}
+      {/* Upload Modal */}
       {uploadModal && (
         <div className="bm-modal-overlay" onClick={() => setUploadModal(false)}>
           <div className="bm-modal" onClick={e => e.stopPropagation()}>
@@ -646,53 +678,26 @@ const BrowseMaterials = () => {
         </div>
       )}
 
-      {/* ── In-app File Preview — rendered via portal, true top layer ── */}
+      {/* In-app File Preview */}
       {previewModal && createPortal(
         <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 99999,
-            background: 'rgba(0,0,0,0.92)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
+          style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={(e) => { if (e.target === e.currentTarget) setPreviewModal(null); }}
         >
-          <div style={{
-            width: 'calc(100% - 2rem)', maxWidth: '1100px',
-            height: '92vh', background: '#1e293b',
-            borderRadius: '12px', display: 'flex', flexDirection: 'column',
-            overflow: 'hidden', boxShadow: '0 32px 100px rgba(0,0,0,0.8)'
-          }}>
-            {/* Header — just filename + close, no extra buttons */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
-              padding: '0.75rem 1.25rem', background: '#0f172a',
-              borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0
-            }}>
-              <span style={{
-                flex: 1, color: '#f1f5f9', fontSize: '0.9rem', fontWeight: 600,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-              }}>
+          <div style={{ width: 'calc(100% - 2rem)', maxWidth: '1100px', height: '92vh', background: '#1e293b', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 32px 100px rgba(0,0,0,0.8)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.25rem', background: '#0f172a', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+              <span style={{ flex: 1, color: '#f1f5f9', fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {previewModal.name}
               </span>
               <button
                 onClick={() => setPreviewModal(null)}
-                style={{
-                  background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-                  color: '#f87171', width: '2rem', height: '2rem', borderRadius: '6px',
-                  cursor: 'pointer', fontSize: '1.1rem', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                }}
+                style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', width: '2rem', height: '2rem', borderRadius: '6px', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                 title="Close (Esc)"
               >✕</button>
             </div>
-            {/* Preview body */}
             <div style={{ flex: 1, overflow: 'hidden', background: '#f8fafc', position: 'relative' }}>
               {previewModal.mimeType?.startsWith('image/') ? (
-                <div style={{
-                  width: '100%', height: '100%', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  background: '#0f172a', overflow: 'auto', padding: '1rem'
-                }}>
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', overflow: 'auto', padding: '1rem' }}>
                   <img
                     src={`https://drive.google.com/thumbnail?id=${previewModal.driveFileId}&sz=w2000`}
                     alt={previewModal.name}
@@ -711,6 +716,30 @@ const BrowseMaterials = () => {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Download Progress Toasts */}
+      {downloads.length > 0 && (
+        <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 99999, display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '320px', maxWidth: '420px', width: '90vw' }}>
+          {downloads.map(dl => (
+            <div key={dl.id} style={{ background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#1e293b', border: `1px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#334155'}`, borderRadius: '10px', padding: '0.75rem 1rem', boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: dl.done || dl.error ? '0' : '0.4rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                  {dl.error ? '❌ ' : dl.done ? '✅ ' : '⬇️ '}{dl.name}
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#94a3b8', flexShrink: 0, marginLeft: '0.5rem' }}>
+                  {dl.error ? 'Failed' : dl.done ? 'Done' : `${dl.progress}%`}
+                </span>
+              </div>
+              {!dl.done && !dl.error && (
+                <div style={{ height: '5px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${dl.progress}%`, background: 'linear-gradient(90deg,#6366f1,#818cf8)', borderRadius: '3px', transition: 'width 0.2s ease' }} />
+                </div>
+              )}
+              {dl.error && <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.2rem' }}>{dl.error}</div>}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
