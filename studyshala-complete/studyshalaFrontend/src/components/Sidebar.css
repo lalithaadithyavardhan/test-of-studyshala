@@ -1,0 +1,349 @@
+/* ── Base sidebar ────────────────────────────────────────────────────────── */
+.sidebar {
+  width: 240px;
+  background-color: var(--surface-light, #ffffff);
+  border-right: 1px solid var(--border-light, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s ease;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  z-index: 200;
+}
+
+body.dark-mode .sidebar {
+  background-color: var(--card-dark, #1e293b);
+  border-right-color: var(--border-dark, #334155);
+}
+
+/* ── Collapsed state (desktop) ───────────────────────────────────────────── */
+.sidebar.collapsed {
+  width: 68px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.sidebar-header {
+  padding: 1.125rem 1rem;
+  border-bottom: 1px solid var(--border-light, #e5e7eb);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 68px;
+}
+
+body.dark-mode .sidebar-header {
+  border-bottom-color: var(--border-dark, #334155);
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+
+/* ── Branding (icon + name + role) ──────────────────────────────────────── */
+.sidebar-branding {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-radius: 10px;
+  font-size: 1.25rem;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-brand-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-light, #111827);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark-mode .sidebar-brand-name { color: var(--text-dark, #f8fafc); }
+
+.sidebar-role-badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
+  width: fit-content;
+}
+
+body.dark-mode .sidebar-role-badge {
+  background: #1e3a8a44;
+  color: #60a5fa;
+}
+
+/* ── Header action buttons container ────────────────────────────────────── */
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* ── Toggle button ───────────────────────────────────────────────────────── */
+.sidebar-toggle {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--text-secondary-light, #6b7280);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+body.dark-mode .sidebar-toggle { color: var(--text-secondary-dark, #94a3b8); }
+
+.sidebar-toggle:hover {
+  color: #2563eb;
+  background: #dbeafe33;
+}
+
+body.dark-mode .sidebar-toggle:hover {
+  color: #60a5fa;
+  background: #1e3a8a44;
+}
+
+/* Visibility helpers */
+.desktop-only { display: flex; }
+.mobile-only  { display: none; }
+
+/* ── Navigation ──────────────────────────────────────────────────────────── */
+.sidebar-nav {
+  padding: 0.875rem 0.75rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.875rem;
+  border-radius: 0.625rem;
+  color: var(--text-secondary-light, #6b7280);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+body.dark-mode .sidebar-link { color: var(--text-secondary-dark, #94a3b8); }
+
+.sidebar-link:hover {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+body.dark-mode .sidebar-link:hover {
+  background-color: #1e3a8a22;
+  color: #60a5fa;
+}
+
+.sidebar-link.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+}
+
+body.dark-mode .sidebar-link.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+}
+
+/* ── Icons & labels ──────────────────────────────────────────────────────── */
+.sidebar-icon {
+  font-size: 1.25rem;
+  min-width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed state adjustments */
+.sidebar.collapsed .sidebar-link {
+  justify-content: center;
+  padding: 0.65rem;
+}
+
+.sidebar.collapsed .sidebar-label { display: none; }
+
+/* ── Mobile hamburger button ─────────────────────────────────────────────── */
+.sidebar-mobile-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  width: 40px;
+  height: 40px;
+  background: var(--surface-light, #ffffff);
+  border: 1px solid var(--border-light, #e5e7eb);
+  border-radius: 10px;
+  font-size: 1.375rem;
+  color: var(--text-light, #111827);
+  cursor: pointer;
+  z-index: 400;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  transition: all 0.2s ease;
+}
+
+body.dark-mode .sidebar-mobile-toggle {
+  background: var(--card-dark, #1e293b);
+  border-color: var(--border-dark, #334155);
+  color: var(--text-dark, #f8fafc);
+}
+
+/* ── Backdrop ────────────────────────────────────────────────────────────── */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 300;
+  backdrop-filter: blur(2px);
+}
+
+/* ── Responsive: Tablet (769 – 1024px) ──────────────────────────────────── */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .sidebar {
+    width: 68px;
+  }
+  .sidebar .sidebar-branding { display: none; }
+  .sidebar .sidebar-label    { display: none; }
+  .sidebar-link {
+    justify-content: center;
+    padding: 0.65rem;
+  }
+  .sidebar-header {
+    justify-content: center;
+  }
+  .sidebar-header-actions { width: 100%; justify-content: center; }
+}
+
+/* ── Responsive: Mobile (≤768px) ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Show hamburger */
+  .sidebar-mobile-toggle { display: flex; }
+
+  /* Show backdrop when open */
+  .sidebar-backdrop { display: block; }
+
+  /* Sidebar is off-screen by default */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: 260px !important;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+    z-index: 350;
+  }
+
+  /* Slide in when open */
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Always show branding + label when mobile menu is open */
+  .sidebar .sidebar-branding { display: flex; }
+  .sidebar .sidebar-label    { display: block; }
+  .sidebar-link {
+    justify-content: flex-start;
+    padding: 0.65rem 0.875rem;
+  }
+
+
+
+
+
+
+  /* ══════════════════════════════════════════════════════════════════════════
+   ADD THIS TO THE BOTTOM of your existing Sidebar.css
+   (Do not replace the whole file — just paste this at the end)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Browse Materials tab — subtle highlight to stand out */
+.sidebar-link--browse {
+  border: 1px dashed transparent;
+  margin-top: 0.5rem;
+}
+
+.sidebar-link--browse:not(.active) {
+  border-color: var(--border-light, #e5e7eb);
+  background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+  color: #2563eb;
+}
+
+body.dark-mode .sidebar-link--browse:not(.active) {
+  border-color: var(--border-dark, #334155);
+  background: linear-gradient(135deg, #1e3a8a22 0%, #1e1b4b22 100%);
+  color: #60a5fa;
+}
+
+.sidebar-link--browse:hover:not(.active) {
+  background: linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%);
+  border-color: #93c5fd;
+}
+
+body.dark-mode .sidebar-link--browse:hover:not(.active) {
+  background: linear-gradient(135deg, #1e3a8a33 0%, #1e1b4b33 100%);
+  border-color: #3b4fd8;
+}
+
+  /* Show mobile close, hide desktop toggle */
+  .desktop-only { display: none; }
+  .mobile-only  { display: flex; }
+}
