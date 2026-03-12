@@ -1,17 +1,7 @@
 /**
  * FileManager  v2
  * ===============
- * Now supports nested sub-folders.
- *
- * Props:
- *   files        — root-level files array
- *   subFolders   — array of { _id, name, files[] }
- *   materialName — title shown in the header
- *   onClose      — called when user closes the manager
- *
- * Navigation:
- *   Level 0: shows sub-folder tiles + root files
- *   Level 1: shows files inside a selected sub-folder (back button returns to level 0)
+ * Supports nested sub-folders + blob download with progress toast.
  */
 import { useState, useEffect } from 'react';
 import FilePreviewModal from './FilePreviewModal';
@@ -20,8 +10,6 @@ import {
   MdVisibility, MdDownload, MdArrowBack
 } from 'react-icons/md';
 import './FileManager.css';
-
-// ── File type metadata ─────────────────────────────────────────────────────
 
 const FILE_META = {
   'application/pdf': { icon: '📕', color: '#ef4444', label: 'PDF' },
@@ -38,10 +26,10 @@ const FILE_META = {
 };
 
 const getFileMeta = (mime = '') => {
-  if (FILE_META[mime])              return FILE_META[mime];
-  if (mime.startsWith('image/'))    return { icon: '🖼️', color: '#06b6d4', label: 'Image' };
-  if (mime.startsWith('video/'))    return { icon: '🎥', color: '#8b5cf6', label: 'Video' };
-  if (mime.startsWith('audio/'))    return { icon: '🎵', color: '#ec4899', label: 'Audio' };
+  if (FILE_META[mime])           return FILE_META[mime];
+  if (mime.startsWith('image/')) return { icon: '🖼️', color: '#06b6d4', label: 'Image' };
+  if (mime.startsWith('video/')) return { icon: '🎥', color: '#8b5cf6', label: 'Video' };
+  if (mime.startsWith('audio/')) return { icon: '🎵', color: '#ec4899', label: 'Audio' };
   return { icon: '📄', color: '#64748b', label: 'File' };
 };
 
@@ -52,29 +40,24 @@ const fmtSize = (bytes) => {
   return (bytes / 1024 ** i).toFixed(1) + ' ' + units[i];
 };
 
-// ── Component ──────────────────────────────────────────────────────────────
-
 const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onClose }) => {
-  const [view,           setView]           = useState('grid');
-  const [selected,       setSelected]       = useState(null);
-  const [preview,        setPreview]        = useState(null);
-  const [openSubFolder,  setOpenSubFolder]  = useState(null);  // sub-folder object currently open
+  const [view,          setView]          = useState('grid');
+  const [selected,      setSelected]      = useState(null);
+  const [preview,       setPreview]       = useState(null);
+  const [openSubFolder, setOpenSubFolder] = useState(null);
+  const [downloads,     setDownloads]     = useState([]);
 
   const hasSubFolders = subFolders.length > 0;
   const hasRootFiles  = files.length > 0;
-
-  // Files shown in current context
-  const currentFiles = openSubFolder ? (openSubFolder.files || []) : files;
-
-  // Total count for header badge
-  const totalCount = files.length + subFolders.reduce((s, sf) => s + (sf.files?.length || 0), 0);
+  const currentFiles  = openSubFolder ? (openSubFolder.files || []) : files;
+  const totalCount    = files.length + subFolders.reduce((s, sf) => s + (sf.files?.length || 0), 0);
 
   useEffect(() => {
     const handler = (e) => {
       if (preview) return;
       if (e.key === 'Escape') {
         if (openSubFolder) { setOpenSubFolder(null); setSelected(null); }
-        else               { onClose(); }
+        else { onClose(); }
       }
       if (e.key === 'Enter' && selected) {
         const f = currentFiles.find(x => x._id === selected);
@@ -89,10 +72,44 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     };
   }, [selected, preview, onClose, currentFiles, openSubFolder]);
 
-  const handleDownload = (e, file) => {
+  const handleDownload = async (e, file) => {
     e.stopPropagation();
     if (!file.downloadUrl) { alert('No download URL. Ask your faculty to re-upload this file.'); return; }
-    window.open(file.downloadUrl, '_blank', 'noopener');
+    const dlId = file._id + '_' + Date.now();
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 0, done: false, error: null }]);
+    try {
+      const response = await fetch(file.downloadUrl);
+      if (!response.ok) throw new Error('Download failed');
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total) {
+          const pct = Math.round((received / total) * 100);
+          setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
+        }
+      }
+      const blob = new Blob(chunks);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 4000);
+    } catch (err) {
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'Download failed. Try again.' } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
+    }
   };
 
   const openPreview = (e, file) => {
@@ -100,17 +117,9 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     if (file.driveFileId) setPreview(file);
   };
 
-  const enterSubFolder = (sf) => {
-    setOpenSubFolder(sf);
-    setSelected(null);
-  };
+  const enterSubFolder = (sf) => { setOpenSubFolder(sf); setSelected(null); };
+  const goBack = () => { setOpenSubFolder(null); setSelected(null); };
 
-  const goBack = () => {
-    setOpenSubFolder(null);
-    setSelected(null);
-  };
-
-  // ── File grid ──────────────────────────────────────────────────────────
   const renderFileGrid = (fileList) => (
     <div className="fm-grid">
       {fileList.map(file => {
@@ -143,13 +152,10 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     </div>
   );
 
-  // ── File list ──────────────────────────────────────────────────────────
   const renderFileList = (fileList) => (
     <table className="fm-table">
       <thead>
-        <tr>
-          <th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th>
-        </tr>
+        <tr><th>Name</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {fileList.map(file => {
@@ -188,21 +194,14 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     </table>
   );
 
-  // ── Root level: sub-folder tiles + root files ─────────────────────────
   const renderRoot = () => (
     <>
-      {/* Sub-folder tiles */}
       {hasSubFolders && (
         <div className="fm-section">
           <div className="fm-section-label">📁 Folders</div>
           <div className="fm-subfolder-grid">
             {subFolders.map(sf => (
-              <div
-                key={sf._id}
-                className="fm-subfolder-tile"
-                onClick={() => enterSubFolder(sf)}
-                title={`Open ${sf.name}`}
-              >
+              <div key={sf._id} className="fm-subfolder-tile" onClick={() => enterSubFolder(sf)} title={`Open ${sf.name}`}>
                 <MdFolder className="fm-subfolder-icon" />
                 <div className="fm-subfolder-name">{sf.name}</div>
                 <div className="fm-subfolder-count">{sf.files?.length || 0} file{sf.files?.length !== 1 ? 's' : ''}</div>
@@ -211,16 +210,12 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
           </div>
         </div>
       )}
-
-      {/* Root files */}
       {hasRootFiles && (
         <div className="fm-section">
           {hasSubFolders && <div className="fm-section-label">📄 Files</div>}
           {view === 'grid' ? renderFileGrid(files) : renderFileList(files)}
         </div>
       )}
-
-      {/* Empty state */}
       {!hasSubFolders && !hasRootFiles && (
         <div className="fm-empty">
           <span style={{ fontSize: '3rem', color: '#94a3b8' }}>📭</span>
@@ -231,15 +226,12 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     </>
   );
 
-  // ── Sub-folder level ──────────────────────────────────────────────────
   const renderSubFolderContents = () => {
     const sfFiles = openSubFolder.files || [];
     return (
       <>
         <div className="fm-subfolder-header">
-          <button className="fm-back-btn" onClick={goBack}>
-            <MdArrowBack /> Back
-          </button>
+          <button className="fm-back-btn" onClick={goBack}><MdArrowBack /> Back</button>
           <span className="fm-subfolder-title">
             <MdFolderOpen style={{ marginRight: '0.4rem', verticalAlign: 'middle' }} />
             {openSubFolder.name}
@@ -263,8 +255,6 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     <>
       <div className="fm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="fm-window">
-
-          {/* ── Title bar ── */}
           <div className="fm-titlebar">
             <div className="fm-titlebar-left">
               <MdFolder />
@@ -283,7 +273,6 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
             </div>
           </div>
 
-          {/* ── Breadcrumb / hint bar ── */}
           <div className="fm-hintbar">
             {openSubFolder ? (
               <span>
@@ -298,12 +287,10 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
             )}
           </div>
 
-          {/* ── Body ── */}
           <div className="fm-body">
             {openSubFolder ? renderSubFolderContents() : renderRoot()}
           </div>
 
-          {/* ── Status bar ── */}
           <div className="fm-statusbar">
             <span>{openSubFolder ? `${openSubFolder.name} — ${openSubFolder.files?.length || 0} items` : `${totalCount} total item${totalCount !== 1 ? 's' : ''}`}</span>
             {selected && (() => {
@@ -315,6 +302,30 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
       </div>
 
       {preview && <FilePreviewModal file={preview} onClose={() => setPreview(null)} />}
+
+      {/* Download Progress Toasts */}
+      {downloads.length > 0 && (
+        <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 999999, display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '320px', maxWidth: '420px', width: '90vw' }}>
+          {downloads.map(dl => (
+            <div key={dl.id} style={{ background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#1e293b', border: `1px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#334155'}`, borderRadius: '10px', padding: '0.75rem 1rem', boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: dl.done || dl.error ? '0' : '0.4rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                  {dl.error ? '❌ ' : dl.done ? '✅ ' : '⬇️ '}{dl.name}
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#94a3b8', flexShrink: 0, marginLeft: '0.5rem' }}>
+                  {dl.error ? 'Failed' : dl.done ? 'Done' : `${dl.progress}%`}
+                </span>
+              </div>
+              {!dl.done && !dl.error && (
+                <div style={{ height: '5px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${dl.progress}%`, background: 'linear-gradient(90deg,#6366f1,#818cf8)', borderRadius: '3px', transition: 'width 0.2s ease' }} />
+                </div>
+              )}
+              {dl.error && <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.2rem' }}>{dl.error}</div>}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 };
