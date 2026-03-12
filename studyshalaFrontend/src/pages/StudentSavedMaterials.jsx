@@ -4,6 +4,7 @@
  * Shows message indicator. Opens FileManager overlay with sub-folder support.
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
@@ -11,20 +12,19 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import FileManager from '../components/FileManager';
 import MessageBanner from '../components/MessageBanner';
-import { MdBook, MdBookmark, MdDelete, MdCampaign } from 'react-icons/md';
+import { MdBook, MdBookmark, MdDelete, MdCampaign, MdFolderOpen } from 'react-icons/md';
 import './StudentSavedMaterials.css';
 
 const StudentSavedMaterials = () => {
-  const [materials,  setMaterials]  = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState('');
-
-  // FileManager state
-  const [fmOpen,     setFmOpen]     = useState(false);
-  const [fmLoading,  setFmLoading]  = useState(false);
-  const [fmFiles,    setFmFiles]    = useState([]);
+  const navigate = useNavigate();
+  const [materials,    setMaterials]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+  const [fmOpen,       setFmOpen]       = useState(false);
+  const [fmLoading,    setFmLoading]    = useState(false);
+  const [fmFiles,      setFmFiles]      = useState([]);
   const [fmSubFolders, setFmSubFolders] = useState([]);
-  const [fmMaterial, setFmMaterial] = useState(null);
+  const [fmMaterial,   setFmMaterial]   = useState(null);
 
   useEffect(() => { fetchMaterials(); }, []);
 
@@ -120,6 +120,9 @@ const StudentSavedMaterials = () => {
                       <Button variant="primary" size="sm" onClick={() => openBrowse(m)}>
                         📂 Browse Files
                       </Button>
+                      <Button variant="secondary" size="sm" onClick={() => navigate('/browse-materials')}>
+                        <MdFolderOpen style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} /> Full View
+                      </Button>
                       <Button variant="danger" size="sm" onClick={() => handleRemove(m._id)}>
                         Remove
                       </Button>
@@ -132,7 +135,6 @@ const StudentSavedMaterials = () => {
         </div>
       </div>
 
-      {/* FileManager overlay */}
       {fmOpen && !fmLoading && fmMaterial && (
         <FileManager
           files={fmFiles}
