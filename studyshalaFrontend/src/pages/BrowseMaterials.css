@@ -855,3 +855,10 @@
   .bm-toolbar { flex-direction: column; align-items: flex-start; }
   .bm-grid    { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
 }
+
+/* ── Download toast indeterminate animation ── */
+@keyframes bmSlide {
+  0%   { transform: translateX(-150%); }
+  50%  { transform: translateX(150%); }
+  100% { transform: translateX(250%); }
+}
