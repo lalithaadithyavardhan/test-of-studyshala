@@ -7,7 +7,6 @@ import { MdMenuBook, MdHistory, MdCampaign, MdFolderOpen } from 'react-icons/md'
 import { ImSpinner8 } from 'react-icons/im';
 import './StudentHistory.css';
 
-/* ── Scroll-reveal ── */
 const RevealItem = ({ children, delay = 0 }) => {
   const ref = useRef(null);
   useEffect(() => {
@@ -28,16 +27,16 @@ const RevealItem = ({ children, delay = 0 }) => {
 };
 
 const StudentHistory = () => {
-  const [history,       setHistory]       = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState('');
-  const [success,       setSuccess]       = useState('');
-  const [pageReady,     setPageReady]     = useState(false);
-  const [fmOpen,        setFmOpen]        = useState(false);
-  const [fmLoading,     setFmLoading]     = useState(false);
-  const [fmFiles,       setFmFiles]       = useState([]);
-  const [fmSubFolders,  setFmSubFolders]  = useState([]);
-  const [fmMaterial,    setFmMaterial]    = useState(null);
+  const [history,      setHistory]      = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+  const [success,      setSuccess]      = useState('');
+  const [pageReady,    setPageReady]    = useState(false);
+  const [fmOpen,       setFmOpen]       = useState(false);
+  const [fmLoading,    setFmLoading]    = useState(false);
+  const [fmFiles,      setFmFiles]      = useState([]);
+  const [fmSubFolders, setFmSubFolders] = useState([]);
+  const [fmMaterial,   setFmMaterial]   = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setPageReady(true), 60);
@@ -52,9 +51,7 @@ const StudentHistory = () => {
       setHistory(res.data.history || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch access history');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleSave = async (id) => {
@@ -63,9 +60,7 @@ const StudentHistory = () => {
       setSuccess('Material saved successfully!');
       setTimeout(() => setSuccess(''), 3000);
       fetchHistory();
-    } catch {
-      setError('Failed to save material');
-    }
+    } catch { setError('Failed to save material'); }
   };
 
   const openMaterial = async (item) => {
@@ -80,9 +75,7 @@ const StudentHistory = () => {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load files');
       setFmOpen(false);
-    } finally {
-      setFmLoading(false);
-    }
+    } finally { setFmLoading(false); }
   };
 
   return (
@@ -92,14 +85,10 @@ const StudentHistory = () => {
         <Navbar />
         <div className={`sh-page ${pageReady ? 'sh-ready' : ''}`}>
 
-          {/* Page hero */}
           <div className="sh-hero">
-            <div className="sh-hero-label sh-enter" style={{ animationDelay: '80ms' }}>
-              — access history
-            </div>
+            <div className="sh-hero-label sh-enter" style={{ animationDelay: '80ms' }}>— access history</div>
             <h1 className="sh-title sh-enter" style={{ animationDelay: '160ms' }}>
-              Your history,<br />
-              <span className="sh-title-accent">all in one place.</span>
+              Your history,<br /><span className="sh-title-accent">all in one place.</span>
             </h1>
             <p className="sh-subtitle sh-enter" style={{ animationDelay: '240ms' }}>
               Every material you've accessed using a code appears below.
@@ -107,11 +96,9 @@ const StudentHistory = () => {
             </p>
           </div>
 
-          {/* Alerts */}
           {error   && <div className="sh-alert sh-alert--err sh-enter" style={{ animationDelay: '280ms' }}><span>⚠</span> {error}</div>}
           {success && <div className="sh-alert sh-alert--ok  sh-enter" style={{ animationDelay: '280ms' }}><span>✓</span> {success}</div>}
 
-          {/* Content */}
           {loading ? (
             <div className="sh-loading sh-enter" style={{ animationDelay: '300ms' }}>
               <ImSpinner8 className="sh-spinner" />
@@ -131,19 +118,12 @@ const StudentHistory = () => {
                 return (
                   <RevealItem key={item._id} delay={i * 55}>
                     <div className="sh-card">
-                      {/* Card left icon */}
-                      <div className="sh-card-icon">
-                        <MdMenuBook />
-                      </div>
-
-                      {/* Card info */}
+                      <div className="sh-card-icon"><MdMenuBook /></div>
                       <div className="sh-card-info">
                         <div className="sh-card-top">
                           <h3 className="sh-card-title">{item.subjectName}</h3>
                           {hasMsg && (
-                            <span className="sh-msg-badge">
-                              <MdCampaign /> msg
-                            </span>
+                            <span className="sh-msg-badge"><MdCampaign /> msg</span>
                           )}
                         </div>
                         <div className="sh-card-meta">
@@ -162,15 +142,11 @@ const StudentHistory = () => {
                           </span>
                         </div>
                       </div>
-
-                      {/* Actions */}
                       <div className="sh-card-actions">
                         {item.isSaved ? (
                           <button className="sh-btn sh-btn--saved" disabled>✓ Saved</button>
                         ) : (
-                          <button className="sh-btn sh-btn--save" onClick={() => handleSave(item._id)}>
-                            💾 Save
-                          </button>
+                          <button className="sh-btn sh-btn--save" onClick={() => handleSave(item._id)}>💾 Save</button>
                         )}
                         <button className="sh-btn sh-btn--open" onClick={() => openMaterial(item)}>
                           <MdFolderOpen /> Open
@@ -182,7 +158,6 @@ const StudentHistory = () => {
               })}
             </div>
           )}
-
         </div>
       </div>
 
