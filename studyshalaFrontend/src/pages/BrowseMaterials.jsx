@@ -168,34 +168,36 @@ const BrowseMaterials = () => {
   // ── Download progress state ───────────────────────────────────────────────
   const [downloads, setDownloads] = useState([]); // [{id, name, progress, done, error}]
 
-  const handleDownload = (file) => {
+  const handleDownload = async (file) => {
     if (!file._id || !selectedFolder?._id) {
-      // Fallback: open Google Drive download URL directly
-      if (file.downloadUrl) {
-        window.open(file.downloadUrl, '_blank', 'noopener');
-      } else {
-        setError('Download not available for this file.');
-      }
+      // Fallback for files without IDs — open direct Drive URL
+      if (file.downloadUrl) window.open(file.downloadUrl, '_blank', 'noopener');
+      else setError('Download not available for this file.');
       return;
     }
 
-    // Use the backend route — it validates access then redirects to Google Drive.
-    // Opening in a new tab lets the browser handle the Google Drive redirect natively,
-    // bypassing CORS issues that break fetch()-based downloads.
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    const url = `${apiBase}/student/materials/${selectedFolder._id}/files/${file._id}/download`;
-
-    // Show a brief toast so the user knows it started
     const dlId = file._id + '_' + Date.now();
-    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: null, done: false, error: null }]);
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, done: false, error: null }]);
 
-    window.open(url, '_blank', 'noopener');
+    try {
+      // api.get sends the JWT Authorization header automatically
+      // Backend validates access then returns { downloadUrl, fileName }
+      const res = await api.get(
+        `/student/materials/${selectedFolder._id}/files/${file._id}/download`
+      );
+      const { downloadUrl } = res.data;
+      if (!downloadUrl) throw new Error('No download URL returned');
 
-    // Mark done after 2s (browser has taken over)
-    setTimeout(() => {
+      // Open the Google Drive URL — browser handles the actual file download
+      window.open(downloadUrl, '_blank', 'noopener');
+
       setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, done: true } : d));
       setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3000);
-    }, 2000);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Download failed. Try again.';
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: msg } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
+    }
   };
 
   const handleDeleteFolder = async (id) => {
