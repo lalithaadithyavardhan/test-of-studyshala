@@ -234,7 +234,7 @@ const downloadFile = async (req, res) => {
     if (!file.driveFileId) return res.status(404).json({ message: 'File not on Drive. Ask faculty to re-upload.' });
 
     await logAction(req, 'DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.name });
-    return res.redirect(buildDriveUrls(file.driveFileId).downloadUrl);
+    return res.json({ downloadUrl: buildDriveUrls(file.driveFileId).downloadUrl, fileName: file.name });
   } catch (err) {
     logger.error(`downloadFile: ${err.message}`);
     res.status(500).json({ message: 'Failed to process download' });
