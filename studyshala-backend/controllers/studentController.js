@@ -7,6 +7,83 @@
 const Folder        = require('../models/Folder');
 const { logAction } = require('../middleware/logging');
 const logger        = require('../utils/logger');
+const https         = require('https');
+const http          = require('http');
+const { PDFDocument, rgb, StandardFonts, degrees } = require('pdf-lib');
+const sharp         = require('sharp');
+
+// ── Fetch a URL as a Buffer, following redirects ─────────────────────────────
+const fetchBuffer = (url, maxRedirects = 6) => new Promise((resolve, reject) => {
+  const lib = url.startsWith('https') ? https : http;
+  lib.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && maxRedirects > 0) {
+      return resolve(fetchBuffer(res.headers.location, maxRedirects - 1));
+    }
+    if (res.statusCode !== 200) {
+      res.resume();
+      return reject(new Error(`Upstream returned ${res.statusCode}`));
+    }
+    const chunks = [];
+    res.on('data', c => chunks.push(c));
+    res.on('end',  () => resolve({ buffer: Buffer.concat(chunks), contentType: res.headers['content-type'] || '' }));
+    res.on('error', reject);
+  }).on('error', reject);
+});
+
+// ── Add diagonal watermark to PDF ────────────────────────────────────────────
+const watermarkPdf = async (buffer, watermarkText) => {
+  try {
+    const pdf    = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const font   = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const pages  = pdf.getPages();
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      const fontSize = Math.round(Math.min(width, height) * 0.052);
+      page.drawText(watermarkText, {
+        x: width * 0.05, y: height * 0.15,
+        size: fontSize, font,
+        color: rgb(0.5, 0.5, 0.5), opacity: 0.20, rotate: degrees(38),
+      });
+      page.drawText(watermarkText, {
+        x: width * 0.28, y: height * 0.55,
+        size: fontSize, font,
+        color: rgb(0.5, 0.5, 0.5), opacity: 0.16, rotate: degrees(38),
+      });
+    }
+    return Buffer.from(await pdf.save());
+  } catch (e) {
+    logger.warn('PDF watermark failed, serving original: ' + e.message);
+    return buffer; // serve without watermark rather than failing
+  }
+};
+
+// ── Add watermark to image ────────────────────────────────────────────────────
+const watermarkImage = async (buffer, watermarkText, contentType) => {
+  try {
+    const meta = await sharp(buffer).metadata();
+    const w = meta.width || 800;
+    const h = meta.height || 600;
+    const fontSize = Math.round(Math.min(w, h) * 0.048);
+    const svgOverlay = `<svg width="${w}" height="${h}">
+      <text x="50%" y="35%" text-anchor="middle"
+            font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold"
+            fill="rgba(120,120,120,0.30)"
+            transform="rotate(-35, ${w/2}, ${h/2})">${watermarkText}</text>
+      <text x="50%" y="62%" text-anchor="middle"
+            font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold"
+            fill="rgba(120,120,120,0.25)"
+            transform="rotate(-35, ${w/2}, ${h/2})">${watermarkText}</text>
+    </svg>`;
+    const fmt = contentType.includes('png') ? 'png' : 'jpeg';
+    return await sharp(buffer)
+      .composite([{ input: Buffer.from(svgOverlay), gravity: 'center' }])
+      [fmt]({ quality: 88 })
+      .toBuffer();
+  } catch (e) {
+    logger.warn('Image watermark failed, serving original: ' + e.message);
+    return buffer;
+  }
+};
 
 // ── URL helpers ──────────────────────────────────────────────────────────────
 
@@ -207,7 +284,14 @@ const getMaterialFiles = async (req, res) => {
   }
 };
 
-// ── Download a file (root or sub-folder) ─────────────────────────────────────
+// ── Download a file — proxied through backend with watermark ─────────────────
+//
+// Strategy:
+//   1. Validate student JWT + access rights (saved or history)
+//   2. Fetch the file from Google Drive server-side (Drive files are anyoneWithLink)
+//   3. Add a diagonal watermark — PDF via pdf-lib, images via sharp
+//   4. Stream the watermarked file directly to the browser with
+//      Content-Disposition: attachment so it saves silently without a new tab.
 
 const downloadFile = async (req, res) => {
   try {
@@ -221,7 +305,7 @@ const downloadFile = async (req, res) => {
 
     if (!hasAccess) return res.status(403).json({ message: 'Access denied. Enter the access code first.' });
 
-    // Search root files then all sub-folders
+    // Search root files then sub-folders
     let file = folder.files.find(f => f._id.toString() === fileId);
     if (!file) {
       for (const sf of folder.subFolders) {
@@ -229,15 +313,47 @@ const downloadFile = async (req, res) => {
         if (file) break;
       }
     }
-
     if (!file)             return res.status(404).json({ message: 'File not found' });
     if (!file.driveFileId) return res.status(404).json({ message: 'File not on Drive. Ask faculty to re-upload.' });
 
     await logAction(req, 'DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.name });
-    return res.json({ downloadUrl: buildDriveUrls(file.driveFileId).downloadUrl, fileName: file.name });
+
+    // Watermark label: "StudyShala • <student email>"
+    const wmText = `StudyShala • ${req.user.email || 'Student'}`;
+
+    // Fetch file from Google Drive server-side (no CORS issues here)
+    const driveUrl = buildDriveUrls(file.driveFileId).downloadUrl;
+    const { buffer, contentType } = await fetchBuffer(driveUrl);
+
+    // Sanitise filename for Content-Disposition header
+    const safeName = (file.name || 'file').replace(/[^\w.\-() ]/g, '_');
+
+    // Apply watermark based on type
+    let finalBuffer = buffer;
+    let finalType   = contentType || 'application/octet-stream';
+
+    if (contentType.includes('pdf') || safeName.toLowerCase().endsWith('.pdf')) {
+      finalBuffer = await watermarkPdf(buffer, wmText);
+      finalType   = 'application/pdf';
+    } else if (contentType.startsWith('image/')) {
+      finalBuffer = await watermarkImage(buffer, wmText, contentType);
+      finalType   = contentType;
+    }
+    // Other types (docx, pptx, etc.) — serve as-is, no watermark possible without Office libs
+
+    res.set({
+      'Content-Type':        finalType,
+      'Content-Disposition': `attachment; filename="${safeName}"`,
+      'Content-Length':      finalBuffer.length,
+      'Cache-Control':       'no-store',
+    });
+    return res.end(finalBuffer);
+
   } catch (err) {
     logger.error(`downloadFile: ${err.message}`);
-    res.status(500).json({ message: 'Failed to process download' });
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Download failed. Please try again.' });
+    }
   }
 };
 
