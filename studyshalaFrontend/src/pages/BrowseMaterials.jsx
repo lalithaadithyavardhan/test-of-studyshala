@@ -679,35 +679,135 @@ const BrowseMaterials = () => {
       )}
 
       {/* In-app File Preview */}
+     {/* ── In-app File Preview — full-screen, no zoom ── */}
       {previewModal && createPortal(
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(0,0,0,0.96)',
+            display: 'flex',
+            alignItems: 'stretch',
+            justifyContent: 'center',
+            // Prevent double-tap zoom and pinch zoom on mobile
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
           onClick={(e) => { if (e.target === e.currentTarget) setPreviewModal(null); }}
         >
-          <div style={{ width: 'calc(100% - 2rem)', maxWidth: '1100px', height: '92vh', background: '#1e293b', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 32px 100px rgba(0,0,0,0.8)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.25rem', background: '#0f172a', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-              <span style={{ flex: 1, color: '#f1f5f9', fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            background: '#1e293b',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.75rem 1.25rem',
+              background: '#0f172a',
+              borderBottom: '1px solid rgba(255,255,255,0.07)',
+              flexShrink: 0,
+              minHeight: '52px',
+            }}>
+              <span style={{
+                flex: 1,
+                color: '#f1f5f9',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
                 {previewModal.name}
               </span>
               <button
+                onClick={() => handleDownload(previewModal)}
+                style={{
+                  background: 'rgba(45,91,227,0.15)',
+                  border: '1px solid rgba(45,91,227,0.3)',
+                  color: '#93c5fd',
+                  height: '2rem',
+                  padding: '0 0.75rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  flexShrink: 0,
+                }}
+                title="Download"
+              >
+                ⬇ Download
+              </button>
+              <button
                 onClick={() => setPreviewModal(null)}
-                style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', width: '2rem', height: '2rem', borderRadius: '6px', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                style={{
+                  background: 'rgba(239,68,68,0.15)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#f87171',
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
                 title="Close (Esc)"
               >✕</button>
             </div>
-            <div style={{ flex: 1, overflow: 'hidden', background: '#f8fafc', position: 'relative' }}>
+ 
+            {/* Preview body — fills all remaining height */}
+            <div style={{
+              flex: 1,
+              overflow: 'hidden',
+              position: 'relative',
+              background: previewModal.mimeType?.startsWith('image/') ? '#0f172a' : '#f8fafc',
+            }}>
               {previewModal.mimeType?.startsWith('image/') ? (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', overflow: 'auto', padding: '1rem' }}>
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'auto',
+                  padding: '1rem',
+                  // Allow pinch-zoom on images only
+                  touchAction: 'pinch-zoom',
+                }}>
                   <img
                     src={`https://drive.google.com/thumbnail?id=${previewModal.driveFileId}&sz=w2000`}
                     alt={previewModal.name}
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      objectFit: 'contain',
+                      borderRadius: '4px',
+                    }}
                   />
                 </div>
               ) : (
                 <iframe
                   src={previewModal.previewUrl || `https://drive.google.com/file/d/${previewModal.driveFileId}/preview`}
-                  style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    display: 'block',
+                  }}
                   allow="autoplay"
                   title={previewModal.name}
                 />
