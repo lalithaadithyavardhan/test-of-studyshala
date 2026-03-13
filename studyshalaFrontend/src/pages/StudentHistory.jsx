@@ -1,33 +1,49 @@
-/**
- * StudentHistory  v2
- * ==================
- * Shows message indicator on history cards.
- * "Open" button launches FileManager with sub-folder support.
- */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
-import Card from '../components/Card';
-import Button from '../components/Button';
 import FileManager from '../components/FileManager';
-import { MdMenuBook, MdHistory, MdCampaign } from 'react-icons/md';
+import { MdMenuBook, MdHistory, MdCampaign, MdFolderOpen } from 'react-icons/md';
+import { ImSpinner8 } from 'react-icons/im';
 import './StudentHistory.css';
 
+/* ── Scroll-reveal ── */
+const RevealItem = ({ children, delay = 0 }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { el.classList.add('is-visible'); obs.unobserve(el); } },
+      { threshold: 0.08 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="sh-reveal" style={{ transitionDelay: `${delay}ms` }}>
+      {children}
+    </div>
+  );
+};
+
 const StudentHistory = () => {
-  const [history,   setHistory]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
-  const [success,   setSuccess]   = useState('');
+  const [history,       setHistory]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
+  const [success,       setSuccess]       = useState('');
+  const [pageReady,     setPageReady]     = useState(false);
+  const [fmOpen,        setFmOpen]        = useState(false);
+  const [fmLoading,     setFmLoading]     = useState(false);
+  const [fmFiles,       setFmFiles]       = useState([]);
+  const [fmSubFolders,  setFmSubFolders]  = useState([]);
+  const [fmMaterial,    setFmMaterial]    = useState(null);
 
-  // FileManager state
-  const [fmOpen,      setFmOpen]      = useState(false);
-  const [fmLoading,   setFmLoading]   = useState(false);
-  const [fmFiles,     setFmFiles]     = useState([]);
-  const [fmSubFolders,setFmSubFolders]= useState([]);
-  const [fmMaterial,  setFmMaterial]  = useState(null);
-
-  useEffect(() => { fetchHistory(); }, []);
+  useEffect(() => {
+    const t = setTimeout(() => setPageReady(true), 60);
+    fetchHistory();
+    return () => clearTimeout(t);
+  }, []);
 
   const fetchHistory = async () => {
     try {
@@ -36,16 +52,20 @@ const StudentHistory = () => {
       setHistory(res.data.history || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch access history');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSave = async (id) => {
     try {
       await api.post('/student/save-material', { materialId: id });
-      setSuccess('✅ Material saved!');
+      setSuccess('Material saved successfully!');
       setTimeout(() => setSuccess(''), 3000);
       fetchHistory();
-    } catch { setError('Failed to save material'); }
+    } catch {
+      setError('Failed to save material');
+    }
   };
 
   const openMaterial = async (item) => {
@@ -60,7 +80,9 @@ const StudentHistory = () => {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load files');
       setFmOpen(false);
-    } finally { setFmLoading(false); }
+    } finally {
+      setFmLoading(false);
+    }
   };
 
   return (
@@ -68,69 +90,99 @@ const StudentHistory = () => {
       <Sidebar role="student" />
       <div className="main-content">
         <Navbar />
-        <div className="page-container">
+        <div className={`sh-page ${pageReady ? 'sh-ready' : ''}`}>
 
-          <div className="page-header">
-            <div>
-              <h1>Access History</h1>
-              <p className="page-description">Materials you've accessed using codes</p>
+          {/* Page hero */}
+          <div className="sh-hero">
+            <div className="sh-hero-label sh-enter" style={{ animationDelay: '80ms' }}>
+              — access history
             </div>
+            <h1 className="sh-title sh-enter" style={{ animationDelay: '160ms' }}>
+              Your history,<br />
+              <span className="sh-title-accent">all in one place.</span>
+            </h1>
+            <p className="sh-subtitle sh-enter" style={{ animationDelay: '240ms' }}>
+              Every material you've accessed using a code appears below.
+              Save ones you want to keep, or open them again anytime.
+            </p>
           </div>
 
-          {error   && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">{success}</div>}
+          {/* Alerts */}
+          {error   && <div className="sh-alert sh-alert--err sh-enter" style={{ animationDelay: '280ms' }}><span>⚠</span> {error}</div>}
+          {success && <div className="sh-alert sh-alert--ok  sh-enter" style={{ animationDelay: '280ms' }}><span>✓</span> {success}</div>}
 
+          {/* Content */}
           {loading ? (
-            <div className="loading-container"><div className="spinner"></div></div>
+            <div className="sh-loading sh-enter" style={{ animationDelay: '300ms' }}>
+              <ImSpinner8 className="sh-spinner" />
+              <span>Loading your history…</span>
+            </div>
           ) : history.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon"><MdHistory /></div>
-              <h3>No Access History</h3>
-              <p>Materials you access will appear here</p>
+            <div className="sh-empty sh-enter" style={{ animationDelay: '320ms' }}>
+              <div className="sh-empty-icon"><MdHistory /></div>
+              <h3 className="sh-empty-title">No history yet</h3>
+              <p className="sh-empty-sub">Materials you access with codes will appear here</p>
             </div>
           ) : (
-            <div className="history-list">
-              {history.map(item => {
+            <div className="sh-list">
+              {history.map((item, i) => {
                 const hasMsg  = !!item.messageToStudents?.trim();
                 const sfCount = item.subFolderCount || 0;
                 return (
-                  <Card key={item._id} className="history-card">
-                    <div className="history-card-content">
-                      <div className="history-icon"><MdMenuBook /></div>
-                      <div className="history-info">
-                        <h3 className="history-title">{item.subjectName}</h3>
-                        <div className="history-meta">
-                          <span>{item.facultyName}</span>
-                          <span>{item.department}</span>
-                          <span>Sem {item.semester}</span>
-                          <span>{item.fileCount} files{sfCount > 0 ? ` · ${sfCount} folders` : ''}</span>
-                        </div>
-                        <div className="history-details">
-                          <span className="code-badge">{item.accessCode}</span>
-                          <span className="date-badge">Accessed {new Date(item.accessedAt).toLocaleDateString()}</span>
+                  <RevealItem key={item._id} delay={i * 55}>
+                    <div className="sh-card">
+                      {/* Card left icon */}
+                      <div className="sh-card-icon">
+                        <MdMenuBook />
+                      </div>
+
+                      {/* Card info */}
+                      <div className="sh-card-info">
+                        <div className="sh-card-top">
+                          <h3 className="sh-card-title">{item.subjectName}</h3>
                           {hasMsg && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', color: '#d97706', background: '#fef3c7', borderRadius: '999px', padding: '0.1rem 0.5rem' }}>
-                              <MdCampaign /> Msg
+                            <span className="sh-msg-badge">
+                              <MdCampaign /> msg
                             </span>
                           )}
                         </div>
+                        <div className="sh-card-meta">
+                          <span>{item.facultyName}</span>
+                          <span className="sh-meta-dot">·</span>
+                          <span>{item.department}</span>
+                          <span className="sh-meta-dot">·</span>
+                          <span>Sem {item.semester}</span>
+                          <span className="sh-meta-dot">·</span>
+                          <span>{item.fileCount} file{item.fileCount !== 1 ? 's' : ''}{sfCount > 0 ? ` · ${sfCount} folder${sfCount !== 1 ? 's' : ''}` : ''}</span>
+                        </div>
+                        <div className="sh-card-badges">
+                          <span className="sh-code-badge">{item.accessCode}</span>
+                          <span className="sh-date-badge">
+                            {new Date(item.accessedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
                       </div>
-                      <div className="history-actions">
+
+                      {/* Actions */}
+                      <div className="sh-card-actions">
                         {item.isSaved ? (
-                          <Button variant="secondary" size="sm" disabled>✓ Saved</Button>
+                          <button className="sh-btn sh-btn--saved" disabled>✓ Saved</button>
                         ) : (
-                          <Button variant="primary" size="sm" onClick={() => handleSave(item._id)}>💾 Save</Button>
+                          <button className="sh-btn sh-btn--save" onClick={() => handleSave(item._id)}>
+                            💾 Save
+                          </button>
                         )}
-                        <Button variant="primary" size="sm" onClick={() => openMaterial(item)}>
-                          📂 Open
-                        </Button>
+                        <button className="sh-btn sh-btn--open" onClick={() => openMaterial(item)}>
+                          <MdFolderOpen /> Open
+                        </button>
                       </div>
                     </div>
-                  </Card>
+                  </RevealItem>
                 );
               })}
             </div>
           )}
+
         </div>
       </div>
 
