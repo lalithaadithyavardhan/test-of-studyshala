@@ -3,8 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   MdMenuBook, MdDashboard, MdLibraryBooks,
   MdHistory, MdKey, MdSettings, MdFolderOpen,
-  MdChevronLeft, MdChevronRight, MdMenu, MdClose
+  MdChevronLeft, MdChevronRight, MdMenu, MdClose,
+  MdInfoOutline
 } from 'react-icons/md';
+import { FaGithub, FaLinkedin, FaHeart } from 'react-icons/fa';
 import './Sidebar.css';
 
 const Sidebar = ({ role }) => {
@@ -13,6 +15,7 @@ const Sidebar = ({ role }) => {
   const [isCollapsed,  setIsCollapsed]  = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [mounted,      setMounted]      = useState(false);
+  const [aboutOpen,    setAboutOpen]    = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 80);
@@ -37,7 +40,6 @@ const Sidebar = ({ role }) => {
       { path: '/faculty/materials', icon: <MdLibraryBooks />, label: 'My Materials'     },
       { path: '/browse-materials',  icon: <MdFolderOpen />,   label: 'Browse Materials' },
     ],
-    /* Student: 3 items only — My Materials removed, Browse Materials replaces it */
     student: [
       { path: '/student/enter-code', icon: <MdKey />,        label: 'Enter Code'       },
       { path: '/browse-materials',   icon: <MdFolderOpen />, label: 'Browse Materials' },
@@ -74,7 +76,11 @@ const Sidebar = ({ role }) => {
             </div>
           )}
           <div className="sb-header-actions">
-            <button className="sb-toggle desktop-only" onClick={() => setIsCollapsed(!isCollapsed)} title={isCollapsed ? 'Expand' : 'Collapse'}>
+            <button
+              className="sb-toggle desktop-only"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              title={isCollapsed ? 'Expand' : 'Collapse'}
+            >
               {isCollapsed ? <MdChevronRight /> : <MdChevronLeft />}
             </button>
             <button className="sb-toggle mobile-only" onClick={() => setIsMobileOpen(false)}>
@@ -83,7 +89,7 @@ const Sidebar = ({ role }) => {
           </div>
         </div>
 
-        {/* Nav links */}
+        {/* Nav — flex:1 + overflow-y:auto makes it scroll when many items */}
         <nav className="sb-nav">
           {links.map((link, i) => (
             <button
@@ -104,12 +110,63 @@ const Sidebar = ({ role }) => {
           ))}
         </nav>
 
-        {/* Footer watermark */}
-        {!isCollapsed && (
-          <div className="sb-footer">
-            <span className="sb-footer-text">studyshala</span>
-          </div>
-        )}
+        {/* Footer: About + watermark */}
+        <div className="sb-footer">
+          {!isCollapsed ? (
+            <>
+              {/* About toggle */}
+              <button
+                className="sb-about-toggle"
+                onClick={() => setAboutOpen(!aboutOpen)}
+              >
+                <MdInfoOutline className="sb-about-icon" />
+                <span>About</span>
+                <span className={`sb-about-caret ${aboutOpen ? 'open' : ''}`}>›</span>
+              </button>
+
+              {/* About panel (slides open) */}
+              <div className={`sb-about-panel ${aboutOpen ? 'sb-about-panel--open' : ''}`}>
+                <div className="sb-about-row">
+                  <img
+                    src="https://avatars.githubusercontent.com/lalithaadithyavardhan"
+                    alt="Borra Adithya"
+                    className="sb-about-avatar"
+                    onError={e => { e.target.style.display = 'none'; }}
+                  />
+                  <div>
+                    <div className="sb-about-name">Borra Adithya</div>
+                    <div className="sb-about-role">Student · Developer</div>
+                  </div>
+                </div>
+                <p className="sb-about-desc">
+                  Built StudyShala to make study material sharing effortless — free, ad-free, always.
+                </p>
+                <div className="sb-about-links">
+                  <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="sb-about-link" title="GitHub">
+                    <FaGithub /> GitHub
+                  </a>
+                  <a href="https://linkedin.com/in/borra-adithya-95a885352" target="_blank" rel="noopener noreferrer" className="sb-about-link" title="LinkedIn">
+                    <FaLinkedin /> LinkedIn
+                  </a>
+                </div>
+              </div>
+
+              <div className="sb-watermark">
+                <span className="sb-footer-text">studyshala</span>
+                <FaHeart className="sb-footer-heart" />
+              </div>
+            </>
+          ) : (
+            <button
+              className="sb-toggle"
+              style={{ margin: '0 auto', display: 'flex' }}
+              title="About"
+              onClick={() => { setIsCollapsed(false); setTimeout(() => setAboutOpen(true), 310); }}
+            >
+              <MdInfoOutline />
+            </button>
+          )}
+        </div>
       </aside>
     </>
   );
