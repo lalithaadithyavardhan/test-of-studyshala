@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
@@ -8,24 +7,9 @@ import { MdKey, MdLockOpen, MdFolderOpen, MdHistory } from 'react-icons/md';
 import { ImSpinner8 } from 'react-icons/im';
 import './StudentEnterCode.css';
 
-/* ── Scroll-reveal hook ── */
-const useReveal = () => {
-  const refs = [];
-  const register = (el) => {
-    if (!el || refs.includes(el)) return;
-    refs.push(el);
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { el.classList.add('is-visible'); obs.unobserve(el); } },
-      { threshold: 0.12 }
-    );
-    obs.observe(el);
-  };
-  return register;
-};
-
 const StudentEnterCode = () => {
   const navigate    = useNavigate();
-  const { user }    = useAuth();
+  const inputRef    = useRef(null);
   const [code,      setCode]      = useState('');
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState('');
@@ -58,8 +42,8 @@ const StudentEnterCode = () => {
   };
 
   const quickLinks = [
-    { icon: <MdFolderOpen />, label: 'Browse Materials', sub: 'View your saved materials', path: '/browse-materials' },
-    { icon: <MdHistory />,    label: 'History',          sub: 'See codes you\'ve used',    path: '/student/history'  },
+    { icon: <MdFolderOpen />, label: 'Browse Materials', sub: "View your saved materials", path: '/browse-materials' },
+    { icon: <MdHistory />,    label: 'History',          sub: "See codes you've used",    path: '/student/history'  },
   ];
 
   return (
@@ -69,7 +53,7 @@ const StudentEnterCode = () => {
         <Navbar />
         <div className={`ec-page ${pageReady ? 'ec-ready' : ''}`}>
 
-          {/* Page heading */}
+          {/* Hero */}
           <div className="ec-hero">
             <div className="ec-hero-label ec-enter" style={{ animationDelay: '80ms' }}>
               — student access
@@ -79,12 +63,12 @@ const StudentEnterCode = () => {
               <span className="ec-title-accent">access code.</span>
             </h1>
             <p className="ec-subtitle ec-enter" style={{ animationDelay: '240ms' }}>
-              Get the 8-character code from your faculty and paste it below
+              Get the 8-character code from your faculty and type it below
               to unlock your study materials instantly.
             </p>
           </div>
 
-          {/* Code form */}
+          {/* Card */}
           <div className="ec-card ec-enter" style={{ animationDelay: '320ms' }}>
             <div className="ec-card-header">
               <div className="ec-card-icon"><MdKey /></div>
@@ -101,25 +85,40 @@ const StudentEnterCode = () => {
             )}
 
             <form onSubmit={handleValidate} className="ec-form">
-              <div className="ec-input-wrap">
+              {/*
+                FIX: cursor is now set to text on the whole wrapper.
+                The real <input> is visually hidden but covers the entire
+                character-box row so clicks anywhere on it focus the input.
+              */}
+              <div
+                className="ec-input-wrap"
+                onClick={() => inputRef.current?.focus()}
+              >
+                {/* Visible character boxes */}
+                <div className="ec-input-chars" aria-hidden="true">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`ec-char-box ${code[i] ? 'ec-char-box--filled' : ''}`}
+                    >
+                      {code[i] || ''}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Real input — transparent overlay */}
                 <input
-                  className="ec-input"
+                  ref={inputRef}
+                  className="ec-real-input"
                   value={code}
-                  onChange={e => { setCode(e.target.value.toUpperCase()); setError(''); }}
-                  placeholder="A3F9K2BX"
+                  onChange={e => { setCode(e.target.value.toUpperCase().slice(0, 8)); setError(''); }}
                   maxLength={8}
                   required
                   autoFocus
                   autoComplete="off"
                   spellCheck={false}
+                  aria-label="Access code"
                 />
-                <div className="ec-input-chars">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className={`ec-char-box ${code[i] ? 'ec-char-box--filled' : ''}`}>
-                      {code[i] || ''}
-                    </div>
-                  ))}
-                </div>
               </div>
 
               <button
