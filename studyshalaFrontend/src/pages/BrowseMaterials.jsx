@@ -16,7 +16,7 @@ import {
   MdInsertDriveFile, MdPictureAsPdf, MdImage, MdVideoFile, MdDescription,
   MdDownload, MdPreview, MdDelete, MdEdit, MdUpload, MdArrowBack,
   MdLightMode, MdDarkMode, MdMoreVert, MdCheck, MdContentCopy,
-  MdFilterList, MdSort, MdInfo, MdKeyboardArrowRight, MdHome
+  MdFilterList, MdSort, MdInfo, MdKeyboardArrowRight, MdHome, MdBookmarkRemove
 } from 'react-icons/md';
 import './BrowseMaterials.css';
 import MessageBanner from '../components/MessageBanner';
@@ -170,7 +170,6 @@ const BrowseMaterials = () => {
 
   const handleDownload = async (file) => {
     if (!file._id || !selectedFolder?._id) {
-      // Fallback for files without IDs — open direct Drive URL
       if (file.downloadUrl) window.open(file.downloadUrl, '_blank', 'noopener');
       else setError('Download not available for this file.');
       return;
@@ -180,21 +179,34 @@ const BrowseMaterials = () => {
     setDownloads(prev => [...prev, { id: dlId, name: file.name, done: false, error: null }]);
 
     try {
-      // api.get sends the JWT Authorization header automatically
-      // Backend validates access then returns { downloadUrl, fileName }
+      // Request the file as a blob — backend proxies from Drive, adds watermark,
+      // and streams it back with Content-Disposition: attachment.
+      // Using responseType:'blob' keeps everything in-page — no new tab opens.
       const res = await api.get(
-        `/student/materials/${selectedFolder._id}/files/${file._id}/download`
+        `/student/materials/${selectedFolder._id}/files/${file._id}/download`,
+        { responseType: 'blob' }
       );
-      const { downloadUrl } = res.data;
-      if (!downloadUrl) throw new Error('No download URL returned');
 
-      // Open the Google Drive URL — browser handles the actual file download
-      window.open(downloadUrl, '_blank', 'noopener');
+      // Build a temporary object URL and click a hidden <a> to save the file
+      const blobUrl  = URL.createObjectURL(res.data);
+      const anchor   = document.createElement('a');
+      anchor.href     = blobUrl;
+      anchor.download = file.name || 'download';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(blobUrl);
 
       setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, done: true } : d));
       setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3000);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Download failed. Try again.';
+      // Try to parse error JSON from blob response
+      let msg = 'Download failed. Please try again.';
+      try {
+        const text = await err.response?.data?.text?.();
+        const json = text ? JSON.parse(text) : null;
+        if (json?.message) msg = json.message;
+      } catch (_) {}
       setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: msg } : d));
       setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
     }
@@ -210,6 +222,19 @@ const BrowseMaterials = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete');
+    }
+  };
+
+  const handleRemoveSaved = async (id) => {
+    if (!window.confirm('Remove this material from your saved list?')) return;
+    try {
+      await api.delete(`/student/saved-materials/${id}`);
+      setSuccess('Removed from saved materials');
+      if (selectedFolder?._id === id) { setSelectedFolder(null); setSelectedFile(null); setPreviewFile(null); }
+      fetchData();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove');
     }
   };
 
@@ -412,6 +437,13 @@ const BrowseMaterials = () => {
                         <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFolder(folder._id)}><MdDelete /></button>
                       </div>
                     )}
+                    {!isFaculty && (
+                      <div className="bm-folder-card-actions" onClick={e => e.stopPropagation()}>
+                        <button title="Remove from saved" className="bm-action--danger" onClick={() => handleRemoveSaved(folder._id)}>
+                          <MdBookmarkRemove />
+                        </button>
+                      </div>
+                    )}
                     <button className="bm-open-btn" onClick={() => openFolder(folder)}>Open →</button>
                   </div>
                 ))}
@@ -427,7 +459,7 @@ const BrowseMaterials = () => {
                     <th>Faculty</th>
                     <th>Files</th>
                     <th>Date</th>
-                    {isFaculty && <th>Actions</th>}
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -442,13 +474,17 @@ const BrowseMaterials = () => {
                       <td>{folder.facultyName}</td>
                       <td>{folder.fileCount ?? 0}</td>
                       <td>{fmtDate(folder.createdAt)}</td>
-                      {isFaculty && (
-                        <td className="bm-table-actions" onClick={e => e.stopPropagation()}>
-                          <button title="Open" onClick={() => openFolder(folder)}><MdFolderOpen /></button>
-                          <button title="Edit" onClick={() => openEdit(folder)}><MdEdit /></button>
-                          <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFolder(folder._id)}><MdDelete /></button>
-                        </td>
-                      )}
+                      <td className="bm-table-actions" onClick={e => e.stopPropagation()}>
+                        <button title="Open" onClick={() => openFolder(folder)}><MdFolderOpen /></button>
+                        {isFaculty ? (
+                          <>
+                            <button title="Edit" onClick={() => openEdit(folder)}><MdEdit /></button>
+                            <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFolder(folder._id)}><MdDelete /></button>
+                          </>
+                        ) : (
+                          <button title="Remove from saved" className="bm-action--danger" onClick={() => handleRemoveSaved(folder._id)}><MdBookmarkRemove /></button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -647,6 +683,13 @@ const BrowseMaterials = () => {
                     <button className="bm-panel-btn bm-panel-btn--danger"     onClick={() => handleDeleteFolder(selectedFolder._id)}><MdDelete /> Delete</button>
                   </div>
                 )}
+                {!isFaculty && (
+                  <div className="bm-panel-actions">
+                    <button className="bm-panel-btn bm-panel-btn--danger" onClick={() => handleRemoveSaved(selectedFolder._id)}>
+                      <MdBookmarkRemove /> Remove Saved
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <div className="bm-panel-empty">
@@ -787,7 +830,7 @@ const BrowseMaterials = () => {
                   {dl.error ? '❌ ' : dl.done ? '✅ ' : '⬇️ '}{dl.name}
                 </span>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#94a3b8', flexShrink: 0, marginLeft: '0.5rem' }}>
-                  {dl.error ? 'Failed' : dl.done ? 'Opening…' : 'Starting…'}
+                  {dl.error ? 'Failed' : dl.done ? 'Saved!' : 'Downloading…'}
                 </span>
               </div>
               {!dl.done && !dl.error && (
