@@ -1,25 +1,49 @@
 /**
- * FacultyMaterials  v2
- * ====================
- * Shows sub-folder structure per material and faculty message.
- * "Browse" opens FileManager with full sub-folder navigation.
+ * FacultyMaterials.jsx — Editorial redesign
+ * Same design system: Lora · IBM Plex Mono · Lato · full dark mode
  */
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
-import Card from '../components/Card';
-import Button from '../components/Button';
 import FileManager from '../components/FileManager';
-import { MdBook, MdFolder, MdDelete, MdContentCopy, MdCheck, MdCampaign, MdFolderOpen } from 'react-icons/md';
+import {
+  MdBook, MdFolder, MdDelete, MdContentCopy, MdCheck,
+  MdCampaign, MdFolderOpen, MdSearch, MdClose
+} from 'react-icons/md';
+import { ImSpinner8 } from 'react-icons/im';
 import './FacultyMaterials.css';
 
+// ── Scroll-reveal wrapper ────────────────────────────────────────────────────
+const Reveal = ({ children, delay = 0 }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { el.classList.add('fm-visible'); obs.unobserve(el); } },
+      { threshold: 0.06 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="fm-reveal" style={{ transitionDelay: `${delay}ms` }}>
+      {children}
+    </div>
+  );
+};
+
+// ── Main Component ───────────────────────────────────────────────────────────
 const FacultyMaterials = () => {
   const [materials,    setMaterials]    = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState('');
   const [success,      setSuccess]      = useState('');
   const [copiedId,     setCopiedId]     = useState(null);
+  const [search,       setSearch]       = useState('');
+  const [pageReady,    setPageReady]    = useState(false);
 
   const [fmOpen,       setFmOpen]       = useState(false);
   const [fmLoading,    setFmLoading]    = useState(false);
@@ -27,7 +51,11 @@ const FacultyMaterials = () => {
   const [fmFiles,      setFmFiles]      = useState([]);
   const [fmSubFolders, setFmSubFolders] = useState([]);
 
-  useEffect(() => { fetchMaterials(); }, []);
+  useEffect(() => {
+    const t = setTimeout(() => setPageReady(true), 60);
+    fetchMaterials();
+    return () => clearTimeout(t);
+  }, []);
 
   const fetchMaterials = async () => {
     try {
@@ -59,7 +87,6 @@ const FacultyMaterials = () => {
     setFmLoading(true);
     setFmOpen(true);
     try {
-      // Refresh to get latest files
       const res = await api.get(`/faculty/folders/${m._id}`);
       const updated = res.data.folder;
       setFmFiles(updated.files || []);
@@ -70,34 +97,68 @@ const FacultyMaterials = () => {
     } finally { setFmLoading(false); }
   };
 
+  const filtered = materials.filter(m => {
+    const q = search.toLowerCase();
+    return !q ||
+      m.subjectName?.toLowerCase().includes(q) ||
+      m.facultyName?.toLowerCase().includes(q) ||
+      m.department?.toLowerCase().includes(q);
+  });
+
   return (
     <div className="app-container">
       <Sidebar role="faculty" />
       <div className="main-content">
         <Navbar />
-        <div className="page-container">
+        <div className={`fm-page ${pageReady ? 'fm-ready' : ''}`}>
 
-          <div className="page-header">
-            <div>
-              <h1>My Materials</h1>
-              <p className="page-description">View, preview, and manage your uploaded materials</p>
-            </div>
+          {/* ── Hero ── */}
+          <div className="fm-hero">
+            <div className="fm-hero-label fm-enter" style={{ animationDelay: '80ms' }}>— my materials</div>
+            <h1 className="fm-title fm-enter" style={{ animationDelay: '160ms' }}>
+              Browse &amp; manage<br /><span className="fm-title-accent">your uploads.</span>
+            </h1>
+            <p className="fm-subtitle fm-enter" style={{ animationDelay: '240ms' }}>
+              View every file you've shared with students, manage sub-folders, and keep everything organised.
+            </p>
           </div>
 
-          {error   && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">✅ {success}</div>}
+          {/* ── Alerts ── */}
+          {error   && <div className="fm-alert fm-alert--err fm-enter"><span>⚠</span> {error}</div>}
+          {success && <div className="fm-alert fm-alert--ok  fm-enter"><span>✓</span> {success}</div>}
 
+          {/* ── Search + count bar ── */}
+          <div className="fm-toolbar fm-enter" style={{ animationDelay: '300ms' }}>
+            <div className="fm-search-wrap">
+              <MdSearch className="fm-search-icon" />
+              <input
+                className="fm-search"
+                placeholder="Search by subject, faculty, department…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && <button className="fm-search-clear" onClick={() => setSearch('')}><MdClose /></button>}
+            </div>
+            <span className="fm-count">{filtered.length} material{filtered.length !== 1 ? 's' : ''}</span>
+          </div>
+
+          {/* ── Content ── */}
           {loading ? (
-            <div className="loading-container"><div className="spinner"></div></div>
-          ) : materials.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon"><MdFolder /></div>
-              <h3>No Materials</h3>
-              <p>Create materials from the Dashboard to see them here</p>
+            <div className="fm-loading">
+              <ImSpinner8 className="fm-spinner" />
+              <span>Loading materials…</span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="fm-empty">
+              <div className="fm-empty-icon"><MdFolder /></div>
+              <h3 className="fm-empty-title">{search ? 'No results found' : 'No materials yet'}</h3>
+              <p className="fm-empty-sub">
+                {search ? `No materials match "${search}"` : 'Create materials from the Dashboard to see them here'}
+              </p>
             </div>
           ) : (
-            <div className="faculty-materials-grid">
-              {materials.map(m => {
+            <div className="fm-list">
+              {filtered.map((m, i) => {
                 const code       = m.accessCode || m.departmentCode;
                 const rootFiles  = m.files?.length || 0;
                 const sfCount    = m.subFolders?.length || 0;
@@ -105,62 +166,71 @@ const FacultyMaterials = () => {
                 const hasMsg     = !!m.messageToStudents?.trim();
 
                 return (
-                  <Card key={m._id} className="faculty-material-card">
-                    <div className="faculty-material-header">
-                      <div className="material-icon"><MdBook /></div>
-                      <h3 className="material-title">{m.subjectName}</h3>
-                    </div>
-                    <div className="faculty-material-body">
-                      <div className="detail-row"><span className="detail-label">Faculty</span><span className="detail-value">{m.facultyName}</span></div>
-                      <div className="detail-row"><span className="detail-label">Dept</span><span className="detail-value">{m.department}</span></div>
-                      <div className="detail-row"><span className="detail-label">Semester</span><span className="detail-value">{m.semester}</span></div>
-                      <div className="detail-row">
-                        <span className="detail-label">Files</span>
-                        <span className="detail-value">{totalFiles} file(s)</span>
-                      </div>
-                      {sfCount > 0 && (
-                        <div className="detail-row">
-                          <span className="detail-label">Folders</span>
-                          <span className="detail-value" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                  <Reveal key={m._id} delay={i * 50}>
+                    <div className="fm-card">
+                      {/* Left icon */}
+                      <div className="fm-card-icon"><MdBook /></div>
+
+                      {/* Main info */}
+                      <div className="fm-card-body">
+                        <div className="fm-card-top">
+                          <h3 className="fm-card-title">{m.subjectName}</h3>
+                          {hasMsg && <span className="fm-msg-badge"><MdCampaign /> message</span>}
+                        </div>
+
+                        <div className="fm-card-meta">
+                          <span>{m.facultyName}</span>
+                          <span className="fm-dot">·</span>
+                          <span>{m.department}</span>
+                          <span className="fm-dot">·</span>
+                          <span>Sem {m.semester}</span>
+                          <span className="fm-dot">·</span>
+                          <span>{totalFiles} file{totalFiles !== 1 ? 's' : ''}{sfCount > 0 ? ` · ${sfCount} folder${sfCount !== 1 ? 's' : ''}` : ''}</span>
+                        </div>
+
+                        {/* Sub-folder chips */}
+                        {sfCount > 0 && (
+                          <div className="fm-sf-list">
                             {m.subFolders.map(sf => (
-                              <span key={sf._id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', background: '#eef2ff', color: '#4338ca', borderRadius: '999px', padding: '0.1rem 0.5rem', fontSize: '0.75rem' }}>
-                                <MdFolderOpen style={{ fontSize: '0.85rem' }} /> {sf.name} ({sf.files?.length || 0})
+                              <span key={sf._id} className="fm-sf-chip">
+                                <MdFolderOpen /> {sf.name} <em>{sf.files?.length || 0}</em>
                               </span>
                             ))}
-                          </span>
-                        </div>
-                      )}
-                      {hasMsg && (
-                        <div className="detail-row" style={{ alignItems: 'flex-start' }}>
-                          <span className="detail-label" style={{ paddingTop: '0.15rem' }}>
-                            <MdCampaign style={{ color: '#d97706', verticalAlign: 'middle' }} />
-                          </span>
-                          <span className="detail-value" style={{ color: '#92400e', fontSize: '0.8rem', background: '#fffbeb', borderRadius: '6px', padding: '0.3rem 0.5rem' }}>
-                            {m.messageToStudents.slice(0, 100)}{m.messageToStudents.length > 100 ? '…' : ''}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        )}
 
-                    <div className="access-code-section">
-                      <span className="access-code-label-sm">Access Code</span>
-                      <div className="access-code-row-sm">
-                        <code className="access-code-sm">{code}</code>
-                        <button className={`copy-btn-sm ${copiedId === m._id ? 'copied' : ''}`} onClick={() => copyCode(code, m._id)} title="Copy">
-                          {copiedId === m._id ? <MdCheck /> : <MdContentCopy />}
+                        {/* Message preview */}
+                        {hasMsg && (
+                          <div className="fm-msg-preview">
+                            <MdCampaign />
+                            <span>{m.messageToStudents.slice(0, 90)}{m.messageToStudents.length > 90 ? '…' : ''}</span>
+                          </div>
+                        )}
+
+                        {/* Code row */}
+                        <div className="fm-code-row">
+                          <code className="fm-code">{code}</code>
+                          <button
+                            className={`fm-copy-btn ${copiedId === m._id ? 'fm-copy-btn--done' : ''}`}
+                            onClick={() => copyCode(code, m._id)}
+                            title="Copy code"
+                          >
+                            {copiedId === m._id ? <><MdCheck /> Copied</> : <><MdContentCopy /> Copy</>}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="fm-card-actions">
+                        <button className="fm-btn fm-btn--primary" onClick={() => openFileManager(m)}>
+                          <MdFolderOpen /> Browse Files
+                        </button>
+                        <button className="fm-btn fm-btn--danger" onClick={() => handleDelete(m._id)}>
+                          <MdDelete /> Delete
                         </button>
                       </div>
                     </div>
-
-                    <div className="faculty-material-actions">
-                      <Button variant="primary" size="sm" onClick={() => openFileManager(m)}>
-                        📂 Browse Files
-                      </Button>
-                      <Button variant="danger" size="sm" onClick={() => handleDelete(m._id)}>
-                        <MdDelete /> Delete
-                      </Button>
-                    </div>
-                  </Card>
+                  </Reveal>
                 );
               })}
             </div>
