@@ -1099,3 +1099,58 @@
   background: #f1f5f9; color: #2d5be3; border-radius: 4px; padding: 0.1rem 0.35rem;
 }
 .bm-dark .bm-md-preview code { background: #1e293b; color: #60a5fa; }
+
+/* ══════════════════════════════════════════════════════════════
+   RECENTLY VIEWED STRIP — on folder landing
+   ══════════════════════════════════════════════════════════════ */
+.bm-recent-strip {
+  margin-bottom: 1.25rem;
+  background: var(--bm-surface);
+  border: 1px solid var(--bm-border);
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+}
+.bm-recent-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 0.625rem;
+}
+.bm-recent-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem; font-weight: 700;
+  color: var(--bm-text-sub); letter-spacing: 0.04em; text-transform: uppercase;
+}
+.bm-recent-clear {
+  font-size: 0.68rem; font-weight: 600; color: var(--bm-text-sub);
+  background: none; border: 1px solid var(--bm-border);
+  border-radius: 4px; padding: 0.1rem 0.45rem; cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.bm-recent-clear:hover { color: var(--bm-danger, #ef4444); border-color: var(--bm-danger, #ef4444); }
+
+.bm-recent-row {
+  display: flex; gap: 0.5rem; flex-wrap: nowrap;
+  overflow-x: auto; padding-bottom: 0.25rem;
+  scrollbar-width: thin; scrollbar-color: var(--bm-border) transparent;
+}
+.bm-recent-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  flex-shrink: 0; width: 88px; padding: 0.6rem 0.5rem;
+  background: var(--bm-bg); border: 1px solid var(--bm-border);
+  border-radius: 8px; cursor: pointer; text-align: center;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.bm-recent-chip:hover {
+  border-color: var(--bm-accent);
+  background: color-mix(in srgb, var(--bm-accent,#6366f1) 5%, var(--bm-bg));
+  transform: translateY(-2px);
+}
+.bm-recent-chip-name {
+  font-size: 0.68rem; font-weight: 600; color: var(--bm-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  width: 100%; display: block;
+}
+.bm-recent-chip-sub {
+  font-size: 0.6rem; color: var(--bm-text-sub);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  width: 100%; display: block;
+}
