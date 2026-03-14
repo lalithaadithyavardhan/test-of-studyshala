@@ -27,12 +27,13 @@ const buildDriveUrls = (driveFileId) => {
 };
 
 const mapFile = (f) => ({
-  _id:         f._id,
-  name:        f.name,
-  mimeType:    f.mimeType,
-  size:        f.size,
-  uploadedAt:  f.uploadedAt,
-  driveFileId: f.driveFileId || null,
+  _id:           f._id,
+  name:          f.name,
+  mimeType:      f.mimeType,
+  size:          f.size,
+  uploadedAt:    f.uploadedAt,
+  driveFileId:   f.driveFileId || null,
+  downloadCount: f.downloadCount || 0,
   ...buildDriveUrls(f.driveFileId)
 });
 
