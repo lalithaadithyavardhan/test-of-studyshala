@@ -289,7 +289,7 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
       {downloads.length > 0 && (
         <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 999999, display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '320px', maxWidth: '420px', width: '90vw' }}>
           {downloads.map(dl => (
-            <div key={dl.id} style={{ background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#1e293b', border: `1px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#334155'}`, borderRadius: '10px', padding: '0.75rem 1rem', boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}>
+            <div key={dl.id} style={{ background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#0c4a6e', border: `1px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#075985'}`, borderRadius: '10px', padding: '0.75rem 1rem', boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: dl.done || dl.error ? '0' : '0.4rem' }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: 600, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
                   {dl.error ? '❌ ' : dl.done ? '✅ ' : '⬇️ '}{dl.name}
@@ -299,8 +299,8 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
                 </span>
               </div>
               {!dl.done && !dl.error && (
-                <div style={{ height: '5px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${dl.progress}%`, background: 'linear-gradient(90deg,#6366f1,#818cf8)', borderRadius: '3px', transition: 'width 0.2s ease' }} />
+                <div style={{ height: '5px', background: '#075985', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${dl.progress}%`, background: 'linear-gradient(90deg,#0891b2,#22d3ee)', borderRadius: '3px', transition: 'width 0.2s ease' }} />
                 </div>
               )}
               {dl.error && <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.2rem' }}>{dl.error}</div>}
