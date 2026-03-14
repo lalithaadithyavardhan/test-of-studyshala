@@ -248,11 +248,26 @@ body.dark-mode .fd-msg-dot { color: var(--fd-amber); }
   font-size: 0.8rem; color: var(--fd-ink3);
   transition: color 0.25s;
 }
-.fd-card-meta span { display: flex; gap: 0.4rem; }
-.fd-card-meta strong { color: var(--fd-ink2); font-weight: 600; min-width: 46px; transition: color 0.25s; }
+.fd-card-meta span {
+  display: flex; gap: 0.4rem;
+  min-width: 0;          /* allow flex children to shrink */
+}
+.fd-card-meta strong {
+  color: var(--fd-ink2); font-weight: 600; min-width: 46px;
+  flex-shrink: 0;        /* label never shrinks */
+  transition: color 0.25s;
+}
+/* Value text truncates with ellipsis if too long */
+.fd-card-meta span > span,
+.fd-card-meta span > *:not(strong) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 
 /* Sub-folder chips */
-.fd-sf-list { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.875rem; }
+.fd-sf-list { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.875rem; min-width: 0; }
 .fd-sf-chip {
   display: inline-flex; align-items: center; gap: 0.3rem;
   font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; font-weight: 500;
@@ -260,6 +275,10 @@ body.dark-mode .fd-msg-dot { color: var(--fd-amber); }
   background: color-mix(in srgb, var(--fd-accent) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--fd-accent) 18%, transparent);
   border-radius: 999px; padding: 0.18rem 0.55rem;
+  max-width: 160px;          /* cap chip width */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: all 0.25s;
 }
 .fd-sf-chip em { font-style: normal; color: var(--fd-ink3); }
@@ -271,6 +290,11 @@ body.dark-mode .fd-msg-dot { color: var(--fd-amber); }
   border-radius: 7px; padding: 0.5rem 0.75rem;
   margin-bottom: 0.875rem;
   font-size: 0.78rem; color: #92400e; line-height: 1.45;
+  /* Prevent long unbroken strings from overflowing the card */
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
+  overflow: hidden;
 }
 body.dark-mode .fd-msg-preview { background: #451a0033; border-color: #78350f44; color: var(--fd-amber); }
 
@@ -288,11 +312,15 @@ body.dark-mode .fd-msg-preview { background: #451a0033; border-color: #78350f44;
   color: var(--fd-accent); margin-bottom: 0.4rem; display: block;
   transition: color 0.25s;
 }
-.fd-code-row { display: flex; align-items: center; gap: 0.6rem; }
+.fd-code-row { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
 .fd-code {
   flex: 1; font-family: 'IBM Plex Mono', monospace;
   font-size: 1.2rem; font-weight: 700; letter-spacing: 0.2em;
   color: var(--fd-ink); background: none; border: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: color 0.25s;
 }
 .fd-copy-btn {
