@@ -91,6 +91,7 @@ const FacultyDashboard = () => {
   // Upload
   const [uploadFiles,    setUploadFiles]    = useState([]);
   const [uploading,      setUploading]      = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging,     setIsDragging]     = useState(false);
   const [selectedSfId,   setSelectedSfId]   = useState('');
   const [newSfName,      setNewSfName]      = useState('');
@@ -169,7 +170,7 @@ const FacultyDashboard = () => {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!uploadFiles.length || !selectedFolder) return;
-    setUploading(true); setError('');
+    setUploading(true); setUploadProgress(0); setError('');
     try {
       const form = new FormData();
       uploadFiles.forEach(f => form.append('files', f));
@@ -177,15 +178,20 @@ const FacultyDashboard = () => {
       const endpoint = selectedSfId
         ? `/faculty/folders/${selectedFolder._id}/subfolders/${selectedSfId}/files`
         : `/faculty/folders/${selectedFolder._id}/files`;
-      await api.post(endpoint, form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setShowUpload(false); setUploadFiles([]); setSelectedFolder(null); setSelectedSfId('');
+      await api.post(endpoint, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (evt) => {
+          if (evt.total) setUploadProgress(Math.round((evt.loaded * 100) / evt.total));
+        }
+      });
+      setShowUpload(false); setUploadFiles([]); setSelectedFolder(null); setSelectedSfId(''); setUploadProgress(0);
       const dest = selectedSfId
         ? `into "${selectedFolder.subFolders?.find(sf => sf._id === selectedSfId)?.name || 'folder'}"`
         : 'to root';
       showSuccess(`${uploadFiles.length} file(s) uploaded ${dest}!`);
       fetchMaterials();
     } catch (err) { showError(err.response?.data?.message || 'Upload failed');
-    } finally { setUploading(false); }
+    } finally { setUploading(false); setUploadProgress(0); }
   };
 
   // ── Delete ─────────────────────────────────────────────────────────────────
@@ -442,18 +448,31 @@ const FacultyDashboard = () => {
       {/* ══ Upload Files Modal ══ */}
       <FdModal
         open={showUpload}
-        onClose={() => { setShowUpload(false); setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); }}
+        onClose={() => { if (!uploading) { setShowUpload(false); setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); setUploadProgress(0); } }}
         title={`Upload Files — ${selectedFolder?.subjectName || ''}`}
         footer={
           <>
+            {/* Progress bar — visible while uploading */}
+            {uploading && (
+              <div style={{ flex: 1, marginRight: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#0369a1', marginBottom: '0.3rem', fontWeight: 600 }}>
+                  <span>⏳ Uploading to Google Drive…</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div style={{ height: '7px', background: '#e0f2fe', borderRadius: '99px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'linear-gradient(90deg, #0891b2, #14b8a6)', borderRadius: '99px', transition: 'width 0.3s ease' }} />
+                </div>
+              </div>
+            )}
             <button className="fd-btn fd-btn--ghost"
-              onClick={() => { setShowUpload(false); setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); }}>
+              onClick={() => { setShowUpload(false); setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); setUploadProgress(0); }}
+              disabled={uploading}>
               Cancel
             </button>
             <button className="fd-btn fd-btn--primary" onClick={handleUpload}
               disabled={uploading || !uploadFiles.length}>
               {uploading
-                ? <><ImSpinner8 className="fd-spin" /> Uploading {uploadFiles.length} file(s)…</>
+                ? <><ImSpinner8 className="fd-spin" /> {uploadProgress}%</>
                 : <><MdUpload /> Upload {uploadFiles.length} file(s)</>
               }
             </button>
