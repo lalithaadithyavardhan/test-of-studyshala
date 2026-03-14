@@ -227,9 +227,20 @@ const BrowseMaterials = () => {
         res = await api.get('/faculty/folders');
         setFolders(res.data.folders || []);
       } else {
-        // Students see saved materials ONLY
         res = await api.get('/student/saved-materials');
         setFolders(res.data.materials || []);
+      }
+
+      // ── Auto-open a folder if navigated from History or Starred ──────────
+      const targetId = sessionStorage.getItem('bm_open_folder');
+      if (targetId) {
+        sessionStorage.removeItem('bm_open_folder');
+        const allFolders = isFaculty ? (res.data.folders || []) : (res.data.materials || []);
+        const target = allFolders.find(f => f._id === targetId || f._id?.toString() === targetId);
+        if (target) {
+          // Use a short delay so the grid has rendered first
+          setTimeout(() => openFolder(target), 100);
+        }
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load materials');
@@ -296,11 +307,7 @@ const BrowseMaterials = () => {
   const [recentFiles,   setRecentFiles]   = useState([]);        // [{fileId,fileName,mimeType,materialId,subjectName,viewedAt}]
   const [recentLoaded,  setRecentLoaded]  = useState(false);
 
-  const handleDownload = (file) => {
-    // Use Google Drive's direct download URL — files are anyoneWithLink so this
-    // works instantly at full CDN speed with no backend bottleneck.
-    // Access control is enforced at the "enter code" step (student must have
-    // the material in their history/saved before they can see the file).
+  const handleDownload = async (file) => {
     const url = file.downloadUrl || (file.driveFileId
       ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
       : null);
@@ -308,23 +315,56 @@ const BrowseMaterials = () => {
     if (!url) { setError('Download not available for this file.'); return; }
 
     const dlId = file._id + '_' + Date.now();
-    setDownloads(prev => [...prev, { id: dlId, name: file.name, done: true, error: null }]);
+    // Show "preparing" toast immediately
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 0, done: false, error: null }]);
 
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    try {
+      // Fetch as blob so download stays in-page (no new tab) with real progress
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
 
-    // Log download count via API (fire-and-forget, non-blocking)
-    if (file._id && selectedFolder?._id && !isFaculty) {
-      api.get(`/student/materials/${selectedFolder._id}/files/${file._id}/download`)
-        .catch(() => {}); // ignore errors — this just increments the counter
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (total) {
+          const pct = Math.min(99, Math.round((received / total) * 100));
+          setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
+        } else {
+          // No Content-Length: show indeterminate pulsing
+          setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: -1 } : d));
+        }
+      }
+
+      // Trigger browser save-file dialog
+      const blob = new Blob(chunks);
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = file.name || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3500);
+
+      // Log download count fire-and-forget (non-blocking)
+      if (file._id && selectedFolder?._id && !isFaculty) {
+        api.get(`/student/materials/${selectedFolder._id}/files/${file._id}/download`).catch(() => {});
+      }
+    } catch (err) {
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'Download failed. Please try again.' } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
     }
-
-    setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 2500);
   };
 
   // ── Inline upload helpers (faculty) ─────────────────────────────────────
@@ -859,14 +899,14 @@ const BrowseMaterials = () => {
                           <div
                             key={sf._id}
                             style={{ background: '#fff', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '0.9rem 0.7rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.15s, box-shadow 0.15s' }}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#eef2ff'; }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#0891b2'; e.currentTarget.style.background = '#e0f2fe'; }}
                             onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
                             onClick={() => setSelectedFolder(prev => ({ ...prev, files: sf.files || [], _activeSubFolder: sf.name, _parentFiles: prev.files, _parentSubFolders: prev.subFolders }))}
                             title={`Open ${sf.name}`}
                           >
-                            <MdFolder style={{ fontSize: '2.4rem', color: '#6366f1' }} />
-                            <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#334155', wordBreak: 'break-word' }}>{sf.name}</span>
-                            <span style={{ fontSize: '0.68rem', color: '#6366f1' }}>{sf.files?.length || 0} file(s)</span>
+                            <MdFolder style={{ fontSize: '2.4rem', color: '#0891b2' }} />
+                            <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#075985', wordBreak: 'break-word' }}>{sf.name}</span>
+                            <span style={{ fontSize: '0.68rem', color: '#0891b2' }}>{sf.files?.length || 0} file(s)</span>
                           </div>
                         ))}
                       </div>
@@ -1121,7 +1161,7 @@ const BrowseMaterials = () => {
 
               {/* Create sub-folder row */}
               <div className="bm-sf-create-row">
-                <MdCreateNewFolder style={{ color: 'var(--bm-accent, #6366f1)', fontSize: '1.1rem', flexShrink: 0 }} />
+                <MdCreateNewFolder style={{ color: 'var(--bm-accent, #0891b2)', fontSize: '1.1rem', flexShrink: 0 }} />
                 <input
                   className="bm-sf-create-input"
                   placeholder="New folder name (e.g. Unit 1, Lab Sheets)"
@@ -1219,14 +1259,14 @@ const BrowseMaterials = () => {
         >
           <div style={{
             width: 'calc(100% - 2rem)', maxWidth: '1100px',
-            height: '92vh', background: '#1e293b',
+            height: '92vh', background: '#0c4a6e',
             borderRadius: '12px', display: 'flex', flexDirection: 'column',
             overflow: 'hidden', boxShadow: '0 32px 100px rgba(0,0,0,0.8)'
           }}>
             {/* Header — just filename + close, no extra buttons */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '0.75rem',
-              padding: '0.75rem 1.25rem', background: '#0f172a',
+              padding: '0.75rem 1.25rem', background: '#052e3d',
               borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0
             }}>
               <span style={{
@@ -1247,7 +1287,7 @@ const BrowseMaterials = () => {
               >✕</button>
             </div>
             {/* Preview body — image / code / markdown / Drive iframe */}
-            <div style={{ flex: 1, overflow: 'hidden', background: '#0f172a', position: 'relative' }}>
+            <div style={{ flex: 1, overflow: 'hidden', background: '#052e3d', position: 'relative' }}>
               {previewModal.mimeType?.startsWith('image/') ? (
                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '1rem' }}>
                   <img
@@ -1277,34 +1317,33 @@ const BrowseMaterials = () => {
         <div style={{
           position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)',
           zIndex: 99999, display: 'flex', flexDirection: 'column', gap: '0.5rem',
-          minWidth: '320px', maxWidth: '420px', width: '90vw',
+          minWidth: '300px', maxWidth: '400px', width: '90vw',
         }}>
           {downloads.map(dl => (
             <div key={dl.id} style={{
-              background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#1e293b',
-              border: `1px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#334155'}`,
-              borderRadius: '10px', padding: '0.75rem 1rem',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+              background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#ffffff',
+              border: `1.5px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#bae6fd'}`,
+              borderRadius: '12px', padding: '0.75rem 1rem',
+              boxShadow: '0 8px 32px rgba(8,145,178,0.18)',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: dl.done || dl.error ? '0' : '0.4rem' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: dl.done || dl.error ? '0' : '0.45rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: dl.error ? '#dc2626' : dl.done ? '#059669' : '#0c4a6e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
                   {dl.error ? '❌ ' : dl.done ? '✅ ' : '⬇️ '}{dl.name}
                 </span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#94a3b8', flexShrink: 0, marginLeft: '0.5rem' }}>
-                  {dl.error ? 'Failed' : dl.done ? 'Saved!' : 'Downloading…'}
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dl.error ? '#dc2626' : dl.done ? '#059669' : '#0891b2', flexShrink: 0, marginLeft: '0.5rem' }}>
+                  {dl.error ? 'Failed' : dl.done ? 'Saved!' : dl.progress === -1 ? 'Downloading…' : `${dl.progress}%`}
                 </span>
               </div>
               {!dl.done && !dl.error && (
-                <div style={{ height: '5px', background: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', width: '40%',
-                    background: 'linear-gradient(90deg,#6366f1,#818cf8)',
-                    borderRadius: '3px',
-                    animation: 'bmSlide 1.2s ease-in-out infinite',
-                  }} />
+                <div style={{ height: '5px', background: '#e0f2fe', borderRadius: '3px', overflow: 'hidden' }}>
+                  {dl.progress === -1 ? (
+                    <div style={{ height: '100%', width: '40%', background: 'linear-gradient(90deg,#0891b2,#14b8a6)', borderRadius: '3px', animation: 'bmSlide 1.2s ease-in-out infinite' }} />
+                  ) : (
+                    <div style={{ height: '100%', width: `${dl.progress}%`, background: 'linear-gradient(90deg,#0891b2,#14b8a6)', borderRadius: '3px', transition: 'width 0.25s ease' }} />
+                  )}
                 </div>
               )}
-              {dl.error && <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.2rem' }}>{dl.error}</div>}
+              {dl.error && <div style={{ fontSize: '0.73rem', color: '#dc2626', marginTop: '0.2rem' }}>{dl.error}</div>}
             </div>
           ))}
         </div>
