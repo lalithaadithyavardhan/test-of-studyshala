@@ -72,44 +72,26 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     };
   }, [selected, preview, onClose, currentFiles, openSubFolder]);
 
-  const handleDownload = async (e, file) => {
+  const handleDownload = (e, file) => {
     e.stopPropagation();
-    if (!file.downloadUrl) { alert('No download URL. Ask your faculty to re-upload this file.'); return; }
+    const url = file.downloadUrl || (file.driveFileId
+      ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
+      : null);
+    if (!url) { alert('No download URL. Ask your faculty to re-upload this file.'); return; }
+
+    // Open Drive's direct download link — instant full CDN speed
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+
+    // Brief "downloading" toast
     const dlId = file._id + '_' + Date.now();
-    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 0, done: false, error: null }]);
-    try {
-      const response = await fetch(file.downloadUrl);
-      if (!response.ok) throw new Error('Download failed');
-      const contentLength = response.headers.get('Content-Length');
-      const total = contentLength ? parseInt(contentLength, 10) : null;
-      const reader = response.body.getReader();
-      const chunks = [];
-      let received = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        if (total) {
-          const pct = Math.round((received / total) * 100);
-          setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
-        }
-      }
-      const blob = new Blob(chunks);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
-      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 4000);
-    } catch (err) {
-      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'Download failed. Try again.' } : d));
-      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
-    }
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 100, done: true, error: null }]);
+    setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3000);
   };
 
   const openPreview = (e, file) => {
