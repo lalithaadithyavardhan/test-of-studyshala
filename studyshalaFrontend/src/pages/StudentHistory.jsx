@@ -59,10 +59,10 @@ const StudentHistory = () => {
     } catch { setError('Failed to save material'); }
   };
 
-  // Open the material in BrowseMaterials — store the ID so it auto-opens
+  // Open the material in BrowseMaterials — pass the folder ID via navigate state
+  // so BrowseMaterials can auto-open it immediately and reliably on mount
   const openMaterial = (item) => {
-    sessionStorage.setItem('bm_open_folder', item._id);
-    navigate('/browse-materials');
+    navigate('/browse-materials', { state: { openFolderId: item._id } });
   };
 
   return (
