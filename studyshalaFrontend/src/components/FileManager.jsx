@@ -72,26 +72,53 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
     };
   }, [selected, preview, onClose, currentFiles, openSubFolder]);
 
-  const handleDownload = (e, file) => {
+  const handleDownload = async (e, file) => {
     e.stopPropagation();
-    const url = file.downloadUrl || (file.driveFileId
-      ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
-      : null);
-    if (!url) { alert('No download URL. Ask your faculty to re-upload this file.'); return; }
+    if (!file.driveFileId) { alert('No download URL. Ask your faculty to re-upload this file.'); return; }
 
-    // Open Drive's direct download link — instant full CDN speed
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener noreferrer';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-
-    // Brief "downloading" toast
     const dlId = file._id + '_' + Date.now();
-    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 100, done: true, error: null }]);
-    setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3000);
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 0, done: false, error: null }]);
+
+    try {
+      // Use the Drive URL directly — FileManager is used by faculty (no JWT needed,
+      // files are anyoneWithLink). We proxy through a hidden fetch to avoid new tab.
+      const url = file.downloadUrl ||
+        `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`;
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${response.status}`);
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        const pct = total ? Math.min(99, Math.round((received / total) * 100)) : -1;
+        setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
+      }
+
+      const blob = new Blob(chunks);
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3500);
+    } catch (err) {
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'Download failed. Try again.' } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
+    }
   };
 
   const openPreview = (e, file) => {
@@ -287,23 +314,26 @@ const FileManager = ({ files = [], subFolders = [], materialName = 'Files', onCl
 
       {/* Download Progress Toasts */}
       {downloads.length > 0 && (
-        <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 999999, display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '320px', maxWidth: '420px', width: '90vw' }}>
+        <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', zIndex: 999999, display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '300px', maxWidth: '400px', width: '90vw' }}>
           {downloads.map(dl => (
-            <div key={dl.id} style={{ background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#0c4a6e', border: `1px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#075985'}`, borderRadius: '10px', padding: '0.75rem 1rem', boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}>
+            <div key={dl.id} style={{ background: dl.error ? '#fef2f2' : dl.done ? '#f0fdf4' : '#ffffff', border: `1.5px solid ${dl.error ? '#fca5a5' : dl.done ? '#86efac' : '#bae6fd'}`, borderRadius: '12px', padding: '0.75rem 1rem', boxShadow: '0 8px 32px rgba(8,145,178,0.18)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: dl.done || dl.error ? '0' : '0.4rem' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: dl.error ? '#dc2626' : dl.done ? '#059669' : '#0c4a6e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '78%' }}>
                   {dl.error ? '❌ ' : dl.done ? '✅ ' : '⬇️ '}{dl.name}
                 </span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dl.error ? '#dc2626' : dl.done ? '#16a34a' : '#94a3b8', flexShrink: 0, marginLeft: '0.5rem' }}>
-                  {dl.error ? 'Failed' : dl.done ? 'Done' : `${dl.progress}%`}
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dl.error ? '#dc2626' : dl.done ? '#059669' : '#0891b2', flexShrink: 0, marginLeft: '0.5rem' }}>
+                  {dl.error ? 'Failed' : dl.done ? 'Saved!' : dl.progress === -1 ? 'Downloading…' : `${dl.progress}%`}
                 </span>
               </div>
               {!dl.done && !dl.error && (
-                <div style={{ height: '5px', background: '#075985', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${dl.progress}%`, background: 'linear-gradient(90deg,#0891b2,#22d3ee)', borderRadius: '3px', transition: 'width 0.2s ease' }} />
+                <div style={{ height: '5px', background: '#e0f2fe', borderRadius: '3px', overflow: 'hidden' }}>
+                  {dl.progress === -1
+                    ? <div style={{ height: '100%', width: '40%', background: 'linear-gradient(90deg,#0891b2,#14b8a6)', borderRadius: '3px', animation: 'fmSlide 1.2s ease-in-out infinite' }} />
+                    : <div style={{ height: '100%', width: `${dl.progress}%`, background: 'linear-gradient(90deg,#0891b2,#14b8a6)', borderRadius: '3px', transition: 'width 0.25s ease' }} />
+                  }
                 </div>
               )}
-              {dl.error && <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.2rem' }}>{dl.error}</div>}
+              {dl.error && <div style={{ fontSize: '0.73rem', color: '#dc2626', marginTop: '0.2rem' }}>{dl.error}</div>}
             </div>
           ))}
         </div>
