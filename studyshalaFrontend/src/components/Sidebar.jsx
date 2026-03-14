@@ -104,7 +104,7 @@ const Sidebar = ({ role }) => {
           {links.map(link => (
             <button
               key={link.path}
-              className={`sidebar-link ${isActive(link.path) ? 'active' : ''} ${link.path === '/browse-materials' ? 'sidebar-link--browse' : ''}`}
+              className={`sidebar-link ${isActive(link.path) ? 'active' : ''} ${link.path === '/browse-materials' ? 'sidebar-link--browse' : ''} ${link.path === '/student/starred' ? 'sidebar-link--starred' : ''}`}
               onClick={() => navigate(link.path)}
               title={isCollapsed ? link.label : ''}
             >
