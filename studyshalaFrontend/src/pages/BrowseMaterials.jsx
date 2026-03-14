@@ -203,9 +203,18 @@ const BrowseMaterials = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  // ── Fetch data ───────────────────────────────────────────────────────────
+  // ── Fetch data + starred/recent from DB ─────────────────────────────────
   useEffect(() => {
     fetchData();
+    if (!isFaculty) {
+      api.get('/student/starred-files').then(r => {
+        setStarredFiles(new Set((r.data.starredFiles || []).map(s => s.fileId)));
+      }).catch(() => {});
+      api.get('/student/recent-files').then(r => {
+        setRecentFiles(r.data.recentFiles || []);
+        setRecentLoaded(true);
+      }).catch(() => { setRecentLoaded(true); });
+    }
   }, []);
 
   const fetchData = async () => {
@@ -281,11 +290,10 @@ const BrowseMaterials = () => {
   const [selectedFiles, setSelectedFiles] = useState(new Set()); // Set of file._id strings
   const [batchZipping,  setBatchZipping]  = useState(false);
 
-  // ── Starred files (students — persisted in localStorage) ──────────────
-  const [starredFiles, setStarredFiles] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('ss_starred') || '[]')); }
-    catch { return new Set(); }
-  });
+  // ── Starred files — DB-backed, cross-device ─────────────────────────────
+  const [starredFiles,  setStarredFiles]  = useState(new Set()); // Set of fileId strings
+  const [recentFiles,   setRecentFiles]   = useState([]);        // [{fileId,fileName,mimeType,materialId,subjectName,viewedAt}]
+  const [recentLoaded,  setRecentLoaded]  = useState(false);
 
   const handleDownload = async (file) => {
     if (!file._id || !selectedFolder?._id) {
@@ -430,18 +438,51 @@ const BrowseMaterials = () => {
     } finally { setBatchZipping(false); }
   };
 
-  // ── Star / bookmark individual files (localStorage) ──────────────────────
-  const toggleStar = (fileId, e) => {
+  // ── Star / bookmark individual files — DB-backed ────────────────────────
+  const toggleStar = async (fileId, file, e) => {
     e.stopPropagation();
+    const alreadyStarred = starredFiles.has(fileId);
+    // Optimistic update
     setStarredFiles(prev => {
       const next = new Set(prev);
-      next.has(fileId) ? next.delete(fileId) : next.add(fileId);
-      localStorage.setItem('ss_starred', JSON.stringify([...next]));
+      alreadyStarred ? next.delete(fileId) : next.add(fileId);
       return next;
     });
+    try {
+      if (alreadyStarred) {
+        await api.delete(`/student/starred-files/${fileId}`);
+      } else {
+        await api.post('/student/starred-files', {
+          fileId,
+          fileName:    file.name,
+          mimeType:    file.mimeType || '',
+          materialId:  selectedFolder?._id,
+          subjectName: selectedFolder?.subjectName || ''
+        });
+      }
+    } catch {
+      // Rollback on failure
+      setStarredFiles(prev => {
+        const next = new Set(prev);
+        alreadyStarred ? next.add(fileId) : next.delete(fileId);
+        return next;
+      });
+    }
   };
 
   const isStarred = (fileId) => starredFiles.has(fileId);
+
+  // ── Track recently viewed file ────────────────────────────────────────────
+  const trackRecent = (file) => {
+    if (!file?._id || !selectedFolder?._id || isFaculty) return;
+    api.post('/student/recent-files', {
+      fileId:      file._id,
+      fileName:    file.name,
+      mimeType:    file.mimeType || '',
+      materialId:  selectedFolder._id,
+      subjectName: selectedFolder.subjectName || ''
+    }).then(r => setRecentFiles(r.data.recentFiles || [])).catch(() => {});
+  };
 
   const handleDeleteFolder = async (id) => {
     if (!window.confirm('Delete this material? Students will lose access.')) return;
@@ -643,6 +684,35 @@ const BrowseMaterials = () => {
                 <p>{search ? 'No results found' : 'No materials available'}</p>
               </div>
             ) : viewMode === 'grid' ? (
+              <>
+              {/* ── Recently Viewed strip (students only, top of grid) ── */}
+              {!isFaculty && recentLoaded && recentFiles.length > 0 && !search && (
+                <div className="bm-recent-strip">
+                  <div className="bm-recent-header">
+                    <span className="bm-recent-label">🕐 Recently Viewed</span>
+                    <button className="bm-recent-clear" onClick={() => {
+                      api.post('/student/recent-files', { clear: true }).catch(()=>{});
+                      setRecentFiles([]);
+                    }}>Clear</button>
+                  </div>
+                  <div className="bm-recent-row">
+                    {recentFiles.slice(0,8).map(rf => (
+                      <button key={rf.fileId} className="bm-recent-chip"
+                        onClick={() => {
+                          const folder = folders.find(f => f._id === rf.materialId?.toString() || f._id?.toString() === rf.materialId?.toString());
+                          if (folder) openFolder(folder);
+                        }}
+                        title={rf.subjectName ? `${rf.fileName} — ${rf.subjectName}` : rf.fileName}
+                      >
+                        <FileIcon mimeType={rf.mimeType} size="sm" />
+                        <span className="bm-recent-chip-name">{rf.fileName.length > 18 ? rf.fileName.slice(0,16)+'…' : rf.fileName}</span>
+                        <span className="bm-recent-chip-sub">{rf.subjectName}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <
               <div className="bm-grid">
                 {filtered.map(folder => (
                   <div
@@ -679,6 +749,7 @@ const BrowseMaterials = () => {
                   </div>
                 ))}
               </div>
+            </>
             ) : (
               /* ── List view ── */
               <table className="bm-table">
@@ -829,7 +900,7 @@ const BrowseMaterials = () => {
                     <div
                       key={file._id}
                       className={`bm-file-card ${selectedFile?._id === file._id ? 'selected' : ''} ${selectedFiles.has(file._id) ? 'bm-file-card--checked' : ''}`}
-                      onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
+                      onClick={() => { setSelectedFile(file); setPreviewFile(file); trackRecent(file); }}
                       onDoubleClick={() => {
                         const name = file.name || '';
                         if (isCodeFile(name) || isMdFile(name)) { setPreviewModal(file); }
@@ -848,7 +919,7 @@ const BrowseMaterials = () => {
                       {/* Star */}
                       {!isFaculty && (
                         <button className={`bm-star-btn ${isStarred(file._id) ? 'bm-star-btn--on' : ''}`}
-                          onClick={e => toggleStar(file._id, e)} title={isStarred(file._id) ? 'Unstar' : 'Star file'}>
+                          onClick={e => toggleStar(file._id, file, e)} title={isStarred(file._id) ? 'Unstar' : 'Star file'}>
                           {isStarred(file._id) ? <MdStar /> : <MdStarBorder />}
                         </button>
                       )}
@@ -886,7 +957,7 @@ const BrowseMaterials = () => {
                       <tr
                         key={file._id}
                         className={`${selectedFile?._id === file._id ? 'selected' : ''} ${selectedFiles.has(file._id) ? 'bm-row--checked' : ''}`}
-                        onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
+                        onClick={() => { setSelectedFile(file); setPreviewFile(file); trackRecent(file); }}
                       >
                         <td style={{ width: '2rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                           <input type="checkbox" className="bm-file-checkbox"
@@ -906,7 +977,7 @@ const BrowseMaterials = () => {
                           )}
                           {!isFaculty && (
                             <button className={`bm-star-btn ${isStarred(file._id) ? 'bm-star-btn--on' : ''}`}
-                              onClick={e => toggleStar(file._id, e)} title={isStarred(file._id) ? 'Unstar' : 'Star'}>
+                              onClick={e => toggleStar(file._id, file, e)} title={isStarred(file._id) ? 'Unstar' : 'Star'}>
                               {isStarred(file._id) ? <MdStar /> : <MdStarBorder />}
                             </button>
                           )}
