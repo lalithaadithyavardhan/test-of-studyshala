@@ -209,14 +209,30 @@ const getMaterialFiles = async (req, res) => {
   }
 };
 
-// ── Download a file — redirect directly to Google Drive ──────────────────────
+// ── Download a file — proxied through backend so frontend fetch() gets real bytes ──────
 //
-// Files are already set to anyoneWithLink at upload time, so we can simply
-// redirect the student's browser straight to Drive. This is MUCH faster than
-// proxying through the backend (no double transfer, no memory usage, instant
-// download speed = full Drive CDN speed regardless of file size).
-//
-// We still log the action and increment downloadCount before redirecting.
+// WHY PROXY: Google Drive blocks browser fetch() with CORS for binary files.
+// window.open() works but opens a new tab (bad UX).
+// Solution: backend fetches from Drive server-side (no CORS) and pipes bytes
+// back to the browser. Frontend fetch()es this endpoint with the JWT header,
+// gets real binary, saves without opening a new tab.
+
+const https = require('https');
+const http  = require('http');
+
+const fetchDriveBinary = (url, maxRedirects = 6) => new Promise((resolve, reject) => {
+  const lib = url.startsWith('https') ? https : http;
+  lib.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && maxRedirects > 0) {
+      return resolve(fetchDriveBinary(res.headers.location, maxRedirects - 1));
+    }
+    if (res.statusCode !== 200) {
+      res.resume();
+      return reject(new Error(`Drive returned ${res.statusCode}`));
+    }
+    resolve(res); // return the raw IncomingMessage so we can pipe it
+  }).on('error', reject);
+});
 
 const downloadFile = async (req, res) => {
   try {
@@ -256,9 +272,20 @@ const downloadFile = async (req, res) => {
       );
     }
 
-    // Redirect directly to Drive — full CDN speed, no backend bottleneck
     const { downloadUrl } = buildDriveUrls(file.driveFileId);
-    return res.redirect(downloadUrl);
+    const safeName = (file.name || 'file').replace(/[^\w.\-() ]/g, '_');
+
+    // Proxy the Drive binary through the backend
+    const driveRes = await fetchDriveBinary(downloadUrl);
+
+    res.setHeader('Content-Type', driveRes.headers['content-type'] || file.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+    if (driveRes.headers['content-length']) {
+      res.setHeader('Content-Length', driveRes.headers['content-length']);
+    }
+    res.setHeader('Cache-Control', 'no-store');
+
+    driveRes.pipe(res);
 
   } catch (err) {
     logger.error(`downloadFile: ${err.message}`);
