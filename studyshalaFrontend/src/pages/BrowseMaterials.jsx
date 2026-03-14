@@ -6,7 +6,7 @@
  * Faculty/Admin: + delete, edit, upload
  */
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
@@ -17,8 +17,9 @@ import {
   MdDownload, MdPreview, MdDelete, MdEdit, MdUpload, MdArrowBack,
   MdLightMode, MdDarkMode, MdMoreVert, MdCheck, MdContentCopy,
   MdFilterList, MdSort, MdInfo, MdKeyboardArrowRight, MdHome, MdBookmarkRemove,
-  MdCreateNewFolder
+  MdCreateNewFolder, MdSelectAll, MdDeselect, MdDownloadForOffline, MdStar, MdStarBorder
 } from 'react-icons/md';
+import JSZip from 'jszip';
 import './BrowseMaterials.css';
 import MessageBanner from '../components/MessageBanner';
 
@@ -46,6 +47,104 @@ const fmtSize = (bytes) => {
 
 // ── Format date ──────────────────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+
+// ── Native code preview ─────────────────────────────────────────────────────
+const CODE_EXTS = ['.js','.jsx','.ts','.tsx','.py','.java','.c','.cpp','.cs',
+                   '.go','.rs','.rb','.php','.sh','.bash','.json','.xml','.yaml','.yml','.txt','.md'];
+
+const isCodeFile  = (name = '') => CODE_EXTS.some(ext => name.toLowerCase().endsWith(ext));
+const isMdFile    = (name = '') => name.toLowerCase().endsWith('.md');
+
+// Simple token-based syntax highlighter (no deps)
+const tokenise = (code = '', ext = '') => {
+  const keywords = /\b(function|return|const|let|var|if|else|for|while|class|import|export|from|default|async|await|def|print|self|None|True|False|public|private|static|void|int|string|bool|new|this|super|try|catch|finally|throw|in|of|null|undefined|typeof|instanceof)\b/g;
+  const strings  = /(["'`])(?:(?!\1)[^\\]|\\.)*\1/g;
+  const comments = /(\/\/.*$|\/\*[\s\S]*?\*\/|#.*$)/gm;
+  const numbers  = /\b(\d+\.?\d*)\b/g;
+
+  return code
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(comments, m => `<span class="hl-comment">${m}</span>`)
+    .replace(strings,  m => `<span class="hl-string">${m}</span>`)
+    .replace(keywords, m => `<span class="hl-keyword">${m}</span>`)
+    .replace(numbers,  m => `<span class="hl-number">${m}</span>`);
+};
+
+// Basic markdown → HTML renderer (no deps)
+const renderMd = (md = '') =>
+  md
+    .replace(/^#{3} (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^#{2} (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,   '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,    '<em>$1</em>')
+    .replace(/`([^`]+)`/g,    '<code>$1</code>')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hlu]|<li|<p)(.+)$/gm, '<p>$1</p>');
+
+// ── Native in-app code / markdown preview ───────────────────────────────────
+const NativePreview = ({ file, isMd }) => {
+  const [content, setContent] = React.useState(null);
+  const [err,     setErr]     = React.useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setContent(null); setErr('');
+    // Fetch from Drive as text — files are anyoneWithLink so no auth needed for text
+    const url = `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`;
+    fetch(url)
+      .then(r => { if (!r.ok) throw new Error('Fetch failed'); return r.text(); })
+      .then(t => { if (!cancelled) setContent(t); })
+      .catch(() => { if (!cancelled) setErr('Could not load file content. Try the Drive preview instead.'); });
+    return () => { cancelled = true; };
+  }, [file.driveFileId]);
+
+  if (err) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: '0.875rem', padding: '2rem', textAlign: 'center' }}>
+      {err}
+    </div>
+  );
+  if (!content) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: '0.875rem', gap: '0.5rem' }}>
+      <div style={{ width: '18px', height: '18px', border: '2px solid #475569', borderTopColor: '#60a5fa', borderRadius: '50%', animation: 'bmSlide 0.7s linear infinite' }} />
+      Loading preview…
+    </div>
+  );
+
+  if (isMd) return (
+    <div
+      className="bm-md-preview"
+      dangerouslySetInnerHTML={{ __html: renderMd(content) }}
+    />
+  );
+
+  const ext = '.' + (file.name || '').split('.').pop().toLowerCase();
+  return (
+    <div className="bm-code-preview">
+      <div className="bm-code-lang">{ext}</div>
+      <pre className="bm-code-pre">
+        <code dangerouslySetInnerHTML={{ __html: tokenise(content, ext) }} />
+      </pre>
+    </div>
+  );
+};
+
+// ── Search highlight helper ──────────────────────────────────────────────────
+const Highlight = ({ text = '', query = '' }) => {
+  if (!query.trim()) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase()
+          ? <mark key={i} className="bm-highlight">{part}</mark>
+          : part
+      )}
+    </>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Main Component
@@ -134,6 +233,7 @@ const BrowseMaterials = () => {
     setSelectedFolder({ ...folder, files: [], subFolders: [] });
     setSelectedFile(null);
     setPreviewFile(null);
+    setSelectedFiles(new Set());
     try {
       const res = await api.get(
         isFaculty
@@ -176,6 +276,16 @@ const BrowseMaterials = () => {
 
   // ── Download progress state ───────────────────────────────────────────────
   const [downloads, setDownloads] = useState([]); // [{id, name, progress, done, error}]
+
+  // ── Batch selection (students & faculty) ──────────────────────────────
+  const [selectedFiles, setSelectedFiles] = useState(new Set()); // Set of file._id strings
+  const [batchZipping,  setBatchZipping]  = useState(false);
+
+  // ── Starred files (students — persisted in localStorage) ──────────────
+  const [starredFiles, setStarredFiles] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('ss_starred') || '[]')); }
+    catch { return new Set(); }
+  });
 
   const handleDownload = async (file) => {
     if (!file._id || !selectedFolder?._id) {
@@ -273,6 +383,65 @@ const BrowseMaterials = () => {
     const u = ['B','KB','MB','GB'], i = Math.floor(Math.log(bytes)/Math.log(1024));
     return (bytes/1024**i).toFixed(1)+' '+u[i];
   };
+
+  // ── Batch file selection ─────────────────────────────────────────────────
+  const toggleFileSelect = (fileId, e) => {
+    e.stopPropagation();
+    setSelectedFiles(prev => {
+      const next = new Set(prev);
+      next.has(fileId) ? next.delete(fileId) : next.add(fileId);
+      return next;
+    });
+  };
+
+  const selectAllFiles = () => {
+    const allIds = (selectedFolder?.files || []).map(f => f._id);
+    setSelectedFiles(prev => prev.size === allIds.length ? new Set() : new Set(allIds));
+  };
+
+  const handleBatchZip = async () => {
+    if (!selectedFiles.size || !selectedFolder) return;
+    setBatchZipping(true);
+    setError('');
+    const files = (selectedFolder.files || []).filter(f => selectedFiles.has(f._id));
+    try {
+      const zip = new JSZip();
+      await Promise.all(files.map(async (file) => {
+        try {
+          const res = await api.get(
+            `/student/materials/${selectedFolder._id}/files/${file._id}/download`,
+            { responseType: 'blob' }
+          );
+          zip.file(file.name, res.data);
+        } catch { zip.file(file.name + '.error.txt', 'Download failed for this file.'); }
+      }));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href     = url;
+      a.download = `${selectedFolder.subjectName || 'files'}.zip`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+      setSuccess(`Downloaded ${files.length} file(s) as ZIP!`);
+      setTimeout(() => setSuccess(''), 4000);
+      setSelectedFiles(new Set());
+    } catch (err) {
+      setError('ZIP download failed. Please try again.');
+    } finally { setBatchZipping(false); }
+  };
+
+  // ── Star / bookmark individual files (localStorage) ──────────────────────
+  const toggleStar = (fileId, e) => {
+    e.stopPropagation();
+    setStarredFiles(prev => {
+      const next = new Set(prev);
+      next.has(fileId) ? next.delete(fileId) : next.add(fileId);
+      localStorage.setItem('ss_starred', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const isStarred = (fileId) => starredFiles.has(fileId);
 
   const handleDeleteFolder = async (id) => {
     if (!window.confirm('Delete this material? Students will lose access.')) return;
@@ -486,7 +655,7 @@ const BrowseMaterials = () => {
                       <MdFolder className="bm-folder-icon" />
                     </div>
                     <div className="bm-folder-card-info">
-                      <span className="bm-folder-name">{folder.subjectName}</span>
+                      <span className="bm-folder-name"><Highlight text={folder.subjectName} query={search} /></span>
                       <span className="bm-folder-meta">{folder.department} · Sem {folder.semester}</span>
                       <span className="bm-folder-meta">{folder.fileCount ?? 0} file(s)</span>
                     </div>
@@ -529,7 +698,7 @@ const BrowseMaterials = () => {
                     <tr key={folder._id} onDoubleClick={() => openFolder(folder)} className={selectedFolder?._id === folder._id ? 'selected' : ''}>
                       <td className="bm-table-name">
                         <MdFolder className="bm-folder-icon-sm" />
-                        {folder.subjectName}
+                        <Highlight text={folder.subjectName} query={search} />
                       </td>
                       <td>{folder.department}</td>
                       <td>Sem {folder.semester}</td>
@@ -571,6 +740,39 @@ const BrowseMaterials = () => {
                   </button>
                 )}
               </div>
+
+              {/* ── Batch action bar ── */}
+              {(selectedFolder.files || []).length > 0 && (
+                <div className="bm-batch-bar">
+                  <button className="bm-batch-select" onClick={selectAllFiles} title="Select / deselect all">
+                    {selectedFiles.size === (selectedFolder.files || []).length && selectedFiles.size > 0
+                      ? <><MdDeselect /> Deselect All</>
+                      : <><MdSelectAll /> Select All</>
+                    }
+                  </button>
+                  {selectedFiles.size > 0 && (
+                    <span className="bm-batch-count">{selectedFiles.size} selected</span>
+                  )}
+                  {selectedFiles.size > 0 && !isFaculty && (
+                    <button className="bm-batch-zip" onClick={handleBatchZip} disabled={batchZipping}>
+                      <MdDownloadForOffline />
+                      {batchZipping ? 'Zipping…' : `Download ${selectedFiles.size} as ZIP`}
+                    </button>
+                  )}
+                  {selectedFiles.size > 0 && isFaculty && (
+                    <button className="bm-batch-delete" onClick={async () => {
+                      if (!window.confirm(`Delete ${selectedFiles.size} file(s)?`)) return;
+                      for (const fid of selectedFiles) {
+                        await api.delete(`/faculty/folders/${selectedFolder._id}/files/${fid}`).catch(()=>{});
+                      }
+                      setSelectedFiles(new Set());
+                      openFolder(selectedFolder);
+                    }}>
+                      <MdDelete /> Delete {selectedFiles.size} file(s)
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Faculty message banner */}
               {selectedFolder.messageToStudents && (
@@ -626,19 +828,43 @@ const BrowseMaterials = () => {
                   {selectedFolder.files.map(file => (
                     <div
                       key={file._id}
-                      className={`bm-file-card ${selectedFile?._id === file._id ? 'selected' : ''}`}
+                      className={`bm-file-card ${selectedFile?._id === file._id ? 'selected' : ''} ${selectedFiles.has(file._id) ? 'bm-file-card--checked' : ''}`}
                       onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
-                      onDoubleClick={() => file.previewUrl && setPreviewModal(file)}
+                      onDoubleClick={() => {
+                        const name = file.name || '';
+                        if (isCodeFile(name) || isMdFile(name)) { setPreviewModal(file); }
+                        else if (file.previewUrl) { setPreviewModal(file); }
+                      }}
                     >
+                      {/* Checkbox */}
+                      <input
+                        type="checkbox"
+                        className="bm-file-checkbox"
+                        checked={selectedFiles.has(file._id)}
+                        onChange={e => toggleFileSelect(file._id, e)}
+                        onClick={e => e.stopPropagation()}
+                        title="Select file"
+                      />
+                      {/* Star */}
+                      {!isFaculty && (
+                        <button className={`bm-star-btn ${isStarred(file._id) ? 'bm-star-btn--on' : ''}`}
+                          onClick={e => toggleStar(file._id, e)} title={isStarred(file._id) ? 'Unstar' : 'Star file'}>
+                          {isStarred(file._id) ? <MdStar /> : <MdStarBorder />}
+                        </button>
+                      )}
                       <div className="bm-file-card-icon">
                         <FileIcon mimeType={file.mimeType} size="lg" />
                       </div>
-                      <span className="bm-file-name" title={file.name}>{file.name}</span>
+                      <span className="bm-file-name" title={file.name}>
+                        <Highlight text={file.name} query={search} />
+                      </span>
                       <span className="bm-file-size">{fmtSize(file.size)}</span>
                       <div className="bm-file-card-actions" onClick={e => e.stopPropagation()}>
-                        {file.previewUrl  && <button title="Preview"  onClick={() => setPreviewModal(file)}><MdPreview /></button>}
+                        {(file.previewUrl || isCodeFile(file.name) || isMdFile(file.name)) && (
+                          <button title="Preview" onClick={() => setPreviewModal(file)}><MdPreview /></button>
+                        )}
                         {file.downloadUrl && <button title="Download" onClick={() => handleDownload(file)}><MdDownload /></button>}
-                        {isFaculty        && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
+                        {isFaculty && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
                       </div>
                     </div>
                   ))}
@@ -647,6 +873,7 @@ const BrowseMaterials = () => {
                 <table className="bm-table">
                   <thead>
                     <tr>
+                      <th style={{ width: '2rem' }}></th>
                       <th>Name</th>
                       <th>Type</th>
                       <th>Size</th>
@@ -658,20 +885,33 @@ const BrowseMaterials = () => {
                     {selectedFolder.files.map(file => (
                       <tr
                         key={file._id}
-                        className={selectedFile?._id === file._id ? 'selected' : ''}
+                        className={`${selectedFile?._id === file._id ? 'selected' : ''} ${selectedFiles.has(file._id) ? 'bm-row--checked' : ''}`}
                         onClick={() => { setSelectedFile(file); setPreviewFile(file); }}
                       >
+                        <td style={{ width: '2rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                          <input type="checkbox" className="bm-file-checkbox"
+                            checked={selectedFiles.has(file._id)}
+                            onChange={e => toggleFileSelect(file._id, e)} />
+                        </td>
                         <td className="bm-table-name">
                           <FileIcon mimeType={file.mimeType} size="sm" />
-                          {file.name}
+                          <Highlight text={file.name} query={search} />
                         </td>
                         <td>{file.mimeType?.split('/')[1]?.toUpperCase() || '—'}</td>
                         <td>{fmtSize(file.size)}</td>
                         <td>{fmtDate(file.uploadedAt)}</td>
                         <td className="bm-table-actions" onClick={e => e.stopPropagation()}>
-                          {file.previewUrl  && <button title="Preview"  onClick={() => setPreviewModal(file)}><MdPreview /></button>}
+                          {(file.previewUrl || isCodeFile(file.name) || isMdFile(file.name)) && (
+                            <button title="Preview" onClick={() => setPreviewModal(file)}><MdPreview /></button>
+                          )}
+                          {!isFaculty && (
+                            <button className={`bm-star-btn ${isStarred(file._id) ? 'bm-star-btn--on' : ''}`}
+                              onClick={e => toggleStar(file._id, e)} title={isStarred(file._id) ? 'Unstar' : 'Star'}>
+                              {isStarred(file._id) ? <MdStar /> : <MdStarBorder />}
+                            </button>
+                          )}
                           {file.downloadUrl && <button title="Download" onClick={() => handleDownload(file)}><MdDownload /></button>}
-                          {isFaculty        && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
+                          {isFaculty && <button title="Delete" className="bm-action--danger" onClick={() => handleDeleteFile(selectedFolder._id, file._id)}><MdDelete /></button>}
                         </td>
                       </tr>
                     ))}
@@ -930,20 +1170,18 @@ const BrowseMaterials = () => {
                 title="Close (Esc)"
               >✕</button>
             </div>
-            {/* Preview body */}
-            <div style={{ flex: 1, overflow: 'hidden', background: '#f8fafc', position: 'relative' }}>
+            {/* Preview body — image / code / markdown / Drive iframe */}
+            <div style={{ flex: 1, overflow: 'hidden', background: '#0f172a', position: 'relative' }}>
               {previewModal.mimeType?.startsWith('image/') ? (
-                <div style={{
-                  width: '100%', height: '100%', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  background: '#0f172a', overflow: 'auto', padding: '1rem'
-                }}>
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '1rem' }}>
                   <img
                     src={`https://drive.google.com/thumbnail?id=${previewModal.driveFileId}&sz=w2000`}
                     alt={previewModal.name}
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }}
                   />
                 </div>
+              ) : isCodeFile(previewModal.name) || isMdFile(previewModal.name) ? (
+                <NativePreview file={previewModal} isMd={isMdFile(previewModal.name)} />
               ) : (
                 <iframe
                   src={previewModal.previewUrl || `https://drive.google.com/file/d/${previewModal.driveFileId}/preview`}
