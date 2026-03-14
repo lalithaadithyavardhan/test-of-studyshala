@@ -712,7 +712,6 @@ const BrowseMaterials = () => {
                   </div>
                 </div>
               )}
-              <
               <div className="bm-grid">
                 {filtered.map(folder => (
                   <div
