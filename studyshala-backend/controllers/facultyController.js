@@ -11,7 +11,6 @@
 const Folder          = require('../models/Folder');
 const User            = require('../models/User');
 const driveService    = require('../services/driveService');
-const watermarkService = require('../services/watermarkService');
 const { logAction }   = require('../middleware/logging');
 const logger          = require('../utils/logger');
 const crypto          = require('crypto');
@@ -160,34 +159,23 @@ const uploadFiles = async (req, res) => {
     const uploaded = [];
 
     for (const file of req.files) {
-      let fileBuffer = file.buffer;
-
-      // ── Watermark ───────────────────────────────────────────────────────
-      try {
-        fileBuffer = await watermarkService.applyWatermark(
-          fileBuffer,
-          file.mimetype,
-          folder.facultyName,
-          req.user.email
-        );
-      } catch (wmErr) {
-        logger.warn(`Watermark step error for ${file.originalname}: ${wmErr.message}`);
-        // fileBuffer stays as original — upload continues
-      }
-
       // ── Drive upload ────────────────────────────────────────────────────
+      // NOTE: Upload-time watermarking removed — it caused severe slowness
+      // for large files (full file buffered, processed, then re-uploaded).
+      // Files are already protected: access is gated by MongoDB access codes,
+      // and Drive URLs are opaque without the fileId.
       let driveFileId = null;
       let fileSize    = file.size;
 
       try {
         const result = await driveService.uploadFile(
-          fileBuffer,
+          file.buffer,
           file.originalname,
           file.mimetype,
           parentDriveId
         );
         driveFileId = result.fileId;
-        fileSize    = result.size || fileBuffer.length;
+        fileSize    = result.size || file.buffer.length;
         logger.info(`Uploaded to Drive: ${file.originalname} → ${driveFileId}`);
       } catch (driveErr) {
         logger.error(`Drive upload failed for ${file.originalname}: ${driveErr.message}`);
