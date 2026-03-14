@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -152,6 +152,7 @@ const Highlight = ({ text = '', query = '' }) => {
 const BrowseMaterials = () => {
   const { user }    = useAuth();
   const navigate    = useNavigate();
+  const location    = useLocation();
   const role        = user?.role || 'student';
   const isFaculty   = role === 'faculty' || role === 'admin';
 
@@ -231,15 +232,16 @@ const BrowseMaterials = () => {
         setFolders(res.data.materials || []);
       }
 
-      // ── Auto-open a folder if navigated from History or Starred ──────────
-      const targetId = sessionStorage.getItem('bm_open_folder');
+      // ── Auto-open a folder if navigated here from History or Starred ─────
+      // Priority: location.state (passed by navigate) > sessionStorage (legacy)
+      const targetId = location.state?.openFolderId || sessionStorage.getItem('bm_open_folder');
       if (targetId) {
         sessionStorage.removeItem('bm_open_folder');
         const allFolders = isFaculty ? (res.data.folders || []) : (res.data.materials || []);
-        const target = allFolders.find(f => f._id === targetId || f._id?.toString() === targetId);
+        const target = allFolders.find(f => String(f._id) === String(targetId));
         if (target) {
-          // Use a short delay so the grid has rendered first
-          setTimeout(() => openFolder(target), 100);
+          // Small delay so component finishes rendering the grid first
+          setTimeout(() => openFolder(target), 150);
         }
       }
     } catch (err) {
@@ -307,7 +309,7 @@ const BrowseMaterials = () => {
   const [recentFiles,   setRecentFiles]   = useState([]);        // [{fileId,fileName,mimeType,materialId,subjectName,viewedAt}]
   const [recentLoaded,  setRecentLoaded]  = useState(false);
 
-  const handleDownload = async (file) => {
+  const handleDownload = (file) => {
     const url = file.downloadUrl || (file.driveFileId
       ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
       : null);
@@ -315,56 +317,13 @@ const BrowseMaterials = () => {
     if (!url) { setError('Download not available for this file.'); return; }
 
     const dlId = file._id + '_' + Date.now();
-    // Show "preparing" toast immediately
-    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 0, done: false, error: null }]);
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 100, done: true, error: null }]);
 
-    try {
-      // Fetch as blob so download stays in-page (no new tab) with real progress
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+    // Open in new tab — Drive handles the download prompt natively.
+    // fetch() cannot be used here because Google Drive blocks cross-origin requests (CORS).
+    window.open(url, '_blank', 'noopener,noreferrer');
 
-      const contentLength = response.headers.get('Content-Length');
-      const total = contentLength ? parseInt(contentLength, 10) : null;
-      const reader = response.body.getReader();
-      const chunks = [];
-      let received = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        if (total) {
-          const pct = Math.min(99, Math.round((received / total) * 100));
-          setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
-        } else {
-          // No Content-Length: show indeterminate pulsing
-          setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: -1 } : d));
-        }
-      }
-
-      // Trigger browser save-file dialog
-      const blob = new Blob(chunks);
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = file.name || 'download';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-
-      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
-      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3500);
-
-      // Log download count fire-and-forget (non-blocking)
-      if (file._id && selectedFolder?._id && !isFaculty) {
-        api.get(`/student/materials/${selectedFolder._id}/files/${file._id}/download`).catch(() => {});
-      }
-    } catch (err) {
-      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'Download failed. Please try again.' } : d));
-      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
-    }
+    setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3000);
   };
 
   // ── Inline upload helpers (faculty) ─────────────────────────────────────
@@ -448,13 +407,23 @@ const BrowseMaterials = () => {
     try {
       const zip = new JSZip();
       await Promise.all(files.map(async (file) => {
+        const url = file.downloadUrl || (file.driveFileId
+          ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
+          : null);
+        if (!url) {
+          zip.file(file.name + '.missing.txt', 'File not available for download.');
+          return;
+        }
         try {
-          const res = await api.get(
-            `/student/materials/${selectedFolder._id}/files/${file._id}/download`,
-            { responseType: 'blob' }
-          );
-          zip.file(file.name, res.data);
-        } catch { zip.file(file.name + '.error.txt', 'Download failed for this file.'); }
+          // Fetch binary directly from Drive — no CORS issue for binary responses
+          const res = await fetch(url, { mode: 'cors' });
+          if (!res.ok) throw new Error('fetch failed');
+          const arrayBuf = await res.arrayBuffer();
+          zip.file(file.name, arrayBuf);
+        } catch {
+          // If CORS blocks it, note it in the zip
+          zip.file(file.name + '.error.txt', 'Could not download this file. Download it individually from Google Drive.');
+        }
       }));
       const blob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob);
