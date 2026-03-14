@@ -13,13 +13,14 @@
 const mongoose = require('mongoose');
 
 const fileSchema = new mongoose.Schema({
-  name:         { type: String, required: true },
-  originalName: { type: String, required: true },
-  mimeType:     { type: String, required: true },
-  size:         { type: Number, required: true },
-  driveFileId:  { type: String },
-  uploadedAt:   { type: Date, default: Date.now },
-  uploadedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  name:          { type: String, required: true },
+  originalName:  { type: String, required: true },
+  mimeType:      { type: String, required: true },
+  size:          { type: Number, required: true },
+  driveFileId:   { type: String },
+  uploadedAt:    { type: Date, default: Date.now },
+  uploadedBy:    { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  downloadCount: { type: Number, default: 0 }   // ← incremented every student download
 });
 
 // Sub-folder schema
