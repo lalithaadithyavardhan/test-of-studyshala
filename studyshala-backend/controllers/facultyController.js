@@ -425,7 +425,7 @@ const getFolderDetails = async (req, res) => {
   }
 };
 
-// ── Faculty file download ─────────────────────────────────────────────────────
+// ── Faculty file download — proxy through backend ─────────────────────────
 
 const downloadFile = async (req, res) => {
   try {
@@ -445,10 +445,34 @@ const downloadFile = async (req, res) => {
     if (!file.driveFileId) return res.status(404).json({ message: 'File not on Drive. Please re-upload.' });
 
     await logAction(req, 'FACULTY_DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.name });
-    return res.redirect(buildDriveUrls(file.driveFileId).downloadUrl);
+
+    const { downloadUrl } = buildDriveUrls(file.driveFileId);
+    const safeName = (file.name || 'file').replace(/[^\w.\-() ]/g, '_');
+
+    // Proxy binary through backend — avoids CORS and new-tab issues in browser
+    const https = require('https');
+    const http  = require('http');
+    const fetchDriveBinary = (url, maxRedirects = 6) => new Promise((resolve, reject) => {
+      const lib = url.startsWith('https') ? https : http;
+      lib.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
+        if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && maxRedirects > 0) {
+          return resolve(fetchDriveBinary(r.headers.location, maxRedirects - 1));
+        }
+        if (r.statusCode !== 200) { r.resume(); return reject(new Error(`Drive ${r.statusCode}`)); }
+        resolve(r);
+      }).on('error', reject);
+    });
+
+    const driveRes = await fetchDriveBinary(downloadUrl);
+    res.setHeader('Content-Type', driveRes.headers['content-type'] || file.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+    if (driveRes.headers['content-length']) res.setHeader('Content-Length', driveRes.headers['content-length']);
+    res.setHeader('Cache-Control', 'no-store');
+    driveRes.pipe(res);
+
   } catch (err) {
     logger.error(`faculty downloadFile: ${err.message}`);
-    res.status(500).json({ message: 'Failed to process download' });
+    if (!res.headersSent) res.status(500).json({ message: 'Failed to process download' });
   }
 };
 
