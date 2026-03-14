@@ -309,21 +309,62 @@ const BrowseMaterials = () => {
   const [recentFiles,   setRecentFiles]   = useState([]);        // [{fileId,fileName,mimeType,materialId,subjectName,viewedAt}]
   const [recentLoaded,  setRecentLoaded]  = useState(false);
 
-  const handleDownload = (file) => {
-    const url = file.downloadUrl || (file.driveFileId
-      ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
-      : null);
-
-    if (!url) { setError('Download not available for this file.'); return; }
+  const handleDownload = async (file) => {
+    if (!file._id || !selectedFolder?._id) {
+      setError('Cannot download this file. Please try again.');
+      return;
+    }
 
     const dlId = file._id + '_' + Date.now();
-    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 100, done: true, error: null }]);
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, progress: 0, done: false, error: null }]);
 
-    // Open in new tab — Drive handles the download prompt natively.
-    // fetch() cannot be used here because Google Drive blocks cross-origin requests (CORS).
-    window.open(url, '_blank', 'noopener,noreferrer');
+    try {
+      // Use backend proxy endpoint — avoids CORS, avoids new tab, gives real binary
+      const endpoint = isFaculty
+        ? `/faculty/folders/${selectedFolder._id}/files/${file._id}/download`
+        : `/student/materials/${selectedFolder._id}/files/${file._id}/download`;
 
-    setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3000);
+      const token = localStorage.getItem('token');
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+      const response = await fetch(`${baseURL}${endpoint}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error(`Server error ${response.status}`);
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+      const reader = response.body.getReader();
+      const chunks = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        const pct = total ? Math.min(99, Math.round((received / total) * 100)) : -1;
+        setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
+      }
+
+      const blob = new Blob(chunks);
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = file.name || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3500);
+
+    } catch (err) {
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'Download failed. Please try again.' } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
+    }
   };
 
   // ── Inline upload helpers (faculty) ─────────────────────────────────────
@@ -404,38 +445,56 @@ const BrowseMaterials = () => {
     setBatchZipping(true);
     setError('');
     const files = (selectedFolder.files || []).filter(f => selectedFiles.has(f._id));
+
+    // Show a download progress toast for the ZIP
+    const dlId = 'zip_' + Date.now();
+    setDownloads(prev => [...prev, { id: dlId, name: `${selectedFolder.subjectName}.zip`, progress: 0, done: false, error: null }]);
+
     try {
       const zip = new JSZip();
-      await Promise.all(files.map(async (file) => {
-        const url = file.downloadUrl || (file.driveFileId
-          ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
-          : null);
-        if (!url) {
-          zip.file(file.name + '.missing.txt', 'File not available for download.');
-          return;
-        }
+      const token = localStorage.getItem('token');
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+      // Download each file through backend proxy — gets real binary, no CORS
+      await Promise.all(files.map(async (file, idx) => {
         try {
-          // Fetch binary directly from Drive — no CORS issue for binary responses
-          const res = await fetch(url, { mode: 'cors' });
-          if (!res.ok) throw new Error('fetch failed');
-          const arrayBuf = await res.arrayBuffer();
-          zip.file(file.name, arrayBuf);
+          const endpoint = isFaculty
+            ? `/faculty/folders/${selectedFolder._id}/files/${file._id}/download`
+            : `/student/materials/${selectedFolder._id}/files/${file._id}/download`;
+
+          const res = await fetch(`${baseURL}${endpoint}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (!res.ok) throw new Error(`${res.status}`);
+          const buf = await res.arrayBuffer();
+          zip.file(file.name, buf);
         } catch {
-          // If CORS blocks it, note it in the zip
-          zip.file(file.name + '.error.txt', 'Could not download this file. Download it individually from Google Drive.');
+          zip.file(file.name + '.error.txt', 'This file could not be downloaded.');
         }
+        // Update progress as files complete
+        const pct = Math.round(((idx + 1) / files.length) * 80); // 0-80% while fetching
+        setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: pct } : d));
       }));
+
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 90 } : d));
+
       const blob = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(blob);
-      const a   = document.createElement('a');
-      a.href     = url;
+      const a = document.createElement('a');
+      a.href = url;
       a.download = `${selectedFolder.subjectName || 'files'}.zip`;
       document.body.appendChild(a); a.click();
-      document.body.removeChild(a); URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, progress: 100, done: true } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 4000);
       setSuccess(`Downloaded ${files.length} file(s) as ZIP!`);
       setTimeout(() => setSuccess(''), 4000);
       setSelectedFiles(new Set());
     } catch (err) {
+      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: 'ZIP failed. Try again.' } : d));
+      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
       setError('ZIP download failed. Please try again.');
     } finally { setBatchZipping(false); }
   };
@@ -825,12 +884,14 @@ const BrowseMaterials = () => {
                   {selectedFiles.size > 0 && (
                     <span className="bm-batch-count">{selectedFiles.size} selected</span>
                   )}
-                  {selectedFiles.size > 0 && !isFaculty && (
+                  {/* ZIP download — available for BOTH students and faculty */}
+                  {selectedFiles.size > 0 && (
                     <button className="bm-batch-zip" onClick={handleBatchZip} disabled={batchZipping}>
                       <MdDownloadForOffline />
                       {batchZipping ? 'Zipping…' : `Download ${selectedFiles.size} as ZIP`}
                     </button>
                   )}
+                  {/* Faculty: also show delete button */}
                   {selectedFiles.size > 0 && isFaculty && (
                     <button className="bm-batch-delete" onClick={async () => {
                       if (!window.confirm(`Delete ${selectedFiles.size} file(s)?`)) return;
