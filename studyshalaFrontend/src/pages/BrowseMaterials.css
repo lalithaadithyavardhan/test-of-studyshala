@@ -862,3 +862,107 @@
   50%  { transform: translateX(150%); }
   100% { transform: translateX(250%); }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   INLINE UPLOAD + DOWNLOAD COUNT additions
+   ══════════════════════════════════════════════════════════════ */
+
+/* Wider upload modal */
+.bm-modal--upload { max-width: 560px; }
+
+.bm-upload-hint {
+  font-size: 0.8rem; color: var(--bm-text-sub); margin-bottom: 1rem; line-height: 1.5;
+}
+.bm-upload-label {
+  display: block; font-size: 0.78rem; font-weight: 700;
+  color: var(--bm-text-sub); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+/* Sub-folder create row */
+.bm-sf-create-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--bm-surface); border: 1px solid var(--bm-border);
+  border-radius: 7px; padding: 0.45rem 0.75rem; margin-bottom: 0.875rem;
+}
+.bm-sf-create-input {
+  flex: 1; border: none; background: transparent;
+  font-size: 0.875rem; color: var(--bm-text); outline: none; font-family: inherit;
+}
+.bm-sf-create-input::placeholder { color: var(--bm-text-sub); opacity: 0.7; }
+
+/* Drag-drop zone */
+.bm-dropzone {
+  border: 2px dashed var(--bm-border);
+  border-radius: 10px; padding: 2rem 1.5rem;
+  text-align: center; cursor: pointer;
+  background: var(--bm-surface);
+  transition: border-color 0.18s, background 0.18s, transform 0.18s;
+  margin-bottom: 0.875rem;
+}
+.bm-dropzone:hover {
+  border-color: var(--bm-accent);
+  background: color-mix(in srgb, var(--bm-accent, #6366f1) 5%, var(--bm-surface));
+}
+.bm-dropzone--active {
+  border-color: var(--bm-accent);
+  background: color-mix(in srgb, var(--bm-accent, #6366f1) 9%, var(--bm-surface));
+  transform: scale(1.01);
+}
+.bm-dropzone-icon { font-size: 2.25rem; margin-bottom: 0.5rem; }
+.bm-dropzone-text { font-size: 0.9rem; font-weight: 700; color: var(--bm-text); margin: 0 0 0.2rem; }
+.bm-dropzone-sub  { font-size: 0.78rem; color: var(--bm-text-sub); margin: 0; }
+
+/* Uploaded file list */
+.bm-upload-filelist {
+  background: var(--bm-bg); border: 1px solid var(--bm-border);
+  border-radius: 8px; padding: 0.625rem; max-height: 200px; overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+.bm-upload-filelist-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 0.4rem; margin-bottom: 0.4rem;
+  border-bottom: 1px solid var(--bm-border);
+  font-size: 0.72rem; font-weight: 700; color: var(--bm-text-sub);
+}
+.bm-clear-btn {
+  font-size: 0.7rem; font-weight: 600; color: var(--bm-danger, #ef4444);
+  background: none; border: 1px solid var(--bm-border);
+  border-radius: 4px; padding: 0.1rem 0.45rem; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.bm-clear-btn:hover { background: var(--bm-danger, #ef4444); color: #fff; border-color: var(--bm-danger, #ef4444); }
+
+.bm-upload-file-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.5rem; background: var(--bm-surface);
+  border: 1px solid var(--bm-border); border-radius: 6px; margin-bottom: 0.3rem;
+  transition: border-color 0.15s;
+}
+.bm-upload-file-row:hover { border-color: var(--bm-accent); }
+.bm-upload-file-info { flex: 1; min-width: 0; }
+.bm-upload-file-name { font-size: 0.78rem; font-weight: 600; color: var(--bm-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bm-upload-file-size { font-size: 0.68rem; color: var(--bm-text-sub); margin-top: 1px; }
+.bm-remove-file-btn {
+  background: none; border: 1px solid var(--bm-border); border-radius: 4px;
+  padding: 0.15rem 0.4rem; font-size: 0.72rem; font-weight: 700;
+  color: var(--bm-danger, #ef4444); cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.bm-remove-file-btn:hover { background: var(--bm-danger, #ef4444); color: #fff; border-color: var(--bm-danger, #ef4444); }
+
+/* Destination badge */
+.bm-dest-badge {
+  padding: 0.4rem 0.75rem; margin-top: 0.25rem;
+  background: color-mix(in srgb, var(--bm-accent, #6366f1) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bm-accent, #6366f1) 18%, transparent);
+  border-radius: 6px; font-size: 0.78rem; color: var(--bm-accent, #6366f1);
+}
+
+/* Download count in info panel */
+.bm-panel-row--downloads { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--bm-border); }
+.bm-dl-count { display: inline-flex; align-items: baseline; gap: 0.3rem; }
+.bm-dl-count-num {
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-size: 1.1rem; font-weight: 700; color: var(--bm-accent, #6366f1);
+}
+.bm-dl-count-label { font-size: 0.72rem; color: var(--bm-text-sub); }
