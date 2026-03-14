@@ -24,19 +24,19 @@
 }
 
 body.dark-mode {
-  --ss-bg:      #0f172a;
-  --ss-bg2:     #1e293b;
-  --ss-card:    #1e293b;
-  --ss-ink:     #f1f5f9;
-  --ss-ink2:    #cbd5e1;
-  --ss-ink3:    #94a3b8;
-  --ss-ink4:    #64748b;
-  --ss-accent:  #60a5fa;
+  --ss-bg:      #052e3d;
+  --ss-bg2:     #0c4a6e;
+  --ss-card:    #0c4a6e;
+  --ss-ink:     #e0f2fe;
+  --ss-ink2:    #bae6fd;
+  --ss-ink3:    #7dd3fc;
+  --ss-ink4:    #38bdf8;
+  --ss-accent:  #22d3ee;
   --ss-amber:   #fbbf24;
   --ss-green:   #4ade80;
   --ss-red:     #f87171;
-  --ss-border:  #334155;
-  --ss-border2: #475569;
+  --ss-border:  #075985;
+  --ss-border2: #0369a1;
 }
 
 /* ── Layout ── */
@@ -192,4 +192,27 @@ body.dark-mode .ss-alert--ok  { background: #052e1633; border-color: #166534; }
 @media (prefers-reduced-motion: reduce) {
   .ss-enter, .ss-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .ss-reveal.ss-visible { opacity: 1; transform: none; }
+}
+
+/* ── Clickable file row + open/preview button ── */
+.ss-file-row--clickable {
+  cursor: pointer;
+}
+.ss-file-row--clickable:hover {
+  background: var(--ss-bg2);
+}
+
+.ss-open-btn {
+  background: none; border: 1.5px solid var(--ss-border);
+  color: var(--ss-accent); border-radius: 7px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 1.1rem; flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  touch-action: manipulation;
+}
+.ss-open-btn:hover {
+  background: var(--ss-accent);
+  color: #fff;
+  border-color: var(--ss-accent);
 }
