@@ -16,7 +16,8 @@ import {
   MdInsertDriveFile, MdPictureAsPdf, MdImage, MdVideoFile, MdDescription,
   MdDownload, MdPreview, MdDelete, MdEdit, MdUpload, MdArrowBack,
   MdLightMode, MdDarkMode, MdMoreVert, MdCheck, MdContentCopy,
-  MdFilterList, MdSort, MdInfo, MdKeyboardArrowRight, MdHome, MdBookmarkRemove
+  MdFilterList, MdSort, MdInfo, MdKeyboardArrowRight, MdHome, MdBookmarkRemove,
+  MdCreateNewFolder
 } from 'react-icons/md';
 import './BrowseMaterials.css';
 import MessageBanner from '../components/MessageBanner';
@@ -79,6 +80,14 @@ const BrowseMaterials = () => {
   const [uploadModal,    setUploadModal]    = useState(false);
   const [editData,       setEditData]       = useState({});
   const [copiedCode,     setCopiedCode]     = useState(null);
+
+  // ── Inline upload state (faculty) ────────────────────────────────────────
+  const [uploadFiles,    setUploadFiles]    = useState([]);
+  const [uploadSfId,     setUploadSfId]     = useState('');
+  const [uploading,      setUploading]      = useState(false);
+  const [uploadDragging, setUploadDragging] = useState(false);
+  const [newSfName,      setNewSfName]      = useState('');
+  const [creatingFolder, setCreatingFolder] = useState(false);
 
   // ── Sidebar panel ────────────────────────────────────────────────────────
   const [infoPanel,      setInfoPanel]      = useState(true);
@@ -210,6 +219,59 @@ const BrowseMaterials = () => {
       setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: msg } : d));
       setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
     }
+  };
+
+  // ── Inline upload helpers (faculty) ─────────────────────────────────────
+  const addUploadFiles = (files) => {
+    const valid = Array.from(files).filter(f => {
+      if (f.size > 50 * 1024 * 1024) { setError(`${f.name} exceeds 50 MB`); return false; }
+      return true;
+    });
+    setUploadFiles(prev => [...prev, ...valid]);
+  };
+
+  const handleCreateSubFolder = async () => {
+    if (!newSfName.trim() || !selectedFolder) return;
+    setCreatingFolder(true);
+    try {
+      const res = await api.post(`/faculty/folders/${selectedFolder._id}/subfolders`, { name: newSfName.trim() });
+      const sf = res.data.subFolder;
+      setSelectedFolder(prev => ({ ...prev, subFolders: [...(prev.subFolders || []), sf] }));
+      setUploadSfId(sf._id);
+      setNewSfName('');
+      setSuccess(`Folder "${sf.name}" created!`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) { setError(err.response?.data?.message || 'Failed to create folder');
+    } finally { setCreatingFolder(false); }
+  };
+
+  const handleUploadSubmit = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!uploadFiles.length || !selectedFolder) return;
+    setUploading(true); setError('');
+    try {
+      const form = new FormData();
+      uploadFiles.forEach(f => form.append('files', f));
+      if (uploadSfId) form.append('subFolderId', uploadSfId);
+      const endpoint = uploadSfId
+        ? `/faculty/folders/${selectedFolder._id}/subfolders/${uploadSfId}/files`
+        : `/faculty/folders/${selectedFolder._id}/files`;
+      await api.post(endpoint, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const dest = uploadSfId
+        ? `into "${selectedFolder.subFolders?.find(sf => sf._id === uploadSfId)?.name || 'folder'}"`
+        : 'to root';
+      setSuccess(`${uploadFiles.length} file(s) uploaded ${dest}!`);
+      setTimeout(() => setSuccess(''), 5000);
+      setUploadFiles([]); setUploadSfId(''); setUploadModal(false);
+      openFolder(selectedFolder);
+    } catch (err) { setError(err.response?.data?.message || 'Upload failed');
+    } finally { setUploading(false); }
+  };
+
+  const fmtUploadSize = (bytes) => {
+    if (!bytes) return '0 B';
+    const u = ['B','KB','MB','GB'], i = Math.floor(Math.log(bytes)/Math.log(1024));
+    return (bytes/1024**i).toFixed(1)+' '+u[i];
   };
 
   const handleDeleteFolder = async (id) => {
@@ -647,6 +709,15 @@ const BrowseMaterials = () => {
                   <div className="bm-panel-row"><span>Size</span><span>{fmtSize(previewFile.size)}</span></div>
                   <div className="bm-panel-row"><span>Type</span><span>{previewFile.mimeType?.split('/')[1]?.toUpperCase() || '—'}</span></div>
                   <div className="bm-panel-row"><span>Uploaded</span><span>{fmtDate(previewFile.uploadedAt)}</span></div>
+                  {isFaculty && (
+                    <div className="bm-panel-row bm-panel-row--downloads">
+                      <span>Downloads</span>
+                      <span className="bm-dl-count">
+                        <span className="bm-dl-count-num">{previewFile.downloadCount ?? 0}</span>
+                        <span className="bm-dl-count-label">times</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="bm-panel-actions">
                   {previewFile.previewUrl  && <button className="bm-panel-btn bm-panel-btn--primary"  onClick={() => setPreviewModal(previewFile)}><MdPreview /> Preview</button>}
@@ -725,20 +796,96 @@ const BrowseMaterials = () => {
         </div>
       )}
 
-      {/* ── Upload notice modal (redirect to full upload page) ── */}
+      {/* ── Inline Upload Modal (faculty) ── */}
       {uploadModal && (
-        <div className="bm-modal-overlay" onClick={() => setUploadModal(false)}>
-          <div className="bm-modal" onClick={e => e.stopPropagation()}>
+        <div className="bm-modal-overlay" onClick={() => { setUploadModal(false); setUploadFiles([]); setUploadSfId(''); setNewSfName(''); }}>
+          <div className="bm-modal bm-modal--upload" onClick={e => e.stopPropagation()}>
             <div className="bm-modal-header">
-              <h3>Upload File</h3>
-              <button onClick={() => setUploadModal(false)}><MdClose /></button>
+              <h3>Upload Files — {selectedFolder?.subjectName}</h3>
+              <button onClick={() => { setUploadModal(false); setUploadFiles([]); setUploadSfId(''); setNewSfName(''); }}><MdClose /></button>
             </div>
             <div className="bm-modal-body">
-              <p>To upload files, go to your Materials page and use the upload feature there.</p>
+              <p className="bm-upload-hint">Max 50 MB per file · PDF, DOC, PPT, XLS, images, video, ZIP</p>
+
+              {/* Destination selector */}
+              <label className="bm-upload-label">Upload destination</label>
+              <select className="bm-input" value={uploadSfId} onChange={e => setUploadSfId(e.target.value)} style={{ marginBottom: '0.75rem' }}>
+                <option value="">📂 Root (no sub-folder)</option>
+                {(selectedFolder?.subFolders || []).map(sf => (
+                  <option key={sf._id} value={sf._id}>📁 {sf.name} ({sf.files?.length || 0} files)</option>
+                ))}
+              </select>
+
+              {/* Create sub-folder row */}
+              <div className="bm-sf-create-row">
+                <MdCreateNewFolder style={{ color: 'var(--bm-accent, #6366f1)', fontSize: '1.1rem', flexShrink: 0 }} />
+                <input
+                  className="bm-sf-create-input"
+                  placeholder="New folder name (e.g. Unit 1, Lab Sheets)"
+                  value={newSfName}
+                  onChange={e => setNewSfName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateSubFolder(); } }}
+                  maxLength={60}
+                />
+                <button className="bm-btn bm-btn--secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', flexShrink: 0 }}
+                  onClick={handleCreateSubFolder} disabled={!newSfName.trim() || creatingFolder}>
+                  {creatingFolder ? '…' : '+ Create'}
+                </button>
+              </div>
+
+              {/* Drag-drop zone */}
+              <div
+                className={`bm-dropzone ${uploadDragging ? 'bm-dropzone--active' : ''}`}
+                onDragEnter={e => { e.preventDefault(); setUploadDragging(true); }}
+                onDragLeave={e => { e.preventDefault(); setUploadDragging(false); }}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); setUploadDragging(false); addUploadFiles(e.dataTransfer.files); }}
+                onClick={() => document.getElementById('bm-file-input').click()}
+              >
+                <div className="bm-dropzone-icon">📂</div>
+                <p className="bm-dropzone-text">Drag &amp; drop files here</p>
+                <p className="bm-dropzone-sub">or click to browse</p>
+                <input id="bm-file-input" type="file" multiple style={{ display: 'none' }}
+                  onChange={e => addUploadFiles(e.target.files)}
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar,.7z,.mp4,.mp3" />
+              </div>
+
+              {/* File list */}
+              {uploadFiles.length > 0 && (
+                <div className="bm-upload-filelist">
+                  <div className="bm-upload-filelist-header">
+                    <span>{uploadFiles.length} file(s) · {fmtUploadSize(uploadFiles.reduce((s,f)=>s+f.size,0))}</span>
+                    <button className="bm-clear-btn" onClick={() => setUploadFiles([])}>Clear all</button>
+                  </div>
+                  {uploadFiles.map((file, i) => (
+                    <div key={i} className="bm-upload-file-row">
+                      <span>📄</span>
+                      <div className="bm-upload-file-info">
+                        <div className="bm-upload-file-name">{file.name}</div>
+                        <div className="bm-upload-file-size">{fmtUploadSize(file.size)}</div>
+                      </div>
+                      <button className="bm-remove-file-btn" onClick={() => setUploadFiles(p => p.filter((_,j)=>j!==i))}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {uploadSfId && (
+                <div className="bm-dest-badge">
+                  📁 Uploading into: <strong>{selectedFolder?.subFolders?.find(sf=>sf._id===uploadSfId)?.name}</strong>
+                </div>
+              )}
             </div>
             <div className="bm-modal-footer">
-              <button className="bm-btn bm-btn--secondary" onClick={() => setUploadModal(false)}>Cancel</button>
-              <button className="bm-btn bm-btn--primary" onClick={() => navigate('/faculty/materials')}>Go to Materials</button>
+              <button className="bm-btn bm-btn--secondary"
+                onClick={() => { setUploadModal(false); setUploadFiles([]); setUploadSfId(''); setNewSfName(''); }}>
+                Cancel
+              </button>
+              <button className="bm-btn bm-btn--primary"
+                onClick={handleUploadSubmit}
+                disabled={uploading || !uploadFiles.length}>
+                {uploading ? `⏳ Uploading ${uploadFiles.length} file(s)…` : `📤 Upload ${uploadFiles.length} file(s)`}
+              </button>
             </div>
           </div>
         </div>
