@@ -18,6 +18,9 @@ import StudentHistory from './pages/StudentHistory';
 // Admin
 import AdminDashboard from './pages/AdminDashboard';
 
+// Student extras
+import StudentStarred from './pages/StudentStarred';
+
 // NEW: File Explorer
 import BrowseMaterials from './pages/BrowseMaterials';
 
@@ -71,6 +74,11 @@ function AppRoutes() {
       <Route path="/student/history" element={
         <ProtectedRoute allowedRoles={['student']}>
           <StudentHistory />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/starred" element={
+        <ProtectedRoute allowedRoles={['student']}>
+          <StudentStarred />
         </ProtectedRoute>
       } />
 
