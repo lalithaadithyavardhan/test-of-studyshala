@@ -10,8 +10,8 @@
 }
 
 body.dark-mode .navbar {
-  background-color: var(--card-dark, #1e293b);
-  border-bottom-color: var(--border-dark, #334155);
+  background-color: var(--card-dark, #0c4a6e);
+  border-bottom-color: var(--border-dark, #075985);
 }
 
 .navbar-content {
@@ -31,7 +31,7 @@ body.dark-mode .navbar {
   letter-spacing: -0.3px;
 }
 
-body.dark-mode .navbar-title { color: var(--text-dark, #f8fafc); }
+body.dark-mode .navbar-title { color: var(--text-dark, #e0f2fe); }
 
 /* ── Actions area ────────────────────────────────────────────────────────── */
 .navbar-actions {
@@ -58,8 +58,8 @@ body.dark-mode .navbar-title { color: var(--text-dark, #f8fafc); }
 }
 
 body.dark-mode .theme-toggle {
-  border-color: var(--border-dark, #334155);
-  color: var(--text-secondary-dark, #94a3b8);
+  border-color: var(--border-dark, #075985);
+  color: var(--text-secondary-dark, #7dd3fc);
 }
 
 .theme-toggle:hover {
@@ -90,7 +90,7 @@ body.dark-mode .theme-toggle:hover {
 }
 
 body.dark-mode .profile-button {
-  border-color: var(--border-dark, #334155);
+  border-color: var(--border-dark, #075985);
 }
 
 .profile-button:hover {
@@ -99,8 +99,8 @@ body.dark-mode .profile-button {
 }
 
 body.dark-mode .profile-button:hover {
-  background: #0f172a;
-  border-color: #475569;
+  background: #052e3d;
+  border-color: #0369a1;
 }
 
 /* ── Avatar ──────────────────────────────────────────────────────────────── */
@@ -144,7 +144,7 @@ body.dark-mode .profile-button:hover {
   text-overflow: ellipsis;
 }
 
-body.dark-mode .profile-name { color: var(--text-dark, #f8fafc); }
+body.dark-mode .profile-name { color: var(--text-dark, #e0f2fe); }
 
 .profile-role {
   font-size: 0.7rem;
@@ -153,7 +153,7 @@ body.dark-mode .profile-name { color: var(--text-dark, #f8fafc); }
   line-height: 1.2;
 }
 
-body.dark-mode .profile-role { color: var(--text-secondary-dark, #94a3b8); }
+body.dark-mode .profile-role { color: var(--text-secondary-dark, #7dd3fc); }
 
 /* ── Dropdown arrow ──────────────────────────────────────────────────────── */
 .dropdown-arrow {
@@ -165,7 +165,7 @@ body.dark-mode .profile-role { color: var(--text-secondary-dark, #94a3b8); }
 
 .dropdown-arrow.rotated { transform: rotate(180deg); }
 
-body.dark-mode .dropdown-arrow { color: #64748b; }
+body.dark-mode .dropdown-arrow { color: #38bdf8; }
 
 /* ── Dropdown menu ───────────────────────────────────────────────────────── */
 .dropdown-menu {
@@ -183,8 +183,8 @@ body.dark-mode .dropdown-arrow { color: #64748b; }
 }
 
 body.dark-mode .dropdown-menu {
-  background-color: var(--card-dark, #1e293b);
-  border-color: var(--border-dark, #334155);
+  background-color: var(--card-dark, #0c4a6e);
+  border-color: var(--border-dark, #075985);
   box-shadow: 0 10px 30px rgba(0,0,0,0.4);
 }
 
@@ -231,7 +231,7 @@ body.dark-mode .dropdown-menu {
   max-width: 155px;
 }
 
-body.dark-mode .dropdown-name { color: var(--text-dark, #f8fafc); }
+body.dark-mode .dropdown-name { color: var(--text-dark, #e0f2fe); }
 
 .dropdown-email {
   font-size: 0.775rem;
@@ -243,7 +243,7 @@ body.dark-mode .dropdown-name { color: var(--text-dark, #f8fafc); }
   max-width: 155px;
 }
 
-body.dark-mode .dropdown-email { color: var(--text-secondary-dark, #94a3b8); }
+body.dark-mode .dropdown-email { color: var(--text-secondary-dark, #7dd3fc); }
 
 .dropdown-divider {
   border: none;
@@ -251,7 +251,7 @@ body.dark-mode .dropdown-email { color: var(--text-secondary-dark, #94a3b8); }
   margin: 0;
 }
 
-body.dark-mode .dropdown-divider { border-top-color: var(--border-dark, #334155); }
+body.dark-mode .dropdown-divider { border-top-color: var(--border-dark, #075985); }
 
 .dropdown-item {
   width: 100%;
@@ -269,13 +269,13 @@ body.dark-mode .dropdown-divider { border-top-color: var(--border-dark, #334155)
   transition: all 0.15s ease;
 }
 
-body.dark-mode .dropdown-item { color: var(--text-dark, #f8fafc); }
+body.dark-mode .dropdown-item { color: var(--text-dark, #e0f2fe); }
 
 .dropdown-item:hover {
   background-color: #f9fafb;
 }
 
-body.dark-mode .dropdown-item:hover { background-color: #0f172a; }
+body.dark-mode .dropdown-item:hover { background-color: #052e3d; }
 
 .dropdown-item--danger { color: #ef4444; }
 body.dark-mode .dropdown-item--danger { color: #f87171; }
