@@ -184,6 +184,7 @@ const BrowseMaterials = () => {
   const [uploadFiles,    setUploadFiles]    = useState([]);
   const [uploadSfId,     setUploadSfId]     = useState('');
   const [uploading,      setUploading]      = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadDragging, setUploadDragging] = useState(false);
   const [newSfName,      setNewSfName]      = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -295,48 +296,35 @@ const BrowseMaterials = () => {
   const [recentFiles,   setRecentFiles]   = useState([]);        // [{fileId,fileName,mimeType,materialId,subjectName,viewedAt}]
   const [recentLoaded,  setRecentLoaded]  = useState(false);
 
-  const handleDownload = async (file) => {
-    if (!file._id || !selectedFolder?._id) {
-      if (file.downloadUrl) window.open(file.downloadUrl, '_blank', 'noopener');
-      else setError('Download not available for this file.');
-      return;
-    }
+  const handleDownload = (file) => {
+    // Use Google Drive's direct download URL — files are anyoneWithLink so this
+    // works instantly at full CDN speed with no backend bottleneck.
+    // Access control is enforced at the "enter code" step (student must have
+    // the material in their history/saved before they can see the file).
+    const url = file.downloadUrl || (file.driveFileId
+      ? `https://drive.usercontent.google.com/download?id=${file.driveFileId}&export=download&authuser=0`
+      : null);
+
+    if (!url) { setError('Download not available for this file.'); return; }
 
     const dlId = file._id + '_' + Date.now();
-    setDownloads(prev => [...prev, { id: dlId, name: file.name, done: false, error: null }]);
+    setDownloads(prev => [...prev, { id: dlId, name: file.name, done: true, error: null }]);
 
-    try {
-      // Request the file as a blob — backend proxies from Drive, adds watermark,
-      // and streams it back with Content-Disposition: attachment.
-      // Using responseType:'blob' keeps everything in-page — no new tab opens.
-      const res = await api.get(
-        `/student/materials/${selectedFolder._id}/files/${file._id}/download`,
-        { responseType: 'blob' }
-      );
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
 
-      // Build a temporary object URL and click a hidden <a> to save the file
-      const blobUrl  = URL.createObjectURL(res.data);
-      const anchor   = document.createElement('a');
-      anchor.href     = blobUrl;
-      anchor.download = file.name || 'download';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(blobUrl);
-
-      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, done: true } : d));
-      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 3000);
-    } catch (err) {
-      // Try to parse error JSON from blob response
-      let msg = 'Download failed. Please try again.';
-      try {
-        const text = await err.response?.data?.text?.();
-        const json = text ? JSON.parse(text) : null;
-        if (json?.message) msg = json.message;
-      } catch (_) {}
-      setDownloads(prev => prev.map(d => d.id === dlId ? { ...d, error: msg } : d));
-      setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 5000);
+    // Log download count via API (fire-and-forget, non-blocking)
+    if (file._id && selectedFolder?._id && !isFaculty) {
+      api.get(`/student/materials/${selectedFolder._id}/files/${file._id}/download`)
+        .catch(() => {}); // ignore errors — this just increments the counter
     }
+
+    setTimeout(() => setDownloads(prev => prev.filter(d => d.id !== dlId)), 2500);
   };
 
   // ── Inline upload helpers (faculty) ─────────────────────────────────────
@@ -366,7 +354,7 @@ const BrowseMaterials = () => {
   const handleUploadSubmit = async (e) => {
     if (e?.preventDefault) e.preventDefault();
     if (!uploadFiles.length || !selectedFolder) return;
-    setUploading(true); setError('');
+    setUploading(true); setError(''); setUploadProgress(0);
     try {
       const form = new FormData();
       uploadFiles.forEach(f => form.append('files', f));
@@ -374,16 +362,21 @@ const BrowseMaterials = () => {
       const endpoint = uploadSfId
         ? `/faculty/folders/${selectedFolder._id}/subfolders/${uploadSfId}/files`
         : `/faculty/folders/${selectedFolder._id}/files`;
-      await api.post(endpoint, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(endpoint, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (evt) => {
+          if (evt.total) setUploadProgress(Math.round((evt.loaded * 100) / evt.total));
+        }
+      });
       const dest = uploadSfId
         ? `into "${selectedFolder.subFolders?.find(sf => sf._id === uploadSfId)?.name || 'folder'}"`
         : 'to root';
       setSuccess(`${uploadFiles.length} file(s) uploaded ${dest}!`);
       setTimeout(() => setSuccess(''), 5000);
-      setUploadFiles([]); setUploadSfId(''); setUploadModal(false);
+      setUploadFiles([]); setUploadSfId(''); setUploadModal(false); setUploadProgress(0);
       openFolder(selectedFolder);
     } catch (err) { setError(err.response?.data?.message || 'Upload failed');
-    } finally { setUploading(false); }
+    } finally { setUploading(false); setUploadProgress(0); }
   };
 
   const fmtUploadSize = (bytes) => {
@@ -1187,14 +1180,27 @@ const BrowseMaterials = () => {
               )}
             </div>
             <div className="bm-modal-footer">
+              {/* Upload progress bar — shows while uploading */}
+              {uploading && (
+                <div style={{ flex: 1, marginRight: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#0369a1', marginBottom: '0.3rem', fontWeight: 600 }}>
+                    <span>⏳ Uploading to Google Drive…</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ height: '7px', background: '#e0f2fe', borderRadius: '99px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'linear-gradient(90deg, #0891b2, #14b8a6)', borderRadius: '99px', transition: 'width 0.3s ease' }} />
+                  </div>
+                </div>
+              )}
               <button className="bm-btn bm-btn--secondary"
-                onClick={() => { setUploadModal(false); setUploadFiles([]); setUploadSfId(''); setNewSfName(''); }}>
+                onClick={() => { setUploadModal(false); setUploadFiles([]); setUploadSfId(''); setNewSfName(''); setUploadProgress(0); }}
+                disabled={uploading}>
                 Cancel
               </button>
               <button className="bm-btn bm-btn--primary"
                 onClick={handleUploadSubmit}
                 disabled={uploading || !uploadFiles.length}>
-                {uploading ? `⏳ Uploading ${uploadFiles.length} file(s)…` : `📤 Upload ${uploadFiles.length} file(s)`}
+                {uploading ? `⏳ ${uploadProgress}%` : `📤 Upload ${uploadFiles.length} file(s)`}
               </button>
             </div>
           </div>
