@@ -389,6 +389,87 @@ const removeSavedMaterial = async (req, res) => {
   }
 };
 
+
+// ── Track recently viewed file (called from frontend on preview/open) ─────────
+const trackRecentFile = async (req, res) => {
+  try {
+    const { fileId, fileName, mimeType, materialId, subjectName, clear } = req.body;
+
+    // Support clear-all flag from frontend
+    if (clear) {
+      req.user.recentFiles = [];
+      await req.user.save();
+      return res.json({ recentFiles: [] });
+    }
+
+    if (!fileId || !materialId) return res.status(400).json({ message: 'fileId and materialId required' });
+
+    // Remove existing entry for this file (dedup), then prepend
+    req.user.recentFiles = req.user.recentFiles.filter(r => r.fileId !== fileId);
+    req.user.recentFiles.unshift({ fileId, fileName, mimeType, materialId, subjectName, viewedAt: new Date() });
+
+    // Keep only the 10 most recent
+    if (req.user.recentFiles.length > 10) req.user.recentFiles = req.user.recentFiles.slice(0, 10);
+
+    await req.user.save();
+    res.json({ recentFiles: req.user.recentFiles });
+  } catch (err) {
+    logger.error(`trackRecentFile: ${err.message}`);
+    res.status(500).json({ message: 'Failed to track file' });
+  }
+};
+
+// ── Get recent files ──────────────────────────────────────────────────────────
+const getRecentFiles = async (req, res) => {
+  try {
+    res.json({ recentFiles: req.user.recentFiles || [] });
+  } catch (err) {
+    logger.error(`getRecentFiles: ${err.message}`);
+    res.status(500).json({ message: 'Failed to fetch recent files' });
+  }
+};
+
+// ── Star a file ───────────────────────────────────────────────────────────────
+const starFile = async (req, res) => {
+  try {
+    const { fileId, fileName, mimeType, materialId, subjectName } = req.body;
+    if (!fileId || !materialId) return res.status(400).json({ message: 'fileId and materialId required' });
+
+    const alreadyStarred = req.user.starredFiles.some(s => s.fileId === fileId);
+    if (alreadyStarred) return res.json({ starredFiles: req.user.starredFiles, alreadyStarred: true });
+
+    req.user.starredFiles.push({ fileId, fileName, mimeType, materialId, subjectName, starredAt: new Date() });
+    await req.user.save();
+    res.json({ starredFiles: req.user.starredFiles });
+  } catch (err) {
+    logger.error(`starFile: ${err.message}`);
+    res.status(500).json({ message: 'Failed to star file' });
+  }
+};
+
+// ── Unstar a file ─────────────────────────────────────────────────────────────
+const unstarFile = async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    req.user.starredFiles = req.user.starredFiles.filter(s => s.fileId !== fileId);
+    await req.user.save();
+    res.json({ starredFiles: req.user.starredFiles });
+  } catch (err) {
+    logger.error(`unstarFile: ${err.message}`);
+    res.status(500).json({ message: 'Failed to unstar file' });
+  }
+};
+
+// ── Get starred files ─────────────────────────────────────────────────────────
+const getStarredFiles = async (req, res) => {
+  try {
+    res.json({ starredFiles: req.user.starredFiles || [] });
+  } catch (err) {
+    logger.error(`getStarredFiles: ${err.message}`);
+    res.status(500).json({ message: 'Failed to fetch starred files' });
+  }
+};
+
 module.exports = {
   validateAccessCode,
   saveMaterial,
@@ -396,5 +477,10 @@ module.exports = {
   getAccessHistory,
   getMaterialFiles,
   downloadFile,
-  removeSavedMaterial
+  removeSavedMaterial,
+  trackRecentFile,
+  getRecentFiles,
+  starFile,
+  unstarFile,
+  getStarredFiles
 };
