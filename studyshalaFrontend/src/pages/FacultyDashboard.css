@@ -25,19 +25,19 @@
 }
 
 body.dark-mode {
-  --fd-bg:      #0f172a;
-  --fd-bg2:     #1e293b;
-  --fd-card:    #1e293b;
-  --fd-ink:     #f1f5f9;
-  --fd-ink2:    #cbd5e1;
-  --fd-ink3:    #94a3b8;
-  --fd-ink4:    #64748b;
-  --fd-accent:  #60a5fa;
+  --fd-bg:      #052e3d;
+  --fd-bg2:     #0c4a6e;
+  --fd-card:    #0c4a6e;
+  --fd-ink:     #e0f2fe;
+  --fd-ink2:    #bae6fd;
+  --fd-ink3:    #7dd3fc;
+  --fd-ink4:    #38bdf8;
+  --fd-accent:  #22d3ee;
   --fd-green:   #4ade80;
   --fd-amber:   #fbbf24;
   --fd-red:     #f87171;
-  --fd-border:  #334155;
-  --fd-border2: #475569;
+  --fd-border:  #075985;
+  --fd-border2: #0369a1;
 }
 
 /* ── Layout ── */
@@ -207,6 +207,8 @@ body.dark-mode .fd-create-btn:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
   border-radius: 12px;
   padding: 1.5rem;
   display: flex; flex-direction: column; gap: 0;
+  overflow: hidden;           /* ← prevents ANY child from escaping the card */
+  min-width: 0;               /* ← flex item doesn't grow beyond grid column */
   transition: border-color 0.2s, box-shadow 0.3s var(--ease-expo), transform 0.3s var(--ease-expo), background 0.25s;
 }
 .fd-card:hover {
