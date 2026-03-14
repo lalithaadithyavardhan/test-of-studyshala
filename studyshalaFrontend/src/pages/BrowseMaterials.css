@@ -1126,7 +1126,6 @@
   transition: color 0.15s, border-color 0.15s;
 }
 .bm-recent-clear:hover { color: var(--bm-danger, #ef4444); border-color: var(--bm-danger, #ef4444); }
-
 .bm-recent-row {
   display: flex; gap: 0.5rem; flex-wrap: nowrap;
   overflow-x: auto; padding-bottom: 0.25rem;
