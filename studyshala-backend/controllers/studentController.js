@@ -96,12 +96,13 @@ const buildDriveUrls = (driveFileId) => {
 };
 
 const mapFile = (f) => ({
-  _id:         f._id,
-  name:        f.name,
-  mimeType:    f.mimeType,
-  size:        f.size,
-  uploadedAt:  f.uploadedAt,
-  driveFileId: f.driveFileId || null,
+  _id:           f._id,
+  name:          f.name,
+  mimeType:      f.mimeType,
+  size:          f.size,
+  uploadedAt:    f.uploadedAt,
+  driveFileId:   f.driveFileId || null,
+  downloadCount: f.downloadCount || 0,
   ...buildDriveUrls(f.driveFileId)
 });
 
@@ -317,6 +318,19 @@ const downloadFile = async (req, res) => {
     if (!file.driveFileId) return res.status(404).json({ message: 'File not on Drive. Ask faculty to re-upload.' });
 
     await logAction(req, 'DOWNLOAD_FILE', 'Folder', folder._id, { fileName: file.name });
+
+    // ── Increment downloadCount on the matching file ──────────────────────
+    const rootInc = await Folder.updateOne(
+      { _id: folder._id, 'files._id': file._id },
+      { $inc: { 'files.$.downloadCount': 1 } }
+    );
+    if (rootInc.modifiedCount === 0) {
+      await Folder.updateOne(
+        { _id: folder._id },
+        { $inc: { 'subFolders.$[].files.$[f].downloadCount': 1 } },
+        { arrayFilters: [{ 'f._id': file._id }] }
+      );
+    }
 
     // Watermark label: "StudyShala • <student email>"
     const wmText = `StudyShala • ${req.user.email || 'Student'}`;
