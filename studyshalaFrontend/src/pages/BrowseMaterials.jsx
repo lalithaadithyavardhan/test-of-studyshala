@@ -154,7 +154,8 @@ const BrowseMaterials = () => {
   const navigate    = useNavigate();
   const location    = useLocation();
   const role        = user?.role || 'student';
-  const isFaculty   = role === 'faculty' || role === 'admin';
+  const isFaculty   = role === 'faculty';  // admin uses its own routes
+  const isAdmin     = role === 'admin';
 
   // ── Data state ──────────────────────────────────────────────────────────
   const [folders,        setFolders]        = useState([]);   // all folders/materials
@@ -208,7 +209,7 @@ const BrowseMaterials = () => {
   // ── Fetch data + starred/recent from DB ─────────────────────────────────
   useEffect(() => {
     fetchData();
-    if (!isFaculty) {
+    if (!isFaculty && !isAdmin) {
       api.get('/student/starred-files').then(r => {
         setStarredFiles(new Set((r.data.starredFiles || []).map(s => s.fileId)));
       }).catch(() => {});
@@ -224,23 +225,27 @@ const BrowseMaterials = () => {
     setError('');
     try {
       let res;
-      if (isFaculty) {
+      let allFolders = [];
+      if (isAdmin) {
+        res = await api.get('/admin/browse');
+        allFolders = res.data.folders || [];
+        setFolders(allFolders);
+      } else if (isFaculty) {
         res = await api.get('/faculty/folders');
-        setFolders(res.data.folders || []);
+        allFolders = res.data.folders || [];
+        setFolders(allFolders);
       } else {
         res = await api.get('/student/saved-materials');
-        setFolders(res.data.materials || []);
+        allFolders = res.data.materials || [];
+        setFolders(allFolders);
       }
 
-      // ── Auto-open a folder if navigated here from History or Starred ─────
-      // Priority: location.state (passed by navigate) > sessionStorage (legacy)
+      // ── Auto-open a folder if navigated here from History, Starred, or Admin Courses ─────
       const targetId = location.state?.openFolderId || sessionStorage.getItem('bm_open_folder');
       if (targetId) {
         sessionStorage.removeItem('bm_open_folder');
-        const allFolders = isFaculty ? (res.data.folders || []) : (res.data.materials || []);
         const target = allFolders.find(f => String(f._id) === String(targetId));
         if (target) {
-          // Small delay so component finishes rendering the grid first
           setTimeout(() => openFolder(target), 150);
         }
       }
@@ -259,11 +264,13 @@ const BrowseMaterials = () => {
     setSelectedFiles(new Set());
     try {
       const res = await api.get(
-        isFaculty
-          ? `/faculty/folders/${folder._id}`
-          : `/student/materials/${folder._id}/files`
+        isAdmin
+          ? `/admin/browse/${folder._id}`
+          : isFaculty
+            ? `/faculty/folders/${folder._id}`
+            : `/student/materials/${folder._id}/files`
       );
-      const data = isFaculty ? res.data.folder : res.data;
+      const data = (isAdmin || isFaculty) ? res.data.folder : res.data;
       setSelectedFolder(prev => ({
         ...prev,
         files:             data.files || [],
