@@ -95,7 +95,9 @@ const SectionReveal = ({ children, className = '' }) => {
 /* Animated stat counter */
 const StatItem = ({ value, label }) => {
   const [visible, setVisible] = useState(false);
-  const count = useCounter(value, 2000, visible);
+  // value === null means still loading
+  const isLoading = value === null || value === undefined;
+  const count = useCounter(isLoading ? 0 : value, 2000, visible && !isLoading);
   const ref = useRef(null);
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -107,7 +109,12 @@ const StatItem = ({ value, label }) => {
   }, []);
   return (
     <div ref={ref} className="clay-stat clay-reveal clay-reveal--bottom">
-      <span className="clay-stat-num">{count.toLocaleString()}<span className="clay-stat-plus">+</span></span>
+      <span className="clay-stat-num">
+        {isLoading
+          ? <span className="clay-stat-loading">—</span>
+          : <>{count.toLocaleString()}<span className="clay-stat-plus">+</span></>
+        }
+      </span>
       <span className="clay-stat-lbl">{label}</span>
     </div>
   );
@@ -234,7 +241,8 @@ const Login = () => {
   const [selectedRole, setSelectedRole] = useState(null);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
-  const [stats,        setStats]        = useState({ totalStudents: 120, totalFaculty: 18, totalMaterials: 95, totalVisits: 540 });
+  // null = not yet loaded (shows "—"), object = real data
+  const [stats,        setStats]        = useState(null);
   const [navScrolled,  setNavScrolled]  = useState(false);
   const [menuOpen,     setMenuOpen]     = useState(false);
   const [pageReady,    setPageReady]    = useState(false);
@@ -252,16 +260,33 @@ const Login = () => {
 
   useEffect(() => {
     let cancelled = false;
-    const fetch_ = async (attempt) => {
-      try {
-        const res = await api.get('/stats');
-        if (!cancelled) setStats(res.data);
-      } catch {
-        if (attempt < 5 && !cancelled)
-          setTimeout(() => fetch_(attempt + 1), attempt === 1 ? 8000 : 15000);
+
+    const wakeAndFetch = async () => {
+      // Step 1: Record this visit (fire-and-forget, non-blocking)
+      // This also acts as a wake ping — starts the Render backend spinning up
+      api.post('/stats/visit').catch(() => {});
+
+      // Step 2: Fetch stats with exponential backoff
+      // Render free tier takes up to 50s to cold-start, so we retry patiently
+      const DELAYS = [3000, 6000, 10000, 15000, 20000, 25000]; // 6 attempts
+      for (let i = 0; i < DELAYS.length; i++) {
+        if (cancelled) return;
+        // Wait before each attempt (first attempt waits 3s to give backend time to wake)
+        await new Promise(r => setTimeout(r, DELAYS[i]));
+        if (cancelled) return;
+        try {
+          const res = await api.get('/stats');
+          if (!cancelled && res.data) {
+            setStats(res.data);
+            return; // success — stop retrying
+          }
+        } catch {
+          // Backend still waking up — keep retrying
+        }
       }
     };
-    fetch_(1);
+
+    wakeAndFetch();
     return () => { cancelled = true; };
   }, []);
 
@@ -426,12 +451,16 @@ const Login = () => {
             <Reveal><div className="clay-section-label">— live numbers</div></Reveal>
             <div className="clay-stats-grid">
               {[
-                { value: stats.totalStudents,  label: 'Students joined' },
-                { value: stats.totalFaculty,   label: 'Faculty members' },
-                { value: stats.totalMaterials, label: 'Materials shared' },
-                { value: stats.totalVisits,    label: 'Total visits' },
-              ].map((s, i) => (
-                <StatItem key={s.label} value={s.value} label={s.label} index={i} />
+                { key: 'totalStudents',  label: 'Students joined' },
+                { key: 'totalFaculty',   label: 'Faculty members' },
+                { key: 'totalMaterials', label: 'Materials shared' },
+                { key: 'totalVisits',    label: 'Total visits' },
+              ].map(s => (
+                <StatItem
+                  key={s.label}
+                  value={stats ? stats[s.key] : null}
+                  label={s.label}
+                />
               ))}
             </div>
           </div>
