@@ -9,23 +9,18 @@ require('dotenv').config();
 const express    = require('express');
 const cors       = require('cors');
 const session    = require('express-session');
-
-const feedbackRoutes = require('./routes/feedbackRoutes');
-
 const passport   = require('./config/passport');
 const connectDB  = require('./config/database');
 const logger     = require('./utils/logger');
 
 // Routes
-const authRoutes    = require('./routes/authRoutes');
-const facultyRoutes = require('./routes/facultyRoutes');
-const studentRoutes = require('./routes/studentRoutes');
+const authRoutes     = require('./routes/authRoutes');
+const facultyRoutes  = require('./routes/facultyRoutes');
+const studentRoutes  = require('./routes/studentRoutes');
 const adminRoutes    = require('./routes/adminRoutes');
 const statsRoutes    = require('./routes/statsRoutes');
 const storageRoutes  = require('./routes/storageRoutes');
-
-app.use('/api/feedback', feedbackRoutes);
-
+const feedbackRoutes = require('./routes/feedbackRoutes');
 
 const app = express();
 
@@ -107,12 +102,13 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/auth',    authRoutes);
-app.use('/api/faculty', facultyRoutes);
-app.use('/api/student', studentRoutes);
-app.use('/api/admin',   adminRoutes);
-app.use('/api/stats',   statsRoutes);
-app.use('/api/storage', storageRoutes);
+app.use('/api/auth',     authRoutes);
+app.use('/api/faculty',  facultyRoutes);
+app.use('/api/student',  studentRoutes);
+app.use('/api/admin',    adminRoutes);
+app.use('/api/stats',    statsRoutes);
+app.use('/api/storage',  storageRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // ── Error handling ──────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));
