@@ -447,6 +447,57 @@ const downloadReport = async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Failed to generate report' }); }
 };
 
+/* ══ ADMIN BROWSE — full folder list + single folder detail for BrowseMaterials ══ */
+
+// Returns all active folders (faculty + admin courses) with enough data for the grid
+const getBrowseFolders = async (req, res) => {
+  try {
+    const folders = await Folder.find({ active: true })
+      .select('subjectName department semester facultyName accessCode accessCount files subFolders messageToStudents isAdminCourse courseCategory createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const result = folders.map(f => ({
+      _id:               f._id,
+      subjectName:       f.subjectName,
+      department:        f.department,
+      semester:          f.semester,
+      facultyName:       f.facultyName,
+      accessCode:        f.accessCode || '',
+      accessCount:       f.accessCount || 0,
+      isAdminCourse:     f.isAdminCourse || false,
+      courseCategory:    f.courseCategory || '',
+      messageToStudents: f.messageToStudents || '',
+      files:             f.files || [],
+      subFolders:        (f.subFolders || []).map(sf => ({
+        _id:       sf._id,
+        name:      sf.name,
+        createdAt: sf.createdAt,
+        fileCount: sf.files.length,
+        files:     sf.files
+      })),
+      createdAt: f.createdAt,
+    }));
+
+    res.json({ folders: result });
+  } catch (err) {
+    logger.error(`getBrowseFolders: ${err.message}`);
+    res.status(500).json({ message: 'Failed to fetch folders' });
+  }
+};
+
+// Returns single folder detail (same shape as /faculty/folders/:id)
+const getBrowseFolder = async (req, res) => {
+  try {
+    const folder = await Folder.findById(req.params.id).lean();
+    if (!folder) return res.status(404).json({ message: 'Folder not found' });
+    res.json({ folder });
+  } catch (err) {
+    logger.error(`getBrowseFolder: ${err.message}`);
+    res.status(500).json({ message: 'Failed to fetch folder' });
+  }
+};
+
 module.exports = {
   getStats, getAnalytics,
   getUsers, getUserProfile, resetUser, deactivateUser, activateUser, removeUser, updateUserRole, selfPromote,
@@ -456,4 +507,5 @@ module.exports = {
   getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
   getSettings, updateSettings,
   downloadReport,
+  getBrowseFolders, getBrowseFolder,
 };
