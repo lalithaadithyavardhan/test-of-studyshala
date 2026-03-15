@@ -5,7 +5,7 @@
  * Warm off-white palette · Full dark mode · Scroll-reveal
  */
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
@@ -64,6 +64,48 @@ const FdModal = ({ open, onClose, title, children, footer }) => {
         <div className="fd-modal-body">{children}</div>
         {footer && <div className="fd-modal-footer">{footer}</div>}
       </div>
+    </div>
+  );
+};
+
+
+// ── Announcement Banner ───────────────────────────────────────────────────────
+const AnnouncementBanner = () => {
+  const [announcements, setAnnouncements] = React.useState([]);
+  const [dismissed,     setDismissed]     = React.useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('dismissed_ann') || '[]'); }
+    catch { return []; }
+  });
+
+  React.useEffect(() => {
+    api.get('/announcements')
+      .then(res => setAnnouncements(res.data.announcements || []))
+      .catch(() => {});
+  }, []);
+
+  const dismiss = (id) => {
+    const next = [...dismissed, id];
+    setDismissed(next);
+    try { sessionStorage.setItem('dismissed_ann', JSON.stringify(next)); } catch {}
+  };
+
+  const visible = announcements.filter(a => !dismissed.includes(a._id));
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="ann-banner-wrap">
+      {visible.map(a => (
+        <div key={a._id} className="ann-banner">
+          <MdCampaign className="ann-banner-icon" />
+          <div className="ann-banner-body">
+            <span className="ann-banner-title">{a.title}</span>
+            <span className="ann-banner-msg">{a.message}</span>
+          </div>
+          <button className="ann-banner-close" onClick={() => dismiss(a._id)} title="Dismiss">
+            <MdClose />
+          </button>
+        </div>
+      ))}
     </div>
   );
 };
@@ -226,6 +268,7 @@ const FacultyDashboard = () => {
       <Sidebar role="faculty" />
       <div className="main-content">
         <Navbar />
+        <AnnouncementBanner />
         <div className={`fd-page ${pageReady ? 'fd-ready' : ''}`}>
 
           {/* ── Hero ── */}
