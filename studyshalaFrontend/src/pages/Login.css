@@ -90,14 +90,16 @@ html { scroll-behavior: smooth; }
   transition: opacity .85s var(--ease-expo), transform .85s var(--ease-expo);
 }
 
-/* ── Scroll reveal ─────────────────────────────────────────────────────── */
+/* ── Scroll reveal — "page fold" per element ────────────────────────────── */
 .clay-reveal {
   opacity: 0;
-  transition: opacity .75s var(--ease-expo), transform .75s var(--ease-expo);
+  transition: opacity .7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform .7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
-.clay-reveal--bottom { transform: translateY(36px); }
-.clay-reveal--left   { transform: translateX(-36px); }
-.clay-reveal--right  { transform: translateX(36px); }
+.clay-reveal--bottom { transform: translateY(40px); }
+.clay-reveal--left   { transform: translateX(-40px); }
+.clay-reveal--right  { transform: translateX(40px); }
 .clay-reveal.is-visible { opacity: 1; transform: none; }
 
 /* ── Divider ───────────────────────────────────────────────────────────── */
@@ -242,13 +244,12 @@ html { scroll-behavior: smooth; }
   position: relative;
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 100px 2.5rem 80px;
+  align-items: stretch;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--ink);
 }
 
+/* Video fills the ENTIRE hero — no overlay, no opacity reduction */
 .clay-hero-video {
   position: absolute;
   inset: 0;
@@ -256,29 +257,24 @@ html { scroll-behavior: smooth; }
   height: 100%;
   object-fit: cover;
   z-index: 0;
-  opacity: .06;
+  opacity: 1;
 }
 
-.clay-hero-overlay { display: none; }
-
-/* Subtle decorative blob — same palette, just slightly different tint */
-.clay-hero::before {
-  content: '';
-  position: absolute;
-  top: -120px;
-  right: -140px;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  background: var(--surface2);
-  opacity: .3;
-  z-index: 0;
-  pointer-events: none;
+/* Transparent pane that holds text — sits on top of video */
+.clay-hero-pane {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 110px 2.5rem 80px;
+  background: rgba(240, 238, 236, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .clay-hero-inner {
-  position: relative;
-  z-index: 3;
   width: 100%;
   max-width: 1200px;
   display: grid;
@@ -287,36 +283,42 @@ html { scroll-behavior: smooth; }
   align-items: center;
 }
 
-/* Floating illustrations */
-.clay-float {
-  position: absolute;
-  z-index: 2;
-  animation: clayFloat 8s ease-in-out infinite;
-  pointer-events: none;
-  user-select: none;
-  opacity: .55;
+/* Section fold-in animation — wraps each full section */
+.clay-section-reveal {
+  opacity: 0;
+  transform: translateY(48px) scale(0.985);
+  transition:
+    opacity .9s cubic-bezier(0.16, 1, 0.3, 1),
+    transform .9s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.clay-float img { width: 100%; height: 100%; object-fit: contain; }
-.clay-float--tl { top: 10%; left: 0%; width: 150px; }
-.clay-float--br { bottom: 8%; right: 2%; width: 120px; animation-delay: 1.5s; }
-.clay-float--bl { bottom: 12%; left: 1%; width: 140px; animation-delay: .8s; }
-
-@keyframes clayFloat {
-  0%,100% { transform: translateY(0); }
-  50%      { transform: translateY(-16px); }
+.clay-section-reveal.is-visible {
+  opacity: 1;
+  transform: none;
 }
 
-.clay-hero-student {
+/* Scroll indicator at bottom of hero */
+.clay-scroll-indicator {
   position: absolute;
-  bottom: 0;
-  right: 3%;
-  width: 190px;
-  z-index: 2;
-  pointer-events: none;
-  user-select: none;
-  opacity: .6;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .4rem;
 }
-.clay-hero-student img { width: 100%; object-fit: contain; }
+.clay-scroll-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+  animation: scrollBounce 2s ease-in-out infinite;
+}
+@keyframes scrollBounce {
+  0%, 100% { transform: translateY(0); opacity: .4; }
+  50%       { transform: translateY(10px); opacity: 1; }
+}
 
 /* Badge — on --bg, text must be --ink */
 .clay-hero-badge {
@@ -1021,12 +1023,10 @@ html { scroll-behavior: smooth; }
    RESPONSIVE
    ══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 1024px) {
+  .clay-hero-pane          { padding: 90px 1.5rem 60px; }
   .clay-hero-inner         { grid-template-columns: 1fr; text-align: center; gap: 2.5rem; }
   .clay-hero-right         { margin: 0 auto; max-width: 440px; }
   .clay-hero-hint          { display: none; }
-  .clay-hero-student       { display: none; }
-  .clay-float--tl, .clay-float--bl { display: none; }
-  .clay-float--br          { width: 80px; }
   .clay-stats-grid         { grid-template-columns: repeat(2,1fr); }
   .clay-features-grid      { grid-template-columns: 1fr; }
   .clay-feature-cols       { grid-template-columns: 1fr; }
@@ -1041,7 +1041,7 @@ html { scroll-behavior: smooth; }
 }
 
 @media (max-width: 600px) {
-  .clay-hero              { padding: 90px 1.25rem 60px; }
+  .clay-hero-pane         { padding: 90px 1.25rem 60px; }
   .clay-wrap              { padding: 0 1.25rem; }
   .clay-hero-h1           { font-size: 2.1rem; }
   .clay-stats-grid        { grid-template-columns: repeat(2,1fr); gap: .875rem; }
@@ -1052,12 +1052,11 @@ html { scroll-behavior: smooth; }
   .clay-how-section,
   .clay-testimonials-section,
   .clay-about-section     { padding: 4rem 0; }
-  .clay-float             { display: none; }
   .clay-footer-bottom     { gap: 1rem; flex-direction: column; align-items: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .clay-enter, .clay-reveal, .clay-float {
+  .clay-enter, .clay-reveal {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
