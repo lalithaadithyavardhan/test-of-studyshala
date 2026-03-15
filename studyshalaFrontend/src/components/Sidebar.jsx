@@ -4,18 +4,114 @@ import {
   MdMenuBook, MdDashboard, MdLibraryBooks,
   MdHistory, MdKey, MdSettings, MdFolderOpen,
   MdChevronLeft, MdChevronRight, MdMenu, MdClose,
-  MdInfoOutline, MdStar
+  MdInfoOutline, MdStar, MdChatBubbleOutline
 } from 'react-icons/md';
 import { FaGithub, FaLinkedin, FaHeart } from 'react-icons/fa';
+import { ImSpinner8 } from 'react-icons/im';
+import api from '../api/axios';
 import './Sidebar.css';
 
+/* ── Feedback Modal ────────────────────────────────────────────────────────── */
+const FeedbackModal = ({ onClose }) => {
+  const MAX = 60;
+  const [text,        setText]        = useState('');
+  const [loading,     setLoading]     = useState(false);
+  const [checking,    setChecking]    = useState(true);
+  const [submitted,   setSubmitted]   = useState(false);
+  const [error,       setError]       = useState('');
+
+  // On open, check if user already submitted
+  useEffect(() => {
+    api.get('/feedback/mine')
+      .then(res => {
+        if (res.data.feedback) setText(res.data.feedback.message);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  const handleSubmit = async () => {
+    if (!text.trim()) return;
+    setLoading(true); setError('');
+    try {
+      await api.post('/feedback', { message: text.trim() });
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fb-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="fb-modal">
+        <div className="fb-modal-header">
+          <span className="fb-modal-title">Leave a Postcard 💌</span>
+          <button className="fb-modal-close" onClick={onClose}><MdClose /></button>
+        </div>
+
+        {submitted ? (
+          <div className="fb-success">
+            <div className="fb-success-icon">🎉</div>
+            <div className="fb-success-msg">Thanks! Your postcard will appear on the homepage.</div>
+            <button className="fb-btn fb-btn--primary" onClick={onClose}>Close</button>
+          </div>
+        ) : checking ? (
+          <div className="fb-loading"><ImSpinner8 className="fb-spin" /></div>
+        ) : (
+          <>
+            <p className="fb-hint">
+              Share a short thought about StudyShala — it'll show up in the <strong>Postcards</strong> section on the landing page.
+            </p>
+            <div className="fb-field">
+              <textarea
+                className="fb-textarea"
+                placeholder="e.g. This saved me so much time before exams!"
+                maxLength={MAX}
+                value={text}
+                onChange={e => setText(e.target.value)}
+                rows={3}
+                autoFocus
+              />
+              <div className={`fb-counter ${text.length >= MAX ? 'fb-counter--max' : ''}`}>
+                {text.length}/{MAX}
+              </div>
+            </div>
+            {error && <div className="fb-error">{error}</div>}
+            <div className="fb-actions">
+              <button className="fb-btn fb-btn--ghost" onClick={onClose}>Cancel</button>
+              <button
+                className="fb-btn fb-btn--primary"
+                onClick={handleSubmit}
+                disabled={loading || !text.trim()}
+              >
+                {loading ? <><ImSpinner8 className="fb-spin" /> Sending…</> : 'Send Postcard ✉️'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ── Main Sidebar ──────────────────────────────────────────────────────────── */
 const Sidebar = ({ role }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isCollapsed,  setIsCollapsed]  = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [mounted,      setMounted]      = useState(false);
-  const [aboutOpen,    setAboutOpen]    = useState(false);
+  const [isCollapsed,   setIsCollapsed]   = useState(false);
+  const [isMobileOpen,  setIsMobileOpen]  = useState(false);
+  const [mounted,       setMounted]       = useState(false);
+  const [aboutOpen,     setAboutOpen]     = useState(false);
+  const [feedbackOpen,  setFeedbackOpen]  = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 80);
@@ -108,6 +204,12 @@ const Sidebar = ({ role }) => {
         <div className="sb-footer">
           {!isCollapsed ? (
             <>
+              {/* ── Feedback button ── */}
+              <button className="sb-feedback-btn" onClick={() => setFeedbackOpen(true)}>
+                <MdChatBubbleOutline className="sb-about-icon" />
+                <span>Leave a Postcard</span>
+              </button>
+
               <button className="sb-about-toggle" onClick={() => setAboutOpen(!aboutOpen)}>
                 <MdInfoOutline className="sb-about-icon" />
                 <span>About</span>
@@ -146,17 +248,29 @@ const Sidebar = ({ role }) => {
               </div>
             </>
           ) : (
-            <button
-              className="sb-toggle"
-              style={{ margin: '0 auto', display: 'flex' }}
-              title="About"
-              onClick={() => { setIsCollapsed(false); setTimeout(() => setAboutOpen(true), 310); }}
-            >
-              <MdInfoOutline />
-            </button>
+            <>
+              <button
+                className="sb-toggle"
+                style={{ margin: '0 auto 4px', display: 'flex' }}
+                title="Leave a Postcard"
+                onClick={() => setFeedbackOpen(true)}
+              >
+                <MdChatBubbleOutline />
+              </button>
+              <button
+                className="sb-toggle"
+                style={{ margin: '0 auto', display: 'flex' }}
+                title="About"
+                onClick={() => { setIsCollapsed(false); setTimeout(() => setAboutOpen(true), 310); }}
+              >
+                <MdInfoOutline />
+              </button>
+            </>
           )}
         </div>
       </aside>
+
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </>
   );
 };
