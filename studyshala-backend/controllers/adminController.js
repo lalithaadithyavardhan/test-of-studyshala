@@ -447,6 +447,102 @@ const downloadReport = async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Failed to generate report' }); }
 };
 
+/* ══ ADMIN COURSE UPLOAD — upload files to admin courses ════════════════════ */
+const driveService = require('../services/driveService');
+
+const mapFile = (f) => ({
+  _id:           f._id,
+  name:          f.name,
+  originalName:  f.originalName,
+  mimeType:      f.mimeType,
+  size:          f.size,
+  driveFileId:   f.driveFileId || null,
+  downloadCount: f.downloadCount || 0,
+  uploadedAt:    f.uploadedAt,
+});
+
+// POST /api/admin/courses/:id/files
+const uploadCourseFiles = async (req, res) => {
+  try {
+    const { id }          = req.params;
+    const { subFolderId } = req.body;
+
+    // Admin can upload to any admin course (no facultyId check)
+    const folder = await Folder.findOne({ _id: id, isAdminCourse: true, active: true });
+    if (!folder)                         return res.status(404).json({ message: 'Course not found' });
+    if (!req.files || !req.files.length) return res.status(400).json({ message: 'No files provided' });
+
+    if (!driveService.enabled) {
+      return res.status(503).json({ message: 'Google Drive is not configured on this server.' });
+    }
+
+    let targetSubFolder = null;
+    let parentDriveId   = null;
+
+    if (subFolderId) {
+      targetSubFolder = folder.subFolders.id(subFolderId);
+      if (!targetSubFolder) return res.status(404).json({ message: 'Sub-folder not found' });
+      parentDriveId = targetSubFolder.driveSubFolderId || null;
+    } else {
+      parentDriveId = (folder.driveFolderId && !folder.driveFolderId.startsWith('local'))
+        ? folder.driveFolderId : null;
+    }
+
+    const uploaded = [];
+    for (const file of req.files) {
+      let driveFileId = null;
+      let fileSize    = file.size;
+      try {
+        const result = await driveService.uploadFile(file.buffer, file.originalname, file.mimetype, parentDriveId);
+        driveFileId = result.fileId;
+        fileSize    = result.size || file.buffer.length;
+      } catch (driveErr) {
+        return res.status(500).json({ message: `Failed to upload "${file.originalname}": ${driveErr.message}` });
+      }
+      const doc = { name: file.originalname, originalName: file.originalname, mimeType: file.mimetype, size: fileSize, driveFileId, uploadedAt: new Date(), uploadedBy: req.user._id };
+      if (targetSubFolder) { targetSubFolder.files.push(doc); } else { folder.files.push(doc); }
+      uploaded.push(doc);
+    }
+
+    await folder.save();
+    await logAction(req, 'ADMIN_UPLOAD_FILES', 'Folder', folder._id, { fileCount: uploaded.length });
+    res.json({ message: `${uploaded.length} file(s) uploaded`, files: uploaded.map(mapFile), subFolderId: subFolderId || null });
+  } catch (err) {
+    logger.error(`uploadCourseFiles: ${err.message}`);
+    res.status(500).json({ message: 'Failed to upload files' });
+  }
+};
+
+// POST /api/admin/courses/:id/subfolders
+const createCourseSubFolder = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ message: 'Folder name required' });
+    const folder = await Folder.findOne({ _id: req.params.id, isAdminCourse: true });
+    if (!folder) return res.status(404).json({ message: 'Course not found' });
+    folder.subFolders.push({ name: name.trim() });
+    await folder.save();
+    const newSf = folder.subFolders[folder.subFolders.length - 1];
+    res.status(201).json({ subFolder: { _id: newSf._id, name: newSf.name, files: [], fileCount: 0, createdAt: newSf.createdAt } });
+  } catch (err) {
+    logger.error(`createCourseSubFolder: ${err.message}`);
+    res.status(500).json({ message: 'Failed to create sub-folder' });
+  }
+};
+
+// DELETE /api/admin/courses/:id/files/:fileId
+const deleteCourseFile = async (req, res) => {
+  try {
+    const folder = await Folder.findOne({ _id: req.params.id, isAdminCourse: true });
+    if (!folder) return res.status(404).json({ message: 'Course not found' });
+    folder.files = folder.files.filter(f => f._id.toString() !== req.params.fileId);
+    await folder.save();
+    res.json({ message: 'File deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete file' });
+  }
+};
+
 /* ══ ADMIN BROWSE — full folder list + single folder detail for BrowseMaterials ══ */
 
 // Returns all active folders (faculty + admin courses) with enough data for the grid
@@ -508,4 +604,5 @@ module.exports = {
   getSettings, updateSettings,
   downloadReport,
   getBrowseFolders, getBrowseFolder,
+  uploadCourseFiles, createCourseSubFolder, deleteCourseFile,
 };
