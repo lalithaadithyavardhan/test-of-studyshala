@@ -37,10 +37,22 @@ connectDB();
 
 /**
  * 2. UPDATED CORS
- * Uses your environment variable and allows credentials.
+ * Accepts multiple frontend origins: custom domain, Render preview URL, localhost.
+ * Add any new domains to the FRONTEND_URL env var as comma-separated values.
+ * Example: FRONTEND_URL=https://www.studyshala.dev,https://studyshala.dev,https://test-of-studyshala-1.onrender.com
  */
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true
 }));
 
