@@ -10,7 +10,8 @@ import {
 } from 'react-icons/fa';
 import { FcGoogle } from 'react-icons/fc';
 import { ImSpinner8 } from 'react-icons/im';
-import { MdMenuBook, MdEmail } from 'react-icons/md';
+import { MdEmail } from 'react-icons/md';
+import owlLogo from '../assets/logo.svg';
 
 import heroBgMp4  from '../assets/hero-bg.mp4';
 import student2Svg from '../assets/student2.svg';
@@ -165,7 +166,7 @@ const HowStep = ({ num, title, desc, delay }) => (
 const LoginCard = ({ selectedRole, setSelectedRole, onSignIn, loading, error }) => (
   <div className="clay-login-card">
     <div className="clay-login-header">
-      <div className="clay-login-logo"><MdMenuBook /></div>
+      <div className="clay-login-logo"><img src={owlLogo} alt="StudyShala" style={{ width: '32px', height: '32px', objectFit: 'contain' }} /></div>
       <div>
         <div className="clay-login-title">Sign in to StudyShala</div>
         <div className="clay-login-sub">Pick your role · continue with Google</div>
@@ -313,7 +314,7 @@ const Login = () => {
     return (
       <div className="clay-auth-loading">
         <div className="clay-auth-loading-inner">
-          <div className="clay-auth-loading-logo"><MdMenuBook /></div>
+          <div className="clay-auth-loading-logo"><img src={owlLogo} alt="StudyShala" style={{ width: '64px', height: '64px', objectFit: 'contain' }} /></div>
           <div className="clay-auth-loading-name">StudyShala</div>
           <div className="clay-auth-loading-ring" />
         </div>
@@ -351,7 +352,7 @@ const Login = () => {
       <nav className={`clay-nav ${navScrolled ? 'clay-nav--solid' : ''}`}>
         <div className="clay-nav-inner">
           <div className="clay-brand clay-enter" style={{ animationDelay: '0ms' }}>
-            <MdMenuBook className="clay-brand-ico" />
+            <img src={owlLogo} alt="StudyShala" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
             <span className="clay-brand-name">StudyShala</span>
           </div>
           <div className="clay-nav-links">
@@ -402,7 +403,7 @@ const Login = () => {
             {/* Left — headline */}
             <div className="clay-hero-left">
               <div className="clay-hero-badge clay-enter" style={{ animationDelay: '80ms' }}>
-                <MdMenuBook style={{ fontSize: '1rem', verticalAlign: 'middle' }} />
+                <img src={owlLogo} alt="" style={{ width: "16px", height: "16px", objectFit: "contain", verticalAlign: "middle" }} />
                 &nbsp; Study material platform
               </div>
               <h1 className="clay-hero-h1">
@@ -668,7 +669,7 @@ const Login = () => {
       <footer className="clay-footer">
         <div className="clay-wrap clay-footer-inner">
           <div className="clay-footer-brand">
-            <MdMenuBook className="clay-footer-brand-ico" />
+            <img src={owlLogo} alt="StudyShala" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
             <span>StudyShala</span>
           </div>
           <p className="clay-footer-tagline">
