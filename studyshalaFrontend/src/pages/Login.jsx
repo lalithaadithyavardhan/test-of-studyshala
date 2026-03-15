@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import {
@@ -365,10 +365,7 @@ const Login = () => {
               </a>
             ))}
           </div>
-          <Link to="/admin/login" className="clay-admin-link clay-enter" style={{ animationDelay: '360ms' }}>
-            Admin ↗
-          </Link>
-          <button
+<button
             className={`clay-burger ${menuOpen ? 'open' : ''}`}
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
@@ -385,7 +382,6 @@ const Login = () => {
                  : id.charAt(0).toUpperCase() + id.slice(1)}
               </a>
             ))}
-            <Link to="/admin/login" onClick={() => setMenuOpen(false)}>Admin</Link>
           </div>
         )}
       </nav>
