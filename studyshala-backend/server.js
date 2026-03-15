@@ -9,6 +9,9 @@ require('dotenv').config();
 const express    = require('express');
 const cors       = require('cors');
 const session    = require('express-session');
+
+const feedbackRoutes = require('./routes/feedbackRoutes');
+
 const passport   = require('./config/passport');
 const connectDB  = require('./config/database');
 const logger     = require('./utils/logger');
@@ -20,6 +23,9 @@ const studentRoutes = require('./routes/studentRoutes');
 const adminRoutes    = require('./routes/adminRoutes');
 const statsRoutes    = require('./routes/statsRoutes');
 const storageRoutes  = require('./routes/storageRoutes');
+
+app.use('/api/feedback', feedbackRoutes);
+
 
 const app = express();
 
