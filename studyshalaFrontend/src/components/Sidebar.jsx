@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   MdDashboard, MdLibraryBooks,
-  MdHistory, MdKey, MdSettings, MdFolderOpen,
+  MdHistory, MdKey, MdSettings, MdFolderOpen, MdSchool,
   MdChevronLeft, MdChevronRight, MdMenu, MdClose,
   MdInfoOutline, MdStar, MdChatBubbleOutline
 } from 'react-icons/md';
@@ -136,16 +136,19 @@ const Sidebar = ({ role }) => {
       { path: '/faculty/dashboard', icon: <MdDashboard />,    label: 'Dashboard'        },
       { path: '/faculty/materials', icon: <MdLibraryBooks />, label: 'My Materials'     },
       { path: '/browse-materials',  icon: <MdFolderOpen />,   label: 'Browse Materials' },
+      { path: '/admin-courses',     icon: <MdSchool />,       label: 'Admin Courses'    },
     ],
     student: [
       { path: '/student/enter-code', icon: <MdKey />,        label: 'Enter Code'       },
       { path: '/browse-materials',   icon: <MdFolderOpen />, label: 'Browse Materials' },
+      { path: '/admin-courses',      icon: <MdSchool />,     label: 'Admin Courses'    },
       { path: '/student/history',    icon: <MdHistory />,    label: 'History'          },
       { path: '/student/starred',    icon: <MdStar />,       label: 'Starred Files'    },
     ],
     admin: [
       { path: '/admin/dashboard',  icon: <MdSettings />,   label: 'Dashboard'        },
       { path: '/browse-materials', icon: <MdFolderOpen />, label: 'Browse Materials' },
+      { path: '/admin-courses',    icon: <MdSchool />,     label: 'Admin Courses'    },
     ],
   };
 
