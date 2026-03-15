@@ -625,10 +625,21 @@ html { scroll-behavior: smooth; }
   font-family: 'Lora', serif;
   font-size: 2.6rem;
   font-weight: 700;
-  color: var(--ink);              /* #1C1A17 on #F0EEEC — perfect */
+  color: var(--ink);
   line-height: 1;
 }
 .clay-stat-plus { font-size: 1.5rem; }
+/* Loading state — pulsing dash while backend wakes up */
+.clay-stat-loading {
+  font-size: 2rem;
+  color: var(--surface);
+  animation: statPulse 1.4s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes statPulse {
+  0%, 100% { opacity: .3; }
+  50%       { opacity: .8; }
+}
 .clay-stat-lbl {
   font-size: .82rem;
   font-weight: 700;
