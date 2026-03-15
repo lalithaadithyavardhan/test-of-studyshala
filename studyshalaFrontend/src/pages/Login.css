@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════════════════════════════════════
    STUDYSHALA LOGIN — CLAYMORPHISM DESIGN
-   Palette: #406093 · #4C8CE4 · #F6F3C2 · #E37434
+   Palette: #FFE75E · #FEB72B · #899857 · #527318
    Fonts: Lora (serif display) + Lato (body)
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -8,10 +8,10 @@
 
 /* ── Variables ─────────────────────────────────────────────────────────── */
 :root {
-  --clay-bg:       #F6F3C2;
-  --clay-surface:  #406093;
-  --clay-primary:  #4C8CE4;
-  --clay-accent:   #E37434;
+  --clay-bg:       #899857;
+  --clay-surface:  #FFE75E;
+  --clay-primary:  #FEB72B;
+  --clay-accent:   #527318;
 
   --clay-ink:      #2a4444;
   --clay-ink2:     #3a5555;
