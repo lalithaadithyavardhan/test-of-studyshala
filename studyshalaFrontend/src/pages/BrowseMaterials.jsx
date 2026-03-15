@@ -406,9 +406,12 @@ const BrowseMaterials = () => {
       const form = new FormData();
       uploadFiles.forEach(f => form.append('files', f));
       if (uploadSfId) form.append('subFolderId', uploadSfId);
-      const endpoint = uploadSfId
-        ? `/faculty/folders/${selectedFolder._id}/subfolders/${uploadSfId}/files`
-        : `/faculty/folders/${selectedFolder._id}/files`;
+      // Admin uses dedicated admin upload route; faculty uses faculty route
+      const endpoint = isAdmin
+        ? `/admin/courses/${selectedFolder._id}/files`
+        : uploadSfId
+          ? `/faculty/folders/${selectedFolder._id}/subfolders/${uploadSfId}/files`
+          : `/faculty/folders/${selectedFolder._id}/files`;
       await api.post(endpoint, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (evt) => {
