@@ -346,8 +346,13 @@ const AdminDashboard = () => {
             <div><h1>Admin Dashboard</h1><p className="page-description">Full platform control</p></div>
           </div>
 
-          {globalError   && <div className="alert alert-error"   style={{marginBottom:'1rem'}}>{globalError}</div>}
-          {globalSuccess && <div className="alert alert-success" style={{marginBottom:'1rem'}}>✅ {globalSuccess}</div>}
+          {/* Flash messages — wrapped so they never overlap */}
+          {(globalError || globalSuccess) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+              {globalError   && <div className="alert alert-error"  >{globalError}</div>}
+              {globalSuccess && <div className="alert alert-success">✅ {globalSuccess}</div>}
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="ad-tabs">
@@ -710,7 +715,7 @@ const AdminDashboard = () => {
           {/* ════ FEEDBACK ════ */}
           {activeTab==='feedback' && (
             feedbackLoading ? <div className="loading-container"><div className="spinner"/></div> : <>
-              <div className="alert alert-info" style={{marginBottom:'1rem'}}>
+              <div className="alert alert-info" style={{marginBottom:'1rem',marginTop:'0.25rem'}}>
                 💡 <strong>Approved</strong> feedback shows on the landing page Postcards section.
               </div>
               <div className="table-toolbar" style={{marginBottom:'1rem'}}>
