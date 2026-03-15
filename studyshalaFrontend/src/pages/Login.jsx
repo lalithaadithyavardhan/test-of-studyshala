@@ -92,6 +92,27 @@ const SectionReveal = ({ children, className = '' }) => {
   );
 };
 
+/* Feedback card — same visual style as old TestimonialCard */
+const FeedbackCard = ({ message, name, role, delay }) => {
+  const ref = useScrollReveal();
+  const roleLabel = role === 'faculty'
+    ? `Faculty`
+    : `Student`;
+  return (
+    <div
+      ref={ref}
+      className="clay-testimonial clay-reveal clay-reveal--bottom"
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      <p className="clay-testimonial-msg">"{message}"</p>
+      <div className="clay-testimonial-footer">
+        <span className="clay-testimonial-from">{name}</span>
+        <span className="clay-testimonial-role">{roleLabel}</span>
+      </div>
+    </div>
+  );
+};
+
 /* Animated stat counter — FIX: no clay-reveal so stats always display regardless of scroll timing */
 const StatItem = ({ value, label }) => {
   // value === null means still loading
@@ -111,22 +132,6 @@ const StatItem = ({ value, label }) => {
   );
 };
 
-const TestimonialCard = ({ message, from, role, delay }) => {
-  const ref = useScrollReveal();
-  return (
-    <div
-      ref={ref}
-      className="clay-testimonial clay-reveal clay-reveal--bottom"
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      <p className="clay-testimonial-msg">"{message}"</p>
-      <div className="clay-testimonial-footer">
-        <span className="clay-testimonial-from">{from}</span>
-        <span className="clay-testimonial-role">{role}</span>
-      </div>
-    </div>
-  );
-};
 
 const FeatureItem = ({ icon, text, delay, colorClass }) => {
   const ref = useScrollReveal();
@@ -234,6 +239,8 @@ const Login = () => {
   const [error,        setError]        = useState('');
   // null = not yet loaded (shows "—"), object = real data
   const [stats,        setStats]        = useState(null);
+  // real feedback from users — [] until loaded
+  const [feedbacks,    setFeedbacks]    = useState([]);
   const [navScrolled,  setNavScrolled]  = useState(false);
   const [menuOpen,     setMenuOpen]     = useState(false);
   const [pageReady,    setPageReady]    = useState(false);
@@ -278,6 +285,15 @@ const Login = () => {
 
     wakeAndFetch();
     return () => { cancelled = true; };
+  }, []);
+
+  // Fetch real feedback for the Postcards section
+  useEffect(() => {
+    api.get('/feedback')
+      .then(res => {
+        if (res.data?.feedbacks?.length) setFeedbacks(res.data.feedbacks);
+      })
+      .catch(() => {}); // silently ignore — section just stays with defaults
   }, []);
 
   useEffect(() => {
@@ -570,10 +586,26 @@ const Login = () => {
               </Reveal>
             </div>
             <div className="clay-testimonials-grid">
-              <TestimonialCard message="This is so helpful!! My faculty shared the code and I had all notes in seconds. Absolutely love this." from="Priya M." role="Student · Hyderabad" delay={0} />
-              <TestimonialCard message="Finally no more WhatsApp forwards with broken Drive links. StudyShala is a blessing for our department." from="Dr. Ramesh K." role="Faculty · Bangalore" delay={100} />
-              <TestimonialCard message="Simple, clean, fast. The code system is genius. All my students accessed notes within 2 minutes." from="Sunita V." role="Faculty · Pune" delay={200} />
-              <TestimonialCard message="I saved so much time not having to email files individually. The download feature works perfectly!" from="Arjun D." role="Student · Chennai" delay={300} />
+              {feedbacks.length > 0
+                ? feedbacks.slice(0, 8).map((fb, i) => (
+                    <FeedbackCard
+                      key={fb._id || i}
+                      message={fb.message}
+                      name={fb.name}
+                      role={fb.role}
+                      delay={i * 80}
+                    />
+                  ))
+                : /* Fallback placeholders shown while no real feedback yet */
+                  [
+                    { message: 'This saved me so much time before exams!', name: 'A Student', role: 'student' },
+                    { message: 'My students accessed all notes within minutes of sharing the code.', name: 'A Faculty', role: 'faculty' },
+                    { message: 'No more broken WhatsApp links. This is exactly what we needed.', name: 'A Faculty', role: 'faculty' },
+                    { message: 'Simple, fast and completely free. Love it!', name: 'A Student', role: 'student' },
+                  ].map((fb, i) => (
+                    <FeedbackCard key={i} message={fb.message} name={fb.name} role={fb.role} delay={i * 80} />
+                  ))
+              }
             </div>
           </div>
         </section>
