@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
@@ -11,17 +11,16 @@ import {
 import { FcGoogle } from 'react-icons/fc';
 import { ImSpinner8 } from 'react-icons/im';
 import { MdMenuBook, MdEmail } from 'react-icons/md';
-import './Login.css';
 
-/* ── Asset paths (place these files in /public/assets/) ──────────────────── */
-const ASSETS = {
-  video:    '/assets/hero-bg.mp4',
-  teacher1: '/assets/teacher1.svg',
-  teacher2: '/assets/teacher2.svg',
-  student1: '/assets/student1.svg',
-  student2: '/assets/student2.svg',
-  student3: '/assets/student3.svg',
-};
+/* ── Import assets from src/assets/ (Vite handles bundling) ────────────── */
+import heroBgMp4  from '../assets/hero-bg.mp4';
+import teacher1Svg from '../assets/teacher1.svg';
+import teacher2Svg from '../assets/teacher2.svg';
+import student1Svg from '../assets/student1.svg';
+import student2Svg from '../assets/student2.svg';
+import student3Svg from '../assets/student3.svg';
+
+import './Login.css';
 
 /* ══════════════════════════════════════════════════════════════════════════
    HOOKS
@@ -61,8 +60,6 @@ const useScrollReveal = () => {
 /* ══════════════════════════════════════════════════════════════════════════
    SMALL COMPONENTS
    ══════════════════════════════════════════════════════════════════════════ */
-
-/* Scroll-reveal wrapper */
 const Reveal = ({ children, delay = 0, from = 'bottom', className = '' }) => {
   const ref = useScrollReveal();
   return (
@@ -73,8 +70,7 @@ const Reveal = ({ children, delay = 0, from = 'bottom', className = '' }) => {
   );
 };
 
-/* Animated stat counter */
-const StatItem = ({ value, label, index }) => {
+const StatItem = ({ value, label }) => {
   const [visible, setVisible] = useState(false);
   const count = useCounter(value, 2000, visible);
   const ref = useRef(null);
@@ -94,14 +90,12 @@ const StatItem = ({ value, label, index }) => {
   );
 };
 
-/* Floating SVG illustration */
 const FloatingIllustration = ({ src, className, delay = 0 }) => (
   <div className={`clay-float ${className}`} style={{ animationDelay: `${delay}s` }}>
     <img src={src} alt="" aria-hidden="true" draggable="false" />
   </div>
 );
 
-/* Testimonial card (postcard style) */
 const TestimonialCard = ({ message, from, role, delay }) => {
   const ref = useScrollReveal();
   return (
@@ -116,11 +110,10 @@ const TestimonialCard = ({ message, from, role, delay }) => {
   );
 };
 
-/* Feature list item */
 const FeatureItem = ({ icon, text, delay, colorClass }) => {
   const ref = useScrollReveal();
   return (
-    <div ref={ref} className={`clay-feature-item clay-reveal clay-reveal--left`}
+    <div ref={ref} className="clay-feature-item clay-reveal clay-reveal--left"
       style={{ transitionDelay: `${delay}ms` }}>
       <span className={`clay-feature-ico ${colorClass}`}>{icon}</span>
       <span>{text}</span>
@@ -128,7 +121,6 @@ const FeatureItem = ({ icon, text, delay, colorClass }) => {
   );
 };
 
-/* How-it-works step */
 const HowStep = ({ num, title, desc, delay }) => (
   <Reveal delay={delay}>
     <div className="clay-step">
@@ -224,11 +216,13 @@ const Login = () => {
   const [pageReady,    setPageReady]    = useState(false);
 
   useEffect(() => { const t = setTimeout(() => setPageReady(true), 60); return () => clearTimeout(t); }, []);
+
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 30);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
   useEffect(() => {
     let cancelled = false;
     const fetch_ = async (attempt) => {
@@ -236,12 +230,14 @@ const Login = () => {
         const res = await api.get('/stats');
         if (!cancelled) setStats(res.data);
       } catch {
-        if (attempt < 5 && !cancelled) setTimeout(() => fetch_(attempt + 1), attempt === 1 ? 8000 : 15000);
+        if (attempt < 5 && !cancelled)
+          setTimeout(() => fetch_(attempt + 1), attempt === 1 ? 8000 : 15000);
       }
     };
     fetch_(1);
     return () => { cancelled = true; };
   }, []);
+
   useEffect(() => {
     if (authLoading) return;
     if (user) {
@@ -250,6 +246,7 @@ const Login = () => {
       else navigate('/student/enter-code', { replace: true });
     }
   }, [user, authLoading, navigate]);
+
   useEffect(() => {
     if (searchParams.get('error') === 'auth_failed') setError('Google sign-in failed. Please try again.');
   }, [searchParams]);
@@ -326,23 +323,18 @@ const Login = () => {
         )}
       </nav>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          HERO
-         ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ HERO ══════════════════════════════════════════════════════════ */}
       <section className="clay-hero">
-        {/* Video background */}
         <video className="clay-hero-video" autoPlay muted loop playsInline>
-          <source src={ASSETS.video} type="video/mp4" />
+          <source src={heroBgMp4} type="video/mp4" />
         </video>
         <div className="clay-hero-overlay" />
 
-        {/* Floating illustrations */}
-        <FloatingIllustration src={ASSETS.teacher1} className="clay-float--tl" delay={0} />
-        <FloatingIllustration src={ASSETS.student3} className="clay-float--br" delay={1.5} />
-        <FloatingIllustration src={ASSETS.teacher2} className="clay-float--bl" delay={0.8} />
+        <FloatingIllustration src={teacher1Svg} className="clay-float--tl" delay={0} />
+        <FloatingIllustration src={student3Svg} className="clay-float--br" delay={1.5} />
+        <FloatingIllustration src={teacher2Svg} className="clay-float--bl" delay={0.8} />
 
         <div className="clay-hero-inner">
-          {/* Left — headline */}
           <div className="clay-hero-left">
             <div className="clay-hero-badge clay-enter" style={{ animationDelay: '80ms' }}>
               📚 study material platform
@@ -372,7 +364,6 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Right — login card */}
           <div className="clay-hero-right clay-enter" style={{ animationDelay: '300ms' }}>
             <LoginCard
               selectedRole={selectedRole}
@@ -385,38 +376,31 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Student illustration at bottom-right of hero */}
         <div className="clay-hero-student clay-enter" style={{ animationDelay: '600ms' }}>
-          <img src={ASSETS.student1} alt="Student illustration" draggable="false" />
+          <img src={student1Svg} alt="Student illustration" draggable="false" />
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          STATS
-         ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ STATS ═════════════════════════════════════════════════════════ */}
       <section className="clay-stats-section" id="stats">
         <div className="clay-wrap">
           <Reveal><div className="clay-section-label">— live numbers</div></Reveal>
           <div className="clay-stats-grid">
-            <StatItem value={stats.totalStudents}  label="Students joined"  index={0} />
-            <StatItem value={stats.totalFaculty}   label="Faculty members"  index={1} />
-            <StatItem value={stats.totalMaterials} label="Materials shared" index={2} />
-            <StatItem value={stats.totalVisits}    label="Total visits"     index={3} />
+            <StatItem value={stats.totalStudents}  label="Students joined" />
+            <StatItem value={stats.totalFaculty}   label="Faculty members" />
+            <StatItem value={stats.totalMaterials} label="Materials shared" />
+            <StatItem value={stats.totalVisits}    label="Total visits" />
           </div>
         </div>
       </section>
 
       <div className="clay-divider" />
 
-      {/* ══════════════════════════════════════════════════════════════════
-          FEATURES
-         ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ FEATURES ══════════════════════════════════════════════════════ */}
       <section className="clay-features-section" id="features">
         <div className="clay-wrap">
           <Reveal><div className="clay-section-label">Features</div></Reveal>
           <div className="clay-features-grid">
-
-            {/* Intro text + student SVG */}
             <div className="clay-features-intro">
               <Reveal delay={0}>
                 <h2 className="clay-section-h2">Everything you need,<br/>nothing you don't.</h2>
@@ -428,12 +412,10 @@ const Login = () => {
               </Reveal>
               <Reveal delay={200}>
                 <div className="clay-features-illustration">
-                  <img src={ASSETS.student2} alt="Student illustration" draggable="false" />
+                  <img src={student2Svg} alt="Student illustration" draggable="false" />
                 </div>
               </Reveal>
             </div>
-
-            {/* Feature columns */}
             <div className="clay-feature-cols">
               <div className="clay-feature-col">
                 <Reveal delay={0}>
@@ -442,8 +424,7 @@ const Login = () => {
                   </div>
                 </Reveal>
                 {studentFeatures.map((f, i) => (
-                  <FeatureItem key={i} icon={f.icon} text={f.text}
-                    delay={i * 60} colorClass="clay-ico--student" />
+                  <FeatureItem key={i} icon={f.icon} text={f.text} delay={i * 60} colorClass="clay-ico--student" />
                 ))}
               </div>
               <div className="clay-feature-col">
@@ -453,8 +434,7 @@ const Login = () => {
                   </div>
                 </Reveal>
                 {facultyFeatures.map((f, i) => (
-                  <FeatureItem key={i} icon={f.icon} text={f.text}
-                    delay={100 + i * 60} colorClass="clay-ico--faculty" />
+                  <FeatureItem key={i} icon={f.icon} text={f.text} delay={100 + i * 60} colorClass="clay-ico--faculty" />
                 ))}
               </div>
             </div>
@@ -464,9 +444,7 @@ const Login = () => {
 
       <div className="clay-divider" />
 
-      {/* ══════════════════════════════════════════════════════════════════
-          HOW IT WORKS
-         ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ HOW IT WORKS ══════════════════════════════════════════════════ */}
       <section className="clay-how-section" id="how">
         <div className="clay-wrap">
           <Reveal><div className="clay-section-label">How it works</div></Reveal>
@@ -474,36 +452,26 @@ const Login = () => {
             <Reveal delay={0}><h2 className="clay-section-h2">Three steps.<br/>For everyone.</h2></Reveal>
             <Reveal delay={100}><p className="clay-section-body">Simple by design. No manuals needed.</p></Reveal>
           </div>
-
           <div className="clay-how-grid">
-            {/* Student flow */}
             <Reveal delay={0}>
               <div className="clay-how-block clay-how-student">
                 <div className="clay-how-block-label">Student flow</div>
-                <HowStep num="01" title="Sign in with Google"
-                  desc="Use your institutional Google account to log in." delay={60} />
-                <HowStep num="02" title="Enter Access Code"
-                  desc="Get the 8-character code from your faculty and enter it." delay={120} />
-                <HowStep num="03" title="Save or Download"
-                  desc="Preview, save materials, or download files to your device." delay={180} />
+                <HowStep num="01" title="Sign in with Google" desc="Use your institutional Google account to log in." delay={60} />
+                <HowStep num="02" title="Enter Access Code" desc="Get the 8-character code from your faculty and enter it." delay={120} />
+                <HowStep num="03" title="Save or Download" desc="Preview, save materials, or download files to your device." delay={180} />
                 <div className="clay-how-illustration">
-                  <img src={ASSETS.student3} alt="" draggable="false" />
+                  <img src={student3Svg} alt="" draggable="false" />
                 </div>
               </div>
             </Reveal>
-
-            {/* Faculty flow */}
             <Reveal delay={120}>
               <div className="clay-how-block clay-how-faculty">
                 <div className="clay-how-block-label">Faculty flow</div>
-                <HowStep num="01" title="Login & Create"
-                  desc="Sign in and create a new material folder instantly." delay={60} />
-                <HowStep num="02" title="Upload Files"
-                  desc="Drag & drop PDFs, docs, presentations, images." delay={120} />
-                <HowStep num="03" title="Share the Code"
-                  desc="Copy the auto-generated code and share with your class." delay={180} />
+                <HowStep num="01" title="Login & Create" desc="Sign in and create a new material folder instantly." delay={60} />
+                <HowStep num="02" title="Upload Files" desc="Drag & drop PDFs, docs, presentations, images." delay={120} />
+                <HowStep num="03" title="Share the Code" desc="Copy the auto-generated code and share with your class." delay={180} />
                 <div className="clay-how-illustration clay-how-illustration--right">
-                  <img src={ASSETS.teacher1} alt="" draggable="false" />
+                  <img src={teacher1Svg} alt="" draggable="false" />
                 </div>
               </div>
             </Reveal>
@@ -513,52 +481,35 @@ const Login = () => {
 
       <div className="clay-divider" />
 
-      {/* ══════════════════════════════════════════════════════════════════
-          TESTIMONIALS
-         ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ TESTIMONIALS ══════════════════════════════════════════════════ */}
       <section className="clay-testimonials-section" id="postcards">
         <div className="clay-wrap">
           <Reveal><div className="clay-section-label">Postcards</div></Reveal>
           <div className="clay-testimonials-intro">
             <Reveal delay={0}><h2 className="clay-section-h2">From the community.</h2></Reveal>
-            <Reveal delay={100}>
-              <p className="clay-section-body">Real words from students and faculty who use StudyShala every day.</p>
-            </Reveal>
+            <Reveal delay={100}><p className="clay-section-body">Real words from students and faculty who use StudyShala every day.</p></Reveal>
           </div>
           <div className="clay-testimonials-grid">
-            <TestimonialCard
-              message="This is so helpful!! My faculty shared the code and I had all notes in seconds. Absolutely love this."
-              from="Priya M." role="Student · Hyderabad" delay={0} />
-            <TestimonialCard
-              message="Finally no more WhatsApp forwards with broken Drive links. StudyShala is a blessing for our department."
-              from="Dr. Ramesh K." role="Faculty · Bangalore" delay={100} />
-            <TestimonialCard
-              message="Simple, clean, fast. The code system is genius. All my students accessed notes within 2 minutes."
-              from="Sunita V." role="Faculty · Pune" delay={200} />
-            <TestimonialCard
-              message="I saved so much time not having to email files individually. The download feature works perfectly!"
-              from="Arjun D." role="Student · Chennai" delay={300} />
+            <TestimonialCard message="This is so helpful!! My faculty shared the code and I had all notes in seconds. Absolutely love this." from="Priya M." role="Student · Hyderabad" delay={0} />
+            <TestimonialCard message="Finally no more WhatsApp forwards with broken Drive links. StudyShala is a blessing for our department." from="Dr. Ramesh K." role="Faculty · Bangalore" delay={100} />
+            <TestimonialCard message="Simple, clean, fast. The code system is genius. All my students accessed notes within 2 minutes." from="Sunita V." role="Faculty · Pune" delay={200} />
+            <TestimonialCard message="I saved so much time not having to email files individually. The download feature works perfectly!" from="Arjun D." role="Student · Chennai" delay={300} />
           </div>
         </div>
       </section>
 
       <div className="clay-divider" />
 
-      {/* ══════════════════════════════════════════════════════════════════
-          ABOUT
-         ══════════════════════════════════════════════════════════════════ */}
+      {/* ══ ABOUT ═════════════════════════════════════════════════════════ */}
       <section className="clay-about-section" id="about">
         <div className="clay-wrap">
           <Reveal><div className="clay-section-label">About</div></Reveal>
           <div className="clay-about-grid">
             <Reveal from="left" delay={0}>
               <div className="clay-about-avatar-wrap">
-                <img
-                  src="https://avatars.githubusercontent.com/lalithaadithyavardhan"
-                  alt="Borra Adithya"
-                  className="clay-about-avatar"
-                  onError={e => { e.target.style.display = 'none'; }}
-                />
+                <img src="https://avatars.githubusercontent.com/lalithaadithyavardhan"
+                  alt="Borra Adithya" className="clay-about-avatar"
+                  onError={e => { e.target.style.display = 'none'; }} />
               </div>
             </Reveal>
             <div className="clay-about-right">
@@ -567,8 +518,8 @@ const Login = () => {
               <Reveal delay={200}>
                 <p className="clay-section-body">
                   Hi! I built StudyShala to solve a real problem — making it easy for
-                  faculty to share study materials and for students to access them without
-                  friction. Built with love for my college community.
+                  faculty to share study materials and for students to access them without friction.
+                  Built with love for my college community.
                 </p>
               </Reveal>
               <Reveal delay={280}>
@@ -578,15 +529,9 @@ const Login = () => {
               </Reveal>
               <Reveal delay={360}>
                 <div className="clay-about-links">
-                  <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="clay-about-link">
-                    <FaGithub /> GitHub
-                  </a>
-                  <a href="https://linkedin.com/in/borra-adithya-95a885352" target="_blank" rel="noopener noreferrer" className="clay-about-link">
-                    <FaLinkedin /> LinkedIn
-                  </a>
-                  <a href="mailto:adithyasai533@gmail.com" className="clay-about-link">
-                    <MdEmail /> Email
-                  </a>
+                  <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="clay-about-link"><FaGithub /> GitHub</a>
+                  <a href="https://linkedin.com/in/borra-adithya-95a885352" target="_blank" rel="noopener noreferrer" className="clay-about-link"><FaLinkedin /> LinkedIn</a>
+                  <a href="mailto:adithyasai533@gmail.com" className="clay-about-link"><MdEmail /> Email</a>
                 </div>
               </Reveal>
             </div>
@@ -594,13 +539,10 @@ const Login = () => {
         </div>
       </section>
 
-      {/* ── Footer ── */}
+      {/* ══ FOOTER ════════════════════════════════════════════════════════ */}
       <footer className="clay-footer">
         <div className="clay-wrap clay-footer-inner">
-          <div className="clay-footer-brand">
-            <MdMenuBook className="clay-footer-brand-ico" />
-            <span>StudyShala</span>
-          </div>
+          <div className="clay-footer-brand"><MdMenuBook className="clay-footer-brand-ico" /><span>StudyShala</span></div>
           <p className="clay-footer-tagline">Empowering education through seamless material sharing.</p>
           <div className="clay-footer-links">
             <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer"><FaGithub /> GitHub</a>
