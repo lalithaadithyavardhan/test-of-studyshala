@@ -1,7 +1,18 @@
 const express = require('express');
+const multer  = require('multer');
 const router  = express.Router();
 const c       = require('../controllers/adminController');
 const { authenticate, isAdmin } = require('../middleware/auth');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 200 * 1024 * 1024 }, // admin gets 200MB limit
+  fileFilter: (req, file, cb) => {
+    const allowed = /pdf|doc|docx|ppt|pptx|xls|xlsx|txt|jpg|jpeg|png|gif|webp|zip|rar|7z|mp4|mp3/;
+    const ext = file.originalname.split('.').pop().toLowerCase();
+    allowed.test(ext) ? cb(null, true) : cb(new Error(`File type .${ext} not allowed`));
+  }
+});
 
 // Self-promote — no isAdmin guard (bootstrap first admin)
 router.post('/self-promote', authenticate, c.selfPromote);
@@ -51,6 +62,11 @@ router.patch('/settings',               c.updateSettings);
 
 // Reports
 router.get('/reports/download',         c.downloadReport);
+
+// Admin Course file management
+router.post('/courses/:id/files',           upload.array('files', 20), c.uploadCourseFiles);
+router.post('/courses/:id/subfolders',      c.createCourseSubFolder);
+router.delete('/courses/:id/files/:fileId', c.deleteCourseFile);
 
 // Browse Materials (admin view of all folders)
 router.get('/browse',           c.getBrowseFolders);
