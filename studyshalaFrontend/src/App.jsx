@@ -14,15 +14,14 @@ import StudentEnterCode from './pages/StudentEnterCode';
 import StudentMaterialAccess from './pages/StudentMaterialAccess';
 import StudentSavedMaterials from './pages/StudentSavedMaterials';
 import StudentHistory from './pages/StudentHistory';
+import StudentStarred from './pages/StudentStarred';
 
 // Admin
 import AdminDashboard from './pages/AdminDashboard';
 
-// Student extras
-import StudentStarred from './pages/StudentStarred';
-
-// NEW: File Explorer
+// Shared pages
 import BrowseMaterials from './pages/BrowseMaterials';
+import AdminCoursesView from './pages/AdminCoursesView';
 
 import './styles/global.css';
 
@@ -89,10 +88,17 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      {/* NEW: Browse Materials — accessible by all roles */}
+      {/* Browse Materials — all roles */}
       <Route path="/browse-materials" element={
         <ProtectedRoute allowedRoles={['student', 'faculty', 'admin']}>
           <BrowseMaterials />
+        </ProtectedRoute>
+      } />
+
+      {/* Admin Courses — visible to all logged-in users */}
+      <Route path="/admin-courses" element={
+        <ProtectedRoute allowedRoles={['student', 'faculty', 'admin']}>
+          <AdminCoursesView />
         </ProtectedRoute>
       } />
 
