@@ -3,8 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import {
-  MdSunny,
-  MdNightlight,
   MdKeyboardArrowDown,
   MdLogout,
   MdPerson
@@ -13,16 +11,9 @@ import './Navbar.css';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const navigate         = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
-  const [isDarkMode, setIsDarkMode]     = useState(false);
   const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const darkMode = localStorage.getItem('darkMode') === 'true';
-    setIsDarkMode(darkMode);
-    if (darkMode) document.body.classList.add('dark-mode');
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -33,13 +24,6 @@ const Navbar = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const toggleDarkMode = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    localStorage.setItem('darkMode', newMode);
-    document.body.classList.toggle('dark-mode');
-  };
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout'); } catch { /* ignore */ }
@@ -53,14 +37,12 @@ const Navbar = () => {
         <h1 className="navbar-title">StudyShala</h1>
 
         <div className="navbar-actions">
-          {/* Dark mode toggle */}
-          <button className="theme-toggle" onClick={toggleDarkMode} aria-label="Toggle dark mode">
-            {isDarkMode ? <MdSunny /> : <MdNightlight />}
-          </button>
-
           {/* Profile dropdown */}
           <div className="profile-dropdown" ref={dropdownRef}>
-            <button className="profile-button" onClick={() => setShowDropdown(!showDropdown)}>
+            <button
+              className="profile-button"
+              onClick={() => setShowDropdown(!showDropdown)}
+            >
               <div className="profile-avatar">
                 {user?.profilePicture ? (
                   <img src={user.profilePicture} alt={user.name} className="profile-avatar-img" />
@@ -91,7 +73,10 @@ const Navbar = () => {
                   </div>
                 </div>
                 <hr className="dropdown-divider" />
-                <button className="dropdown-item dropdown-item--danger" onClick={handleLogout}>
+                <button
+                  className="dropdown-item dropdown-item--danger"
+                  onClick={handleLogout}
+                >
                   <MdLogout /> Logout
                 </button>
               </div>
