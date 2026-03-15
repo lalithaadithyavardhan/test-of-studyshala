@@ -303,3 +303,7 @@ body.dark-mode .activity-metric p {
   .ad-feedback-grid { grid-template-columns:1fr; }
   .ad-settings-layout { grid-template-columns:1fr; }
 }
+
+/* ── Alert overlap fix ─────────────────────────────────── */
+/* Reset default margin-bottom so the wrapper gap controls spacing */
+.page-container > div > .alert { margin-bottom: 0; }
