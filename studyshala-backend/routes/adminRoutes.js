@@ -52,4 +52,8 @@ router.patch('/settings',               c.updateSettings);
 // Reports
 router.get('/reports/download',         c.downloadReport);
 
+// Browse Materials (admin view of all folders)
+router.get('/browse',           c.getBrowseFolders);
+router.get('/browse/:id',       c.getBrowseFolder);
+
 module.exports = router;
