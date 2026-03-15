@@ -92,23 +92,14 @@ const SectionReveal = ({ children, className = '' }) => {
   );
 };
 
-/* Animated stat counter */
+/* Animated stat counter — FIX: no clay-reveal so stats always display regardless of scroll timing */
 const StatItem = ({ value, label }) => {
-  const [visible, setVisible] = useState(false);
   // value === null means still loading
   const isLoading = value === null || value === undefined;
-  const count = useCounter(isLoading ? 0 : value, 2000, visible && !isLoading);
-  const ref = useRef(null);
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) setVisible(true); },
-      { threshold: 0.4 }
-    );
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, []);
+  // Always start counter as soon as value arrives
+  const count = useCounter(isLoading ? 0 : value, 2000, !isLoading);
   return (
-    <div ref={ref} className="clay-stat clay-reveal clay-reveal--bottom">
+    <div className="clay-stat">
       <span className="clay-stat-num">
         {isLoading
           ? <span className="clay-stat-loading">—</span>
@@ -262,17 +253,16 @@ const Login = () => {
     let cancelled = false;
 
     const wakeAndFetch = async () => {
-      // Step 1: Record this visit (fire-and-forget, non-blocking)
-      // This also acts as a wake ping — starts the Render backend spinning up
+      // Record this visit (fire-and-forget, also wakes the Render backend)
       api.post('/stats/visit').catch(() => {});
 
-      // Step 2: Fetch stats with exponential backoff
-      // Render free tier takes up to 50s to cold-start, so we retry patiently
-      const DELAYS = [3000, 6000, 10000, 15000, 20000, 25000]; // 6 attempts
+      // FIX: Try immediately first, then retry with backoff if backend is cold-starting
+      const DELAYS = [0, 5000, 10000, 15000, 20000, 25000, 30000]; // first attempt is instant
       for (let i = 0; i < DELAYS.length; i++) {
         if (cancelled) return;
-        // Wait before each attempt (first attempt waits 3s to give backend time to wake)
-        await new Promise(r => setTimeout(r, DELAYS[i]));
+        if (DELAYS[i] > 0) {
+          await new Promise(r => setTimeout(r, DELAYS[i]));
+        }
         if (cancelled) return;
         try {
           const res = await api.get('/stats');
