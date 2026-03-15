@@ -3,10 +3,56 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
-import { MdKey, MdLockOpen, MdFolderOpen, MdHistory } from 'react-icons/md';
+import { MdKey, MdLockOpen, MdFolderOpen, MdHistory, MdCampaign, MdClose } from 'react-icons/md';
 import { ImSpinner8 } from 'react-icons/im';
 import './StudentEnterCode.css';
 
+/* ── Announcement Banner ─────────────────────────────────────────────────────
+   Fetches announcements for the logged-in student and shows them one at a time.
+   Each can be dismissed. Dismissed IDs are stored in sessionStorage so they
+   don't reappear on the same session, but come back on next login.
+────────────────────────────────────────────────────────────────────────────── */
+const AnnouncementBanner = () => {
+  const [announcements, setAnnouncements] = useState([]);
+  const [dismissed,     setDismissed]     = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('dismissed_ann') || '[]'); }
+    catch { return []; }
+  });
+
+  useEffect(() => {
+    api.get('/announcements')
+      .then(res => setAnnouncements(res.data.announcements || []))
+      .catch(() => {});
+  }, []);
+
+  const dismiss = (id) => {
+    const next = [...dismissed, id];
+    setDismissed(next);
+    try { sessionStorage.setItem('dismissed_ann', JSON.stringify(next)); } catch {}
+  };
+
+  const visible = announcements.filter(a => !dismissed.includes(a._id));
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="ann-banner-wrap">
+      {visible.map(a => (
+        <div key={a._id} className="ann-banner">
+          <MdCampaign className="ann-banner-icon" />
+          <div className="ann-banner-body">
+            <span className="ann-banner-title">{a.title}</span>
+            <span className="ann-banner-msg">{a.message}</span>
+          </div>
+          <button className="ann-banner-close" onClick={() => dismiss(a._id)} title="Dismiss">
+            <MdClose />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ── Main Page ───────────────────────────────────────────────────────────────*/
 const StudentEnterCode = () => {
   const navigate    = useNavigate();
   const inputRef    = useRef(null);
@@ -42,8 +88,8 @@ const StudentEnterCode = () => {
   };
 
   const quickLinks = [
-    { icon: <MdFolderOpen />, label: 'Browse Materials', sub: "View your saved materials", path: '/browse-materials' },
-    { icon: <MdHistory />,    label: 'History',          sub: "See codes you've used",    path: '/student/history'  },
+    { icon: <MdFolderOpen />, label: 'Browse Materials', sub: 'View your saved materials', path: '/browse-materials' },
+    { icon: <MdHistory />,    label: 'History',          sub: "See codes you've used",     path: '/student/history'  },
   ];
 
   return (
@@ -52,6 +98,9 @@ const StudentEnterCode = () => {
       <div className="main-content">
         <Navbar />
         <div className={`ec-page ${pageReady ? 'ec-ready' : ''}`}>
+
+          {/* ── Announcement banner — shows at the very top ── */}
+          <AnnouncementBanner />
 
           {/* Hero */}
           <div className="ec-hero">
@@ -85,16 +134,10 @@ const StudentEnterCode = () => {
             )}
 
             <form onSubmit={handleValidate} className="ec-form">
-              {/*
-                FIX: cursor is now set to text on the whole wrapper.
-                The real <input> is visually hidden but covers the entire
-                character-box row so clicks anywhere on it focus the input.
-              */}
               <div
                 className="ec-input-wrap"
                 onClick={() => inputRef.current?.focus()}
               >
-                {/* Visible character boxes */}
                 <div className="ec-input-chars" aria-hidden="true">
                   {Array.from({ length: 8 }).map((_, i) => (
                     <div
@@ -105,8 +148,6 @@ const StudentEnterCode = () => {
                     </div>
                   ))}
                 </div>
-
-                {/* Real input — transparent overlay */}
                 <input
                   ref={inputRef}
                   className="ec-real-input"
