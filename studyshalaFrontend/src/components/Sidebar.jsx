@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  MdMenuBook, MdDashboard, MdLibraryBooks,
+  MdDashboard, MdLibraryBooks,
   MdHistory, MdKey, MdSettings, MdFolderOpen,
   MdChevronLeft, MdChevronRight, MdMenu, MdClose,
   MdInfoOutline, MdStar, MdChatBubbleOutline
@@ -9,6 +9,7 @@ import {
 import { FaGithub, FaLinkedin, FaHeart } from 'react-icons/fa';
 import { ImSpinner8 } from 'react-icons/im';
 import api from '../api/axios';
+import owlLogo from '../assets/logo.svg';
 import './Sidebar.css';
 
 /* ── Feedback Modal ────────────────────────────────────────────────────────── */
@@ -164,7 +165,7 @@ const Sidebar = ({ role }) => {
         <div className="sb-header">
           {!isCollapsed && (
             <div className="sb-brand">
-              <div className="sb-brand-icon"><MdMenuBook /></div>
+              <div className="sb-brand-icon"><img src={owlLogo} alt="StudyShala" style={{ width: '22px', height: '22px', objectFit: 'contain', filter: 'invert(1)' }} /></div>
               <div className="sb-brand-text">
                 <span className="sb-brand-name">StudyShala</span>
                 <span className="sb-role-pill">{roleLabel}</span>
