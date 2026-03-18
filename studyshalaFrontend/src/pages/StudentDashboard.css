@@ -92,3 +92,14 @@ body.dark-mode .active-code-badge { background: #1e3a8a44; border-color: #3b82f6
   .filters-grid  { grid-template-columns: 1fr; }
   .materials-grid { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   STORAGE WIDGET ROW
+   ══════════════════════════════════════════════════════════════ */
+.sd-storage-row {
+  margin-bottom: 1.5rem;
+  max-width: 480px;
+}
+@media (max-width: 600px) {
+  .sd-storage-row { max-width: 100%; }
+}
