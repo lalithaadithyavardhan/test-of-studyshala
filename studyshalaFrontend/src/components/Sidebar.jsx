@@ -211,7 +211,7 @@ const Sidebar = ({ role }) => {
             <>
               {/* ── Storage widget (compact) ── */}
               <div className="sb-storage-wrap">
-                <StorageWidget variant={role === 'student' ? 'student' : 'faculty'} size="compact" />
+                <StorageWidget role={role === 'student' ? 'student' : 'faculty'} size="compact" />
               </div>
 
               {/* ── Feedback button ── */}
