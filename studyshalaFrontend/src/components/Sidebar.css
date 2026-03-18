@@ -671,3 +671,19 @@ body.dark-mode .fb-success-msg { color: #94a3b8; }
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   STORAGE WIDGET — sidebar compact wrapper
+   ══════════════════════════════════════════════════════════════ */
+.sb-storage-wrap {
+  border:        1px solid var(--sb-border);
+  border-radius: 9px;
+  padding:       0.5rem 0.625rem 0.5rem;
+  background:    rgba(45,91,227,0.04);
+  margin-bottom: 0.1rem;
+  transition:    background 0.25s, border-color 0.25s;
+}
+body.dark-mode .sb-storage-wrap {
+  background:   rgba(96,165,250,0.06);
+  border-color: var(--sb-border2);
+}
