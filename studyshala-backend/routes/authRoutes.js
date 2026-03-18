@@ -10,9 +10,14 @@ router.get('/google', (req, res, next) => {
     ? req.query.role : 'student';
 
   passport.authenticate('google', {
-    scope: ['profile', 'email'],
+    scope: [
+      'profile',
+      'email',
+      'https://www.googleapis.com/auth/drive.metadata.readonly'  // needed for Drive quota
+    ],
     state: role,
-    prompt: 'select_account'
+    prompt: 'select_account',
+    accessType: 'offline'   // ensures we get a fresh token each login
   })(req, res, next);
 });
 
