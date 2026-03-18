@@ -317,8 +317,7 @@ const FacultyDashboard = () => {
 
           {/* ── Storage Widgets ── */}
           <div className="fd-storage-row fd-enter" style={{ animationDelay: '340ms' }}>
-            <StorageWidget variant="drive"   size="full" />
-            <StorageWidget variant="faculty" size="full" />
+            <StorageWidget role="faculty" size="full" />
           </div>
 
           {/* ── Alerts ── */}
