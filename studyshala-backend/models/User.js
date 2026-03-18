@@ -44,7 +44,6 @@ const userSchema = new mongoose.Schema({
   semester: String,
   departmentCode: String,  // legacy - current active code
 
-  
   token:               { type: String, default: null },
   googleAccessToken:   { type: String, default: null },  // user's personal Google OAuth token
   
