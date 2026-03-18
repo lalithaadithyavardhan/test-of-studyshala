@@ -207,7 +207,7 @@ const StudentDashboard = () => {
 
           {/* ── Storage Widget ── */}
           <div className="sd-storage-row">
-            <StorageWidget variant="student" size="full" />
+            <StorageWidget role="student" size="full" />
           </div>
 
           {/* Filters */}
