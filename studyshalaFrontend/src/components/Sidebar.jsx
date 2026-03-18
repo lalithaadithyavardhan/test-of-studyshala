@@ -11,6 +11,7 @@ import { ImSpinner8 } from 'react-icons/im';
 import api from '../api/axios';
 import owlLogo from '../assets/logo.svg';
 import './Sidebar.css';
+import StorageWidget from './StorageWidget';
 
 /* ── Feedback Modal ────────────────────────────────────────────────────────── */
 const FeedbackModal = ({ onClose }) => {
@@ -208,6 +209,11 @@ const Sidebar = ({ role }) => {
         <div className="sb-footer">
           {!isCollapsed ? (
             <>
+              {/* ── Storage widget (compact) ── */}
+              <div className="sb-storage-wrap">
+                <StorageWidget variant={role === 'student' ? 'student' : 'faculty'} size="compact" />
+              </div>
+
               {/* ── Feedback button ── */}
               <button className="sb-feedback-btn" onClick={() => setFeedbackOpen(true)}>
                 <MdChatBubbleOutline className="sb-about-icon" />
