@@ -42,14 +42,26 @@ const useCounter = (target, duration = 2000, start = false) => {
   return count;
 };
 
-/* Scroll reveal — fires once when element enters viewport */
+/* Scroll reveal — progressive enhancement only.
+   Elements default to visible. Only add animation class if element
+   starts below the viewport fold (i.e. user actually needs to scroll). */
 const useScrollReveal = (threshold = 0.12) => {
   const ref = useRef(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Already visible (e.g. on re-render) — skip observer
     if (el.classList.contains('is-visible')) return;
+    // Only animate elements that start off-screen (below fold)
+    const rect = el.getBoundingClientRect();
+    const inView = rect.top < window.innerHeight && rect.bottom > 0;
+    if (!inView) {
+      // Off-screen: opt in to animation
+      el.classList.add('clay-anim-ready');
+    } else {
+      // Already in view on load — mark visible immediately, no animation
+      el.classList.add('is-visible');
+      return;
+    }
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -57,7 +69,7 @@ const useScrollReveal = (threshold = 0.12) => {
           obs.unobserve(el);
         }
       },
-      { threshold, rootMargin: '0px 0px -50px 0px' }
+      { threshold, rootMargin: '0px 0px -30px 0px' }
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -83,9 +95,24 @@ const Reveal = ({ children, delay = 0, from = 'bottom', className = '' }) => {
   );
 };
 
-/* Section wrapper with fold-in animation */
+/* Section wrapper — visible by default, animates only if below fold */
 const SectionReveal = ({ children, className = '' }) => {
-  const ref = useScrollReveal(0.08);
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const inView = rect.top < window.innerHeight;
+    if (!inView) {
+      el.classList.add('clay-animate');
+      const obs = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) { el.classList.add('is-visible'); obs.unobserve(el); } },
+        { threshold: 0.06, rootMargin: '0px 0px -30px 0px' }
+      );
+      obs.observe(el);
+      return () => obs.disconnect();
+    }
+  }, []);
   return (
     <div ref={ref} className={`clay-section-reveal ${className}`}>
       {children}
@@ -343,7 +370,7 @@ const Login = () => {
     { icon: <FaFileAlt />,        text: 'Preview and manage all uploaded files' },
   ];
 
-  const navLinks = ['features', 'how', 'stats', 'postcards', 'about'];
+  const navLinks = ['features', 'how', 'stats', 'postcards'];
 
   return (
     <div className={`clay-page ${pageReady ? 'clay-ready' : ''}`}>
@@ -364,6 +391,10 @@ const Login = () => {
                  : id.charAt(0).toUpperCase() + id.slice(1)}
               </a>
             ))}
+            <a href="#signin" className="clay-nav-signin clay-enter"
+              style={{ animationDelay: '330ms' }}>
+              Sign In
+            </a>
           </div>
 <button
             className={`clay-burger ${menuOpen ? 'open' : ''}`}
@@ -382,6 +413,9 @@ const Login = () => {
                  : id.charAt(0).toUpperCase() + id.slice(1)}
               </a>
             ))}
+            <a href="#signin" onClick={() => setMenuOpen(false)} className="clay-mobile-signin">
+              Sign In →
+            </a>
           </div>
         )}
       </nav>
@@ -428,7 +462,7 @@ const Login = () => {
             </div>
 
             {/* Right — login card */}
-            <div className="clay-hero-right clay-enter" style={{ animationDelay: '300ms' }}>
+            <div id="signin" className="clay-hero-right clay-enter" style={{ animationDelay: '300ms' }}>
               <LoginCard
                 selectedRole={selectedRole}
                 setSelectedRole={(r) => { setSelectedRole(r); setError(''); }}
@@ -608,62 +642,11 @@ const Login = () => {
         </section>
       </SectionReveal>
 
-      <div className="clay-divider" />
-
-      {/* ══ ABOUT ═════════════════════════════════════════════════════════ */}
-      <SectionReveal>
-        <section className="clay-about-section" id="about">
-          <div className="clay-wrap">
-            <Reveal><div className="clay-section-label">About</div></Reveal>
-            <div className="clay-about-grid">
-              <Reveal from="left" delay={0}>
-                <div className="clay-about-avatar-wrap">
-                  <img
-                    src="https://avatars.githubusercontent.com/lalithaadithyavardhan"
-                    alt="Borra Adithya"
-                    className="clay-about-avatar"
-                    onError={e => { e.target.style.display = 'none'; }}
-                  />
-                </div>
-              </Reveal>
-              <div className="clay-about-right">
-                <Reveal delay={80}><h2 className="clay-section-h2">Borra Adithya.</h2></Reveal>
-                <Reveal delay={140}><div className="clay-about-role">Student · Developer</div></Reveal>
-                <Reveal delay={200}>
-                  <p className="clay-section-body">
-                    Hi! I built StudyShala to solve a real problem — making it easy for
-                    faculty to share study materials and for students to access them without friction.
-                    Built with love for my college community.
-                  </p>
-                </Reveal>
-                <Reveal delay={280}>
-                  <blockquote className="clay-about-quote">
-                    "StudyShala is free, ad-free, and will always remain so.
-                    If it helps even one student, that's all the reward I need."
-                  </blockquote>
-                </Reveal>
-                <Reveal delay={360}>
-                  <div className="clay-about-links">
-                    <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer" className="clay-about-link">
-                      <FaGithub /> GitHub
-                    </a>
-                    <a href="https://linkedin.com/in/borra-adithya-95a885352" target="_blank" rel="noopener noreferrer" className="clay-about-link">
-                      <FaLinkedin /> LinkedIn
-                    </a>
-                    <a href="mailto:adithyasai533@gmail.com" className="clay-about-link">
-                      <MdEmail /> Email
-                    </a>
-                  </div>
-                </Reveal>
-              </div>
-            </div>
-          </div>
-        </section>
-      </SectionReveal>
-
       {/* ══ FOOTER ════════════════════════════════════════════════════════ */}
-      <footer className="clay-footer">
+      <footer className="clay-footer" id="about">
         <div className="clay-wrap clay-footer-inner">
+
+          {/* Brand */}
           <div className="clay-footer-brand">
             <img src={owlLogo} alt="StudyShala" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
             <span>StudyShala</span>
@@ -671,6 +654,21 @@ const Login = () => {
           <p className="clay-footer-tagline">
             Empowering education through seamless material sharing.
           </p>
+
+          {/* About — no photo, just text */}
+          <div className="clay-footer-about">
+            <div className="clay-footer-about-name">Borra Adithya</div>
+            <div className="clay-footer-about-meta">Student · Developer</div>
+            <p className="clay-footer-about-bio">
+              Built StudyShala to make it easy for faculty to share study materials
+              and for students to access them without friction — free, ad-free, always.
+            </p>
+            <blockquote className="clay-footer-quote">
+              "If it helps even one student, that's all the reward I need."
+            </blockquote>
+          </div>
+
+          {/* Links */}
           <div className="clay-footer-links">
             <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer">
               <FaGithub /> GitHub
@@ -680,6 +678,7 @@ const Login = () => {
             </a>
             <a href="mailto:adithyasai533@gmail.com"><MdEmail /> Email</a>
           </div>
+
           <div className="clay-footer-bottom">
             <span>© {new Date().getFullYear()} StudyShala · Built by Borra Adithya</span>
             <span>Made with <FaHeart className="clay-footer-heart" /> for the community</span>
