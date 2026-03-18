@@ -9,7 +9,6 @@ import Input from '../components/Input';
 import Modal from '../components/Modal';
 import { MdKey, MdBook, MdFolder, MdBookmark } from 'react-icons/md';
 import './StudentDashboard.css';
-import StorageWidget from '../components/StorageWidget';
 
 const StudentDashboard = () => {
   const { user } = useAuth();
@@ -204,11 +203,6 @@ const StudentDashboard = () => {
           </div>
 
           {error && <div className="alert alert-error" style={{marginBottom:'1rem'}}>{error}</div>}
-
-          {/* ── Storage Widget ── */}
-          <div className="sd-storage-row">
-            <StorageWidget role="student" size="full" />
-          </div>
 
           {/* Filters */}
           <Card title="🔍 Filter Materials">
