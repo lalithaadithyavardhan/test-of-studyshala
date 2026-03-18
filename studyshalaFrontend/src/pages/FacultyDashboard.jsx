@@ -17,7 +17,6 @@ import {
 } from 'react-icons/md';
 import { ImSpinner8 } from 'react-icons/im';
 import './FacultyDashboard.css';
-import StorageWidget from '../components/StorageWidget';
 
 // ── Scroll-reveal wrapper ────────────────────────────────────────────────────
 const Reveal = ({ children, delay = 0, direction = 'bottom' }) => {
@@ -316,10 +315,6 @@ const FacultyDashboard = () => {
           </div>
 
           {/* ── Storage Widgets ── */}
-          <div className="fd-enter" style={{ animationDelay: '340ms', marginBottom: '1.75rem' }}>
-            <StorageWidget role="faculty" size="full" />
-          </div>
-
           {/* ── Alerts ── */}
           {error   && <div className="fd-alert fd-alert--err fd-enter"><span>⚠</span> {error}</div>}
           {success && <div className="fd-alert fd-alert--ok  fd-enter"><span>✓</span> {success}</div>}
