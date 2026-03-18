@@ -3,7 +3,6 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
 const logger = require('../utils/logger');
 
-
 passport.use(
   new GoogleStrategy(
     {
@@ -39,7 +38,6 @@ passport.use(
             user.role = chosenRole;
           }
           user.lastLogin = new Date();
-          user.googleAccessToken = accessToken;  // store fresh token each login
           await user.save();
           logger.info(`Login: ${email} as ${user.role}`);
           return done(null, user);
@@ -52,8 +50,7 @@ passport.use(
           email:             profile.emails[0].value,
           role:              chosenRole,
           profilePicture:    profile.photos[0]?.value,
-          lastLogin:         new Date(),
-          googleAccessToken: accessToken   // store on first login
+          lastLogin:      new Date()
         });
         await user.save();
         logger.info(`New user: ${email} as ${chosenRole}`);
