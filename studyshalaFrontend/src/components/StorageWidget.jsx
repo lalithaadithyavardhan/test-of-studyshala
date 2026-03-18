@@ -1,19 +1,28 @@
 /**
- * StorageWidget.jsx
- * =================
- * Three widget variants driven by the `variant` prop:
+ * StorageWidget.jsx  v2
+ * =====================
+ * Shows two independent storage bars for any logged-in user:
  *
- *  "drive"    — Platform-wide Google Drive quota bar (faculty / admin)
- *  "faculty"  — Faculty's own upload footprint from MongoDB
- *  "student"  — Student's saved-materials footprint from MongoDB
+ *  Bar 1 — "My Google Drive"
+ *    Source: /api/storage/my-drive  (calls Drive API with user's own token)
+ *    Shows:  total Drive usage / quota (e.g. 2.3 GB of 15 GB)
+ *            with a second thin sub-bar showing Gmail+Photos portion
+ *
+ *  Bar 2 — "StudyShala Usage"
+ *    Source: /api/storage/my-studyshala  (MongoDB aggregation)
+ *    Faculty: how many MB they've uploaded to StudyShala
+ *    Student: how many MB are in their saved materials
  *
  * Size prop:
- *  "full"     — full card for dashboards (default)
- *  "compact"  — slim bar for the sidebar footer
+ *   "full"    — full two-bar card for dashboards
+ *   "compact" — slim single-line bar for sidebar footer
  */
 
 import { useState, useEffect } from 'react';
-import { MdCloudQueue, MdUpload, MdBookmark, MdRefresh } from 'react-icons/md';
+import {
+  MdCloudQueue, MdUploadFile, MdBookmarkAdded,
+  MdRefresh, MdWarningAmber, MdLogout
+} from 'react-icons/md';
 import { ImSpinner8 } from 'react-icons/im';
 import api from '../api/axios';
 import './StorageWidget.css';
@@ -23,219 +32,293 @@ import './StorageWidget.css';
 const fmtBytes = (bytes) => {
   if (!bytes || bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i     = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   return (bytes / 1024 ** i).toFixed(i >= 2 ? 1 : 0) + ' ' + units[i];
 };
 
 const pct = (used, total) => {
-  if (!total) return 0;
+  if (!total || total === 0) return 0;
   return Math.min(Math.round((used / total) * 100), 100);
 };
 
-// Colour ramp: green → amber → red
-const barColor = (percent) => {
+const barColorClass = (percent) => {
   if (percent < 60) return 'sw-bar--green';
   if (percent < 85) return 'sw-bar--amber';
   return 'sw-bar--red';
 };
 
-// ── Config per variant ────────────────────────────────────────────────────────
+// ── Shared fetch hook ─────────────────────────────────────────────────────────
 
-const VARIANTS = {
-  drive: {
-    endpoint:    '/storage',
-    icon:        <MdCloudQueue />,
-    title:       'Platform Drive',
-    subtitle:    'Shared Google Drive space',
-    getUsed:     (d) => d.usageInDrive,
-    getTotal:    (d) => d.limit,
-    statLabel:   (d) => `${fmtBytes(d.usageInDrive)} used of ${fmtBytes(d.limit)}`,
-    extraStats:  (d) => d.usage !== d.usageInDrive
-      ? [{ label: 'Total Google usage', value: fmtBytes(d.usage) }]
-      : [],
-  },
-  faculty: {
-    endpoint:    '/storage/faculty-footprint',
-    icon:        <MdUpload />,
-    title:       'Your Uploads',
-    subtitle:    'Files you\'ve uploaded to StudyShala',
-    getUsed:     (d) => d.totalBytes,
-    getTotal:    () => null,   // no hard cap — show absolute numbers
-    statLabel:   (d) => fmtBytes(d.totalBytes),
-    extraStats:  (d) => [
-      { label: 'Files uploaded',    value: d.totalFiles    },
-      { label: 'Materials created', value: d.totalMaterials },
-    ],
-  },
-  student: {
-    endpoint:    '/storage/student-footprint',
-    icon:        <MdBookmark />,
-    title:       'Saved Materials',
-    subtitle:    'Size of your saved study materials',
-    getUsed:     (d) => d.totalBytes,
-    getTotal:    () => null,
-    statLabel:   (d) => fmtBytes(d.totalBytes),
-    extraStats:  (d) => [
-      { label: 'Files accessible',   value: d.totalFiles    },
-      { label: 'Materials saved',    value: d.totalMaterials },
-    ],
-  },
-};
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
-const StorageWidget = ({ variant = 'drive', size = 'full' }) => {
+const useFetch = (endpoint) => {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
-  const cfg = VARIANTS[variant];
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError('');
+  const fetch_ = async () => {
+    setLoading(true); setError('');
     try {
-      const res = await api.get(cfg.endpoint);
+      const res = await api.get(endpoint);
       setData(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not load storage info');
+      setError(err.response?.data?.message || 'Failed to load');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, [variant]);
+  useEffect(() => { fetch_(); }, [endpoint]);
+  return { data, loading, error, refetch: fetch_ };
+};
 
-  const used    = data ? cfg.getUsed(data)  : 0;
-  const total   = data ? cfg.getTotal(data) : null;
-  const percent = total ? pct(used, total)  : null;
-  const barCls  = percent !== null ? barColor(percent) : 'sw-bar--green';
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-  // ── Compact sidebar variant ──────────────────────────────────────────────
+// A single progress bar row
+const BarRow = ({ label, used, total, loading, colorClass, subUsed, subLabel }) => {
+  const percent    = pct(used, total);
+  const subPercent = subUsed != null ? pct(subUsed, total) : null;
+
+  return (
+    <div className="sw-row">
+      <div className="sw-row-header">
+        <span className="sw-row-label">{label}</span>
+        <span className="sw-row-stat">
+          {loading
+            ? <ImSpinner8 className="sw-spin sw-spin--sm" />
+            : total
+              ? <><strong>{fmtBytes(used)}</strong> of {fmtBytes(total)} — {percent}%</>
+              : <strong>{fmtBytes(used)}</strong>
+          }
+        </span>
+      </div>
+
+      {/* Main bar */}
+      <div className="sw-track">
+        <div
+          className={`sw-fill sw-fill--animated ${colorClass}`}
+          style={{ width: loading ? '0%' : (total ? `${percent}%` : '100%'),
+                   opacity: total ? 1 : 0.25 }}
+        />
+        {/* Sub-portion marker (e.g. Gmail+Photos within total Drive) */}
+        {subPercent != null && !loading && total && (
+          <div
+            className="sw-fill sw-fill--sub"
+            style={{ width: `${subPercent}%` }}
+            title={`${subLabel}: ${fmtBytes(subUsed)}`}
+          />
+        )}
+      </div>
+
+      {/* Sub-label */}
+      {subUsed != null && !loading && total && (
+        <div className="sw-row-sublabel">
+          <span className="sw-sub-dot" /> {subLabel}: {fmtBytes(subUsed)}
+          <span style={{ marginLeft: 'auto' }}>
+            Drive files only: {fmtBytes(used - (subUsed || 0))}
+          </span>
+        </div>
+      )}
+
+      {percent >= 85 && !loading && total && (
+        <div className={`sw-alert ${percent >= 95 ? 'sw-alert--red' : 'sw-alert--amber'}`}>
+          <MdWarningAmber />
+          {percent >= 95 ? 'Drive almost full!' : 'Drive getting full — consider freeing space.'}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
+const StorageWidget = ({ role = 'student', size = 'full' }) => {
+  const drive = useFetch('/storage/my-drive');
+  const ss    = useFetch('/storage/my-studyshala');
+
+  const refetchAll = () => { drive.refetch(); ss.refetch(); };
+
+  // Drive data
+  const driveTotal    = drive.data?.limit         || 0;
+  const driveUsed     = drive.data?.usage          || 0;  // all Google (Drive+Gmail+Photos)
+  const driveFiles    = drive.data?.usageInDrive   || 0;  // Drive files portion
+  const driveTrash    = drive.data?.usageInDriveTrash || 0;
+  const drivePct      = pct(driveUsed, driveTotal);
+  const driveColorCls = barColorClass(drivePct);
+
+  // StudyShala data
+  const ssBytes       = ss.data?.totalBytes    || 0;
+  const ssFiles       = ss.data?.totalFiles    || 0;
+  const ssMaterials   = ss.data?.totalMaterials || 0;
+  const ssLabel       = role === 'student' ? 'Files in saved materials' : 'Files uploaded by you';
+  const ssMtLabel     = role === 'student' ? 'Materials saved'          : 'Materials created';
+
+  const needsRelogin  = drive.data?.needsRelogin;
+
+  // ── COMPACT (sidebar) ─────────────────────────────────────────────────────
   if (size === 'compact') {
+    const isLoading = drive.loading || ss.loading;
+    const drivePctVal = pct(driveUsed, driveTotal);
+
     return (
       <div className="sw sw--compact">
+        {/* Row 1: Drive */}
         <div className="sw-compact-header">
-          <span className="sw-compact-icon">{cfg.icon}</span>
-          <span className="sw-compact-title">{cfg.title}</span>
-          {loading && <ImSpinner8 className="sw-spin sw-compact-spin" />}
+          <MdCloudQueue className="sw-compact-icon" />
+          <span className="sw-compact-title">My Drive</span>
+          {drive.loading && <ImSpinner8 className="sw-spin sw-compact-spin" />}
         </div>
-
-        {!loading && !error && data && (
+        {!drive.loading && !needsRelogin && drive.data && (
           <>
             <div className="sw-compact-label">
-              {cfg.statLabel(data)}
-              {percent !== null && <span className="sw-compact-pct">{percent}%</span>}
+              {fmtBytes(driveUsed)} / {fmtBytes(driveTotal)}
+              <span className="sw-compact-pct">{drivePctVal}%</span>
             </div>
-            {percent !== null && (
-              <div className="sw-track">
-                <div
-                  className={`sw-fill ${barCls}`}
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-            )}
-            {percent === null && (
-              <div className="sw-track">
-                <div
-                  className="sw-fill sw-bar--green sw-fill--indeterminate"
-                  style={{ width: '100%', opacity: 0.35 }}
-                />
-              </div>
-            )}
+            <div className="sw-track">
+              <div className={`sw-fill ${driveColorCls}`} style={{ width: `${drivePctVal}%` }} />
+            </div>
           </>
         )}
+        {!drive.loading && needsRelogin && (
+          <div className="sw-compact-error">Re-login to see quota</div>
+        )}
 
-        {!loading && error && (
-          <div className="sw-compact-error">{error}</div>
+        {/* Row 2: StudyShala */}
+        <div className="sw-compact-header" style={{ marginTop: '0.45rem' }}>
+          {role === 'student'
+            ? <MdBookmarkAdded className="sw-compact-icon" />
+            : <MdUploadFile    className="sw-compact-icon" />}
+          <span className="sw-compact-title">
+            {role === 'student' ? 'Saved' : 'Uploaded'} on StudyShala
+          </span>
+          {ss.loading && <ImSpinner8 className="sw-spin sw-compact-spin" />}
+        </div>
+        {!ss.loading && ss.data && (
+          <>
+            <div className="sw-compact-label">{fmtBytes(ssBytes)}</div>
+            <div className="sw-track">
+              <div className="sw-fill sw-bar--green sw-fill--indeterminate"
+                style={{ width: '100%', opacity: 0.3 }} />
+            </div>
+          </>
         )}
       </div>
     );
   }
 
-  // ── Full dashboard card ──────────────────────────────────────────────────
+  // ── FULL dashboard card ───────────────────────────────────────────────────
   return (
     <div className="sw sw--full">
+
+      {/* Header */}
       <div className="sw-head">
         <div className="sw-head-left">
-          <span className="sw-icon">{cfg.icon}</span>
+          <MdCloudQueue className="sw-icon" />
           <div>
-            <div className="sw-title">{cfg.title}</div>
-            <div className="sw-subtitle">{cfg.subtitle}</div>
+            <div className="sw-title">Storage Overview</div>
+            <div className="sw-subtitle">
+              Your Google Drive · StudyShala usage
+            </div>
           </div>
         </div>
         <button
           className="sw-refresh"
-          onClick={fetchData}
-          disabled={loading}
+          onClick={refetchAll}
+          disabled={drive.loading || ss.loading}
           title="Refresh"
-          aria-label="Refresh storage info"
         >
-          {loading
+          {(drive.loading || ss.loading)
             ? <ImSpinner8 className="sw-spin" />
             : <MdRefresh />}
         </button>
       </div>
 
-      {error && (
-        <div className="sw-error">
-          {error} <button className="sw-error-retry" onClick={fetchData}>Retry</button>
+      {/* Needs re-login notice */}
+      {needsRelogin && (
+        <div className="sw-relogin">
+          <MdLogout className="sw-relogin-icon" />
+          <div>
+            <div className="sw-relogin-title">Drive quota unavailable</div>
+            <div className="sw-relogin-sub">
+              {drive.data?.message || 'Log out and log back in once to enable this.'}
+            </div>
+          </div>
         </div>
       )}
 
-      {!error && (
+      {/* Fetch error */}
+      {drive.error && !needsRelogin && (
+        <div className="sw-error">
+          {drive.error}
+          <button className="sw-error-retry" onClick={drive.refetch}>Retry</button>
+        </div>
+      )}
+
+      {/* ── Bar 1: Personal Google Drive ── */}
+      {!needsRelogin && !drive.error && (
+        <BarRow
+          label="My Google Drive"
+          used={driveUsed}
+          total={driveTotal}
+          loading={drive.loading}
+          colorClass={driveColorCls}
+          subUsed={driveUsed - driveFiles}
+          subLabel="Gmail + Photos"
+        />
+      )}
+
+      {/* Divider */}
+      <div className="sw-divider" />
+
+      {/* ── Bar 2: StudyShala usage ── */}
+      {ss.error && (
+        <div className="sw-error">
+          {ss.error}
+          <button className="sw-error-retry" onClick={ss.refetch}>Retry</button>
+        </div>
+      )}
+
+      {!ss.error && (
         <>
-          {/* Progress bar (only when there's a total) */}
-          {percent !== null && (
-            <div className="sw-bar-wrap">
-              <div className="sw-track sw-track--full">
-                <div
-                  className={`sw-fill ${barCls} sw-fill--animated`}
-                  style={{ width: loading ? '0%' : `${percent}%` }}
-                />
-              </div>
-              <div className="sw-bar-labels">
-                <span className="sw-bar-used">
-                  {loading ? '—' : fmtBytes(used)}
-                </span>
-                <span className="sw-bar-pct">
-                  {loading ? '—' : `${percent}%`}
-                </span>
-                <span className="sw-bar-total">
-                  {loading ? '—' : fmtBytes(total)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Absolute footprint display (no total) */}
-          {percent === null && (
-            <div className="sw-absolute">
-              <span className="sw-absolute-num">
-                {loading ? <ImSpinner8 className="sw-spin" /> : fmtBytes(used)}
+          <div className="sw-row">
+            <div className="sw-row-header">
+              <span className="sw-row-label">
+                {role === 'student'
+                  ? '📚 StudyShala — Saved Materials'
+                  : '📤 StudyShala — Your Uploads'}
               </span>
-              <span className="sw-absolute-label">stored on StudyShala</span>
+              <span className="sw-row-stat">
+                {ss.loading
+                  ? <ImSpinner8 className="sw-spin sw-spin--sm" />
+                  : <strong>{fmtBytes(ssBytes)}</strong>}
+              </span>
             </div>
-          )}
 
-          {/* Extra stat pills */}
-          {!loading && data && cfg.extraStats(data).length > 0 && (
+            {/* Purely informational bar — no hard cap, shows filled */}
+            <div className="sw-track">
+              {ss.loading
+                ? <div className="sw-fill sw-bar--green" style={{ width: '0%' }} />
+                : <div className="sw-fill sw-bar--green sw-fill--animated"
+                       style={{ width: ssBytes > 0 ? '100%' : '0%', opacity: ssBytes > 0 ? 0.6 : 0.15 }} />
+              }
+            </div>
+          </div>
+
+          {/* Stat pills */}
+          {!ss.loading && ss.data && (
             <div className="sw-stats">
-              {cfg.extraStats(data).map((s) => (
-                <div key={s.label} className="sw-stat">
-                  <span className="sw-stat-val">{s.value}</span>
-                  <span className="sw-stat-lbl">{s.label}</span>
+              <div className="sw-stat">
+                <span className="sw-stat-val">{ssFiles}</span>
+                <span className="sw-stat-lbl">{ssLabel}</span>
+              </div>
+              <div className="sw-stat">
+                <span className="sw-stat-val">{ssMaterials}</span>
+                <span className="sw-stat-lbl">{ssMtLabel}</span>
+              </div>
+              {driveTotal > 0 && !drive.loading && !needsRelogin && (
+                <div className="sw-stat">
+                  <span className="sw-stat-val">{fmtBytes(driveTotal - driveUsed)}</span>
+                  <span className="sw-stat-lbl">Drive free space</span>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Warning when Drive is nearly full */}
-          {!loading && percent !== null && percent >= 85 && (
-            <div className={`sw-alert ${percent >= 95 ? 'sw-alert--red' : 'sw-alert--amber'}`}>
-              {percent >= 95
-                ? '⚠️ Drive almost full! Delete old materials or contact admin.'
-                : '⚡ Drive getting full. Consider cleaning up old materials.'}
+              )}
             </div>
           )}
         </>
