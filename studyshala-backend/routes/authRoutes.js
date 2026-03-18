@@ -13,7 +13,7 @@ router.get('/google', (req, res, next) => {
     scope: [
       'profile',
       'email',
-      'https://www.googleapis.com/auth/drive.metadata.readonly'  // needed for Drive quota
+      'https://www.googleapis.com/auth/drive.file'  // non-restricted scope — still allows about.get() for quota
     ],
     state: role,
     prompt: 'select_account',
