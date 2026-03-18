@@ -343,3 +343,23 @@ body.dark-mode .sw-compact-icon  { color: var(--sb-accent, #60a5fa); }
 body.dark-mode .sw-compact-title { color: var(--sb-ink2, #bae6fd);  }
 body.dark-mode .sw-compact-label { color: var(--sb-ink3, #7dd3fc);  }
 body.dark-mode .sw-compact-pct   { color: var(--sb-accent, #60a5fa); }
+
+/* ── Re-login action button ──────────────────────────────────────────────────  */
+.sw-relogin-btn {
+  background:    #d97706;
+  color:         #fff;
+  border:        none;
+  border-radius: 7px;
+  padding:       0.35rem 0.75rem;
+  font-family:   'Lato', system-ui, sans-serif;
+  font-size:     0.75rem;
+  font-weight:   700;
+  cursor:        pointer;
+  white-space:   nowrap;
+  flex-shrink:   0;
+  transition:    background 0.18s, transform 0.18s;
+}
+.sw-relogin-btn:hover {
+  background: #b45309;
+  transform:  translateY(-1px);
+}
