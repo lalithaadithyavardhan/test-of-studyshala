@@ -92,15 +92,19 @@ html { scroll-behavior: smooth; }
 
 /* ── Scroll reveal — "page fold" per element ────────────────────────────── */
 .clay-reveal {
-  opacity: 0;
+  /* Default visible — animation is progressive enhancement */
+  opacity: 1;
+  transform: none;
   transition: opacity .7s cubic-bezier(0.16, 1, 0.3, 1),
               transform .7s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: opacity, transform;
 }
-.clay-reveal--bottom { transform: translateY(40px); }
-.clay-reveal--left   { transform: translateX(-40px); }
-.clay-reveal--right  { transform: translateX(40px); }
-.clay-reveal.is-visible { opacity: 1; transform: none; }
+/* Only animate when JS has loaded and element is below fold */
+.clay-reveal.clay-anim-ready { opacity: 0; }
+.clay-reveal.clay-anim-ready.clay-reveal--bottom { transform: translateY(40px); }
+.clay-reveal.clay-anim-ready.clay-reveal--left   { transform: translateX(-40px); }
+.clay-reveal.clay-anim-ready.clay-reveal--right  { transform: translateX(40px); }
+.clay-reveal.clay-anim-ready.is-visible { opacity: 1; transform: none; }
 
 /* ── Divider ───────────────────────────────────────────────────────────── */
 .clay-divider {
@@ -285,13 +289,19 @@ html { scroll-behavior: smooth; }
 
 /* Section fold-in animation — wraps each full section */
 .clay-section-reveal {
-  opacity: 0;
-  transform: translateY(48px) scale(0.985);
+  /* Default: fully visible — JS scroll animation is progressive enhancement only */
+  opacity: 1;
+  transform: none;
   transition:
     opacity .9s cubic-bezier(0.16, 1, 0.3, 1),
     transform .9s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.clay-section-reveal.is-visible {
+/* JS adds .clay-animate class to opt-in to animation */
+.clay-section-reveal.clay-animate {
+  opacity: 0;
+  transform: translateY(48px) scale(0.985);
+}
+.clay-section-reveal.clay-animate.is-visible {
   opacity: 1;
   transform: none;
 }
@@ -788,14 +798,14 @@ html { scroll-behavior: smooth; }
 
 .clay-how-illustration {
   position: absolute;
-  bottom: -12px; right: -16px;
-  width: 120px;
-  opacity: .12;
+  bottom: -8px; right: -8px;
+  width: 100px;
+  opacity: .10;
   pointer-events: none;
   user-select: none;
 }
-.clay-how-illustration--right { right: -8px; }
-.clay-how-illustration img { width: 100%; object-fit: contain; }
+.clay-how-illustration--right { right: -4px; bottom: -8px; }
+.clay-how-illustration img { width: 100%; height: auto; object-fit: contain; display: block; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    TESTIMONIALS  (#F0EEEC — warm white)
@@ -1030,6 +1040,78 @@ html { scroll-behavior: smooth; }
   animation: claySpin .85s linear infinite;
 }
 
+
+/* Nav Sign In CTA */
+.clay-nav-signin {
+  text-decoration: none;
+  font-size: .85rem;
+  font-weight: 800;
+  color: var(--cta-text);
+  background: var(--cta);
+  padding: .42rem 1.1rem;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-sm);
+  transition: transform .2s var(--ease-spring), box-shadow .2s;
+  white-space: nowrap;
+}
+.clay-nav-signin:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+/* Mobile Sign In CTA */
+.clay-mobile-signin {
+  display: block;
+  margin-top: .5rem;
+  padding: .875rem .5rem !important;
+  font-weight: 800 !important;
+  color: var(--ink) !important;
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  text-align: center;
+}
+
+/* Footer about — no photo */
+.clay-footer-about {
+  max-width: 480px;
+  text-align: center;
+  padding: 1.5rem 2rem;
+  background: rgba(240,238,236,.06);
+  border: 1px solid rgba(240,238,236,.12);
+  border-radius: var(--r-lg);
+}
+.clay-footer-about-name {
+  font-family: 'Lora', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--bg);
+  margin-bottom: .25rem;
+}
+.clay-footer-about-meta {
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--surface);
+  margin-bottom: .875rem;
+}
+.clay-footer-about-bio {
+  font-size: .85rem;
+  line-height: 1.7;
+  color: rgba(240,238,236,.7);
+  font-weight: 400;
+  margin-bottom: .875rem;
+}
+.clay-footer-quote {
+  font-family: 'Lora', serif;
+  font-style: italic;
+  font-size: .85rem;
+  color: var(--surface);
+  border-left: 3px solid var(--surface);
+  padding: .5rem .875rem;
+  text-align: left;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
 /* ══════════════════════════════════════════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════════════════════════════════════════ */
