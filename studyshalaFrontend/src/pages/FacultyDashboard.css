@@ -680,11 +680,6 @@ body.dark-mode .ann-banner-close:hover { background: #45260044; }
    STORAGE WIDGETS ROW
    ══════════════════════════════════════════════════════════════ */
 .fd-storage-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
   margin-bottom: 1.75rem;
-}
-@media (max-width: 700px) {
-  .fd-storage-row { grid-template-columns: 1fr; }
+  max-width: 600px;
 }
