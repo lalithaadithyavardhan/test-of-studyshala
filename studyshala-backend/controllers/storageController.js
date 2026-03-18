@@ -1,87 +1,53 @@
 /**
- * storageController  v3
- * =====================
+ * storageController  v4 — No user token. No scary consent screen.
+ * =================================================================
  *
- * WHY the previous version failed:
- *   1. OAuth login scope was only ['profile','email'] — no Drive permission granted.
- *      The token was saved but Drive API rejected it with 403/401.
- *   2. We were building the Drive client with GOOGLE_CLIENT_ID (login OAuth app)
- *      which may not have Drive API enabled in Google Cloud Console.
- *
- * THE FIX:
- *   - authRoutes.js now requests 'drive.metadata.readonly' scope at login.
- *   - We build the user Drive client using GOOGLE_DRIVE_CLIENT_ID/SECRET
- *     (the same credentials already proven to work for file uploads).
- *   - If the token is missing or expired → return needsRelogin:true (soft error,
- *     widget shows a friendly message, not a red error box).
+ * DESIGN DECISION:
+ *   All StudyShala files live on ONE shared platform Drive account.
+ *   We use the platform's existing service token (GOOGLE_DRIVE_REFRESH_TOKEN)
+ *   to get quota — the same token already used for uploads/deletes.
+ *   We NEVER ask users for their personal Drive access. No consent screen.
  *
  * Endpoints:
- *   GET /api/storage/my-drive       → personal Google Drive quota (user's token)
- *   GET /api/storage/my-studyshala  → StudyShala-specific usage (MongoDB)
+ *
+ *   GET /api/storage/platform-drive   (faculty + admin only)
+ *     → Platform Drive quota using service account token
+ *     → Shows: total used / limit of the shared Drive
+ *
+ *   GET /api/storage/my-studyshala    (any authenticated user)
+ *     → Faculty: sum of file sizes they've uploaded (MongoDB)
+ *     → Student: sum of file sizes in their saved materials (MongoDB)
+ *     → Pure MongoDB — no Drive API call needed
  */
 
-const { google } = require('googleapis');
-const Folder     = require('../models/Folder');
-const logger     = require('../utils/logger');
+const driveService = require('../services/driveService');
+const Folder       = require('../models/Folder');
+const logger       = require('../utils/logger');
 
-// ── Build a Drive client using the user's OWN access token
-//    but with the Drive API OAuth credentials (these already have Drive API enabled)
-const userDriveClient = (accessToken) => {
-  const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_DRIVE_CLIENT_ID,     // Drive API client (has Drive API enabled)
-    process.env.GOOGLE_DRIVE_CLIENT_SECRET,
-    process.env.GOOGLE_DRIVE_REDIRECT_URI
-  );
-  auth.setCredentials({ access_token: accessToken });
-  return google.drive({ version: 'v3', auth });
-};
-
-// ── 1. Personal Google Drive quota ───────────────────────────────────────────
-exports.getMyDriveStorage = async (req, res) => {
+// ── 1. Platform Drive quota (service account) ─────────────────────────────────
+exports.getPlatformDriveStorage = async (req, res) => {
   try {
-    const token = req.user.googleAccessToken;
-
-    // Token not saved yet → user logged in before this feature was added
-    if (!token) {
-      return res.status(200).json({
-        needsRelogin: true,
-        message: 'Please log out and log back in once to enable Drive quota.'
-      });
+    if (!driveService.enabled) {
+      return res.status(503).json({ message: 'Drive not configured on this server.' });
     }
 
-    const drive = userDriveClient(token);
-    const about = await drive.about.get({ fields: 'storageQuota' });
+    const about = await driveService.drive.about.get({ fields: 'storageQuota' });
     const q     = about.data.storageQuota;
 
     return res.json({
       limit:             parseInt(q.limit             || 0),
-      usage:             parseInt(q.usage             || 0),   // Drive + Gmail + Photos combined
-      usageInDrive:      parseInt(q.usageInDrive      || 0),   // Drive files only
+      usage:             parseInt(q.usage             || 0),
+      usageInDrive:      parseInt(q.usageInDrive      || 0),
       usageInDriveTrash: parseInt(q.usageInDriveTrash || 0),
     });
 
   } catch (err) {
-    const msg = err.message || '';
-    // Token expired or insufficient scope → soft error, don't show red box
-    if (
-      err.code === 401 || err.code === 403 ||
-      msg.includes('invalid_grant') ||
-      msg.includes('Invalid Credentials') ||
-      msg.includes('insufficientPermissions') ||
-      msg.includes('Request had insufficient authentication scopes')
-    ) {
-      logger.warn(`getMyDriveStorage: token issue for ${req.user.email} — ${msg}`);
-      return res.status(200).json({
-        needsRelogin: true,
-        message: 'Please log out and log back in to refresh Drive access.'
-      });
-    }
-    logger.error(`getMyDriveStorage: ${msg}`);
+    logger.error(`getPlatformDriveStorage: ${err.message}`);
     return res.status(500).json({ message: 'Failed to fetch Drive quota' });
   }
 };
 
-// ── 2. StudyShala-specific usage (pure MongoDB — no token needed) ─────────────
+// ── 2. User's personal StudyShala footprint (MongoDB only) ────────────────────
 exports.getMyStudyshalaUsage = async (req, res) => {
   try {
     const role = req.user.role;
@@ -112,6 +78,6 @@ exports.getMyStudyshalaUsage = async (req, res) => {
 
   } catch (err) {
     logger.error(`getMyStudyshalaUsage: ${err.message}`);
-    return res.status(500).json({ message: 'Failed to fetch StudyShala usage' });
+    return res.status(500).json({ message: 'Failed to fetch usage' });
   }
 };
