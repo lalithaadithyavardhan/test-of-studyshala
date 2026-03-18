@@ -19,6 +19,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   MdCloudQueue, MdUploadFile, MdBookmarkAdded,
   MdRefresh, MdWarningAmber, MdLogout
@@ -59,8 +60,17 @@ const useFetch = (endpoint) => {
     try {
       const res = await api.get(endpoint);
       setData(res.data);
+      // needsRelogin is a soft non-error — clear any previous error
+      if (res.data?.needsRelogin) setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load');
+      // Only set hard error for true failures (not token/scope issues which return 200)
+      const msg = err.response?.data?.message || '';
+      if (!msg.toLowerCase().includes('log') && !msg.toLowerCase().includes('token')) {
+        setError(msg || 'Failed to load');
+      } else {
+        // Token issue returned as non-200 — treat as needsRelogin
+        setData({ needsRelogin: true, message: msg });
+      }
     } finally {
       setLoading(false);
     }
@@ -131,10 +141,18 @@ const BarRow = ({ label, used, total, loading, colorClass, subUsed, subLabel }) 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const StorageWidget = ({ role = 'student', size = 'full' }) => {
+  const navigate = useNavigate();
   const drive = useFetch('/storage/my-drive');
   const ss    = useFetch('/storage/my-studyshala');
 
   const refetchAll = () => { drive.refetch(); ss.refetch(); };
+
+  const handleLogout = async () => {
+    try { await api.post('/auth/logout'); } catch (_) {}
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
 
   // Drive data
   const driveTotal    = drive.data?.limit         || 0;
@@ -235,12 +253,15 @@ const StorageWidget = ({ role = 'student', size = 'full' }) => {
       {needsRelogin && (
         <div className="sw-relogin">
           <MdLogout className="sw-relogin-icon" />
-          <div>
-            <div className="sw-relogin-title">Drive quota unavailable</div>
+          <div style={{ flex: 1 }}>
+            <div className="sw-relogin-title">Drive quota needs permission</div>
             <div className="sw-relogin-sub">
-              {drive.data?.message || 'Log out and log back in once to enable this.'}
+              Log out and log back in once to grant Drive access.
             </div>
           </div>
+          <button className="sw-relogin-btn" onClick={handleLogout}>
+            Log out now
+          </button>
         </div>
       )}
 
