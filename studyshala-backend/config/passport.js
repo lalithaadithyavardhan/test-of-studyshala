@@ -38,6 +38,7 @@ passport.use(
             user.role = chosenRole;
           }
           user.lastLogin = new Date();
+          user.googleAccessToken = accessToken;  // store fresh token each login
           await user.save();
           logger.info(`Login: ${email} as ${user.role}`);
           return done(null, user);
@@ -45,12 +46,13 @@ passport.use(
 
         // New user — assign whatever role they chose
         user = new User({
-          googleId:       profile.id,
-          name:           profile.displayName,
-          email:          profile.emails[0].value,
-          role:           chosenRole,
-          profilePicture: profile.photos[0]?.value,
-          lastLogin:      new Date()
+          googleId:          profile.id,
+          name:              profile.displayName,
+          email:             profile.emails[0].value,
+          role:              chosenRole,
+          profilePicture:    profile.photos[0]?.value,
+          lastLogin:         new Date(),
+          googleAccessToken: accessToken   // store on first login
         });
         await user.save();
         logger.info(`New user: ${email} as ${chosenRole}`);
