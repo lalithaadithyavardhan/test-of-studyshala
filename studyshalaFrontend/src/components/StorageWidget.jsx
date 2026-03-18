@@ -1,34 +1,32 @@
 /**
- * StorageWidget.jsx  v2
+ * StorageWidget.jsx  v4
  * =====================
- * Shows two independent storage bars for any logged-in user:
+ * No user token. No scary Google consent screen. Clean and simple.
  *
- *  Bar 1 — "My Google Drive"
- *    Source: /api/storage/my-drive  (calls Drive API with user's own token)
- *    Shows:  total Drive usage / quota (e.g. 2.3 GB of 15 GB)
- *            with a second thin sub-bar showing Gmail+Photos portion
+ * Faculty dashboard shows TWO cards:
+ *   Card 1 — Platform Drive bar  (/api/storage/platform-drive)
+ *            "How full is StudyShala's shared Drive?"
+ *            e.g. 461 MB of 2 TB used — 0%
  *
- *  Bar 2 — "StudyShala Usage"
- *    Source: /api/storage/my-studyshala  (MongoDB aggregation)
- *    Faculty: how many MB they've uploaded to StudyShala
- *    Student: how many MB are in their saved materials
+ *   Card 2 — Your Uploads        (/api/storage/my-studyshala)
+ *            "How much have YOU uploaded to StudyShala?"
+ *            e.g. 10.5 MB across 13 files, 4 materials
  *
- * Size prop:
- *   "full"    — full two-bar card for dashboards
- *   "compact" — slim single-line bar for sidebar footer
+ * Student dashboard shows ONE card:
+ *   Card  — Saved Materials      (/api/storage/my-studyshala)
+ *           "How much space do your saved materials take up?"
+ *           e.g. 32 MB across 8 files, 3 materials saved
+ *
+ * Sidebar compact: slim version of whichever variant is relevant
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  MdCloudQueue, MdUploadFile, MdBookmarkAdded,
-  MdRefresh, MdWarningAmber, MdLogout
-} from 'react-icons/md';
+import { MdCloudQueue, MdUploadFile, MdBookmarkAdded, MdRefresh } from 'react-icons/md';
 import { ImSpinner8 } from 'react-icons/im';
 import api from '../api/axios';
 import './StorageWidget.css';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const fmtBytes = (bytes) => {
   if (!bytes || bytes === 0) return '0 B';
@@ -48,304 +46,208 @@ const barColorClass = (percent) => {
   return 'sw-bar--red';
 };
 
-// ── Shared fetch hook ─────────────────────────────────────────────────────────
+// ── Fetch hook ────────────────────────────────────────────────────────────────
 
 const useFetch = (endpoint) => {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
 
-  const fetch_ = async () => {
+  const load = async () => {
     setLoading(true); setError('');
     try {
       const res = await api.get(endpoint);
       setData(res.data);
-      // needsRelogin is a soft non-error — clear any previous error
-      if (res.data?.needsRelogin) setError('');
     } catch (err) {
-      // Only set hard error for true failures (not token/scope issues which return 200)
-      const msg = err.response?.data?.message || '';
-      if (!msg.toLowerCase().includes('log') && !msg.toLowerCase().includes('token')) {
-        setError(msg || 'Failed to load');
-      } else {
-        // Token issue returned as non-200 — treat as needsRelogin
-        setData({ needsRelogin: true, message: msg });
-      }
+      setError(err.response?.data?.message || 'Failed to load');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetch_(); }, [endpoint]);
-  return { data, loading, error, refetch: fetch_ };
+  useEffect(() => { load(); }, [endpoint]);
+  return { data, loading, error, refetch: load };
 };
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Reusable progress bar ─────────────────────────────────────────────────────
 
-// A single progress bar row
-const BarRow = ({ label, used, total, loading, colorClass, subUsed, subLabel }) => {
-  const percent    = pct(used, total);
-  const subPercent = subUsed != null ? pct(subUsed, total) : null;
-
+const ProgressBar = ({ used, total, loading }) => {
+  const percent  = pct(used, total);
+  const colorCls = barColorClass(percent);
   return (
-    <div className="sw-row">
-      <div className="sw-row-header">
-        <span className="sw-row-label">{label}</span>
-        <span className="sw-row-stat">
-          {loading
-            ? <ImSpinner8 className="sw-spin sw-spin--sm" />
-            : total
-              ? <><strong>{fmtBytes(used)}</strong> of {fmtBytes(total)} — {percent}%</>
-              : <strong>{fmtBytes(used)}</strong>
-          }
-        </span>
-      </div>
-
-      {/* Main bar */}
+    <div className="sw-bar-wrap">
       <div className="sw-track">
         <div
-          className={`sw-fill sw-fill--animated ${colorClass}`}
-          style={{ width: loading ? '0%' : (total ? `${percent}%` : '100%'),
-                   opacity: total ? 1 : 0.25 }}
+          className={`sw-fill sw-fill--animated ${colorCls}`}
+          style={{ width: loading ? '0%' : `${percent}%` }}
         />
-        {/* Sub-portion marker (e.g. Gmail+Photos within total Drive) */}
-        {subPercent != null && !loading && total && (
-          <div
-            className="sw-fill sw-fill--sub"
-            style={{ width: `${subPercent}%` }}
-            title={`${subLabel}: ${fmtBytes(subUsed)}`}
-          />
-        )}
       </div>
-
-      {/* Sub-label */}
-      {subUsed != null && !loading && total && (
-        <div className="sw-row-sublabel">
-          <span className="sw-sub-dot" /> {subLabel}: {fmtBytes(subUsed)}
-          <span style={{ marginLeft: 'auto' }}>
-            Drive files only: {fmtBytes(used - (subUsed || 0))}
-          </span>
-        </div>
-      )}
-
-      {percent >= 85 && !loading && total && (
+      <div className="sw-bar-labels">
+        <span className="sw-bar-used">{loading ? '—' : fmtBytes(used)}</span>
+        <span className="sw-bar-pct">{loading  ? '—' : `${percent}%`}</span>
+        <span className="sw-bar-total">{loading ? '—' : fmtBytes(total)}</span>
+      </div>
+      {percent >= 85 && !loading && (
         <div className={`sw-alert ${percent >= 95 ? 'sw-alert--red' : 'sw-alert--amber'}`}>
-          <MdWarningAmber />
-          {percent >= 95 ? 'Drive almost full!' : 'Drive getting full — consider freeing space.'}
+          {percent >= 95 ? '⚠️ Platform Drive almost full! Contact admin.' : '⚡ Platform Drive getting full.'}
         </div>
       )}
     </div>
   );
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── StatPills ─────────────────────────────────────────────────────────────────
+
+const StatPills = ({ pills }) => (
+  <div className="sw-stats">
+    {pills.map(p => (
+      <div key={p.label} className="sw-stat">
+        <span className="sw-stat-val">{p.value}</span>
+        <span className="sw-stat-lbl">{p.label}</span>
+      </div>
+    ))}
+  </div>
+);
+
+// ── Card shell ────────────────────────────────────────────────────────────────
+
+const Card = ({ icon, title, subtitle, onRefresh, loading, error, children }) => (
+  <div className="sw sw--full">
+    <div className="sw-head">
+      <div className="sw-head-left">
+        <span className="sw-icon">{icon}</span>
+        <div>
+          <div className="sw-title">{title}</div>
+          <div className="sw-subtitle">{subtitle}</div>
+        </div>
+      </div>
+      <button className="sw-refresh" onClick={onRefresh} disabled={loading} title="Refresh">
+        {loading ? <ImSpinner8 className="sw-spin" /> : <MdRefresh />}
+      </button>
+    </div>
+    {error && (
+      <div className="sw-error">
+        {error}
+        <button className="sw-error-retry" onClick={onRefresh}>Retry</button>
+      </div>
+    )}
+    {!error && children}
+  </div>
+);
+
+// ── Variants ──────────────────────────────────────────────────────────────────
+
+// Card 1: Platform Drive quota (faculty/admin only)
+export const PlatformDriveCard = () => {
+  const { data, loading, error, refetch } = useFetch('/storage/platform-drive');
+  const used  = data?.usageInDrive || 0;
+  const total = data?.limit        || 0;
+  const trash = data?.usageInDriveTrash || 0;
+
+  return (
+    <Card
+      icon={<MdCloudQueue />}
+      title="Platform Drive"
+      subtitle="StudyShala's shared Google Drive storage"
+      onRefresh={refetch}
+      loading={loading}
+      error={error}
+    >
+      <ProgressBar used={used} total={total} loading={loading} />
+      {!loading && data && (
+        <StatPills pills={[
+          { label: 'Drive files used', value: fmtBytes(used)           },
+          { label: 'Free space',       value: fmtBytes(total - used)   },
+          { label: 'In trash',         value: fmtBytes(trash)          },
+        ]} />
+      )}
+    </Card>
+  );
+};
+
+// Card 2: User's personal StudyShala footprint
+export const MyStudyshalaCard = ({ role = 'student' }) => {
+  const { data, loading, error, refetch } = useFetch('/storage/my-studyshala');
+  const bytes     = data?.totalBytes     || 0;
+  const files     = data?.totalFiles     || 0;
+  const materials = data?.totalMaterials || 0;
+
+  const isFaculty = role === 'faculty' || role === 'admin';
+
+  return (
+    <Card
+      icon={isFaculty ? <MdUploadFile /> : <MdBookmarkAdded />}
+      title={isFaculty ? 'Your Uploads'    : 'Saved Materials'}
+      subtitle={isFaculty
+        ? 'Files you\'ve uploaded to StudyShala'
+        : 'Size of your saved study materials'}
+      onRefresh={refetch}
+      loading={loading}
+      error={error}
+    >
+      <div className="sw-absolute">
+        <span className="sw-absolute-num">
+          {loading ? <ImSpinner8 className="sw-spin" /> : fmtBytes(bytes)}
+        </span>
+        <span className="sw-absolute-label">
+          {isFaculty ? 'uploaded to StudyShala' : 'in your saved materials'}
+        </span>
+      </div>
+      {!loading && data && (
+        <StatPills pills={[
+          { label: isFaculty ? 'Files uploaded'   : 'Files accessible',  value: files     },
+          { label: isFaculty ? 'Materials created' : 'Materials saved',   value: materials },
+        ]} />
+      )}
+    </Card>
+  );
+};
+
+// ── Default export: combined widget (used in dashboards) ─────────────────────
 
 const StorageWidget = ({ role = 'student', size = 'full' }) => {
-  const navigate = useNavigate();
-  const drive = useFetch('/storage/my-drive');
-  const ss    = useFetch('/storage/my-studyshala');
+  const isFaculty = role === 'faculty' || role === 'admin';
+  const ss = useFetch('/storage/my-studyshala');
 
-  const refetchAll = () => { drive.refetch(); ss.refetch(); };
-
-  const handleLogout = async () => {
-    try { await api.post('/auth/logout'); } catch (_) {}
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
-
-  // Drive data
-  const driveTotal    = drive.data?.limit         || 0;
-  const driveUsed     = drive.data?.usage          || 0;  // all Google (Drive+Gmail+Photos)
-  const driveFiles    = drive.data?.usageInDrive   || 0;  // Drive files portion
-  const driveTrash    = drive.data?.usageInDriveTrash || 0;
-  const drivePct      = pct(driveUsed, driveTotal);
-  const driveColorCls = barColorClass(drivePct);
-
-  // StudyShala data
-  const ssBytes       = ss.data?.totalBytes    || 0;
-  const ssFiles       = ss.data?.totalFiles    || 0;
-  const ssMaterials   = ss.data?.totalMaterials || 0;
-  const ssLabel       = role === 'student' ? 'Files in saved materials' : 'Files uploaded by you';
-  const ssMtLabel     = role === 'student' ? 'Materials saved'          : 'Materials created';
-
-  const needsRelogin  = drive.data?.needsRelogin;
-
-  // ── COMPACT (sidebar) ─────────────────────────────────────────────────────
+  // ── Compact sidebar ────────────────────────────────────────────────────────
   if (size === 'compact') {
-    const isLoading = drive.loading || ss.loading;
-    const drivePctVal = pct(driveUsed, driveTotal);
-
+    const bytes = ss.data?.totalBytes || 0;
     return (
       <div className="sw sw--compact">
-        {/* Row 1: Drive */}
         <div className="sw-compact-header">
-          <MdCloudQueue className="sw-compact-icon" />
-          <span className="sw-compact-title">My Drive</span>
-          {drive.loading && <ImSpinner8 className="sw-spin sw-compact-spin" />}
-        </div>
-        {!drive.loading && !needsRelogin && drive.data && (
-          <>
-            <div className="sw-compact-label">
-              {fmtBytes(driveUsed)} / {fmtBytes(driveTotal)}
-              <span className="sw-compact-pct">{drivePctVal}%</span>
-            </div>
-            <div className="sw-track">
-              <div className={`sw-fill ${driveColorCls}`} style={{ width: `${drivePctVal}%` }} />
-            </div>
-          </>
-        )}
-        {!drive.loading && needsRelogin && (
-          <div className="sw-compact-error">Re-login to see quota</div>
-        )}
-
-        {/* Row 2: StudyShala */}
-        <div className="sw-compact-header" style={{ marginTop: '0.45rem' }}>
-          {role === 'student'
-            ? <MdBookmarkAdded className="sw-compact-icon" />
-            : <MdUploadFile    className="sw-compact-icon" />}
+          {isFaculty
+            ? <MdUploadFile    className="sw-compact-icon" />
+            : <MdBookmarkAdded className="sw-compact-icon" />}
           <span className="sw-compact-title">
-            {role === 'student' ? 'Saved' : 'Uploaded'} on StudyShala
+            {isFaculty ? 'Your Uploads' : 'Saved Materials'}
           </span>
           {ss.loading && <ImSpinner8 className="sw-spin sw-compact-spin" />}
         </div>
-        {!ss.loading && ss.data && (
+        {!ss.loading && !ss.error && (
           <>
-            <div className="sw-compact-label">{fmtBytes(ssBytes)}</div>
+            <div className="sw-compact-label">{fmtBytes(bytes)}</div>
             <div className="sw-track">
-              <div className="sw-fill sw-bar--green sw-fill--indeterminate"
-                style={{ width: '100%', opacity: 0.3 }} />
+              <div className="sw-fill sw-bar--green"
+                style={{ width: bytes > 0 ? '100%' : '0%', opacity: bytes > 0 ? 0.5 : 0.15 }} />
             </div>
           </>
         )}
+        {ss.error && <div className="sw-compact-error">Could not load</div>}
       </div>
     );
   }
 
-  // ── FULL dashboard card ───────────────────────────────────────────────────
-  return (
-    <div className="sw sw--full">
-
-      {/* Header */}
-      <div className="sw-head">
-        <div className="sw-head-left">
-          <MdCloudQueue className="sw-icon" />
-          <div>
-            <div className="sw-title">Storage Overview</div>
-            <div className="sw-subtitle">
-              Your Google Drive · StudyShala usage
-            </div>
-          </div>
-        </div>
-        <button
-          className="sw-refresh"
-          onClick={refetchAll}
-          disabled={drive.loading || ss.loading}
-          title="Refresh"
-        >
-          {(drive.loading || ss.loading)
-            ? <ImSpinner8 className="sw-spin" />
-            : <MdRefresh />}
-        </button>
+  // ── Full dashboard ─────────────────────────────────────────────────────────
+  // Faculty sees both cards; students see just the saved materials card
+  if (isFaculty) {
+    return (
+      <div className="sw-dual">
+        <PlatformDriveCard />
+        <MyStudyshalaCard role={role} />
       </div>
-
-      {/* Needs re-login notice */}
-      {needsRelogin && (
-        <div className="sw-relogin">
-          <MdLogout className="sw-relogin-icon" />
-          <div style={{ flex: 1 }}>
-            <div className="sw-relogin-title">Drive quota needs permission</div>
-            <div className="sw-relogin-sub">
-              Log out and log back in once to grant Drive access.
-            </div>
-          </div>
-          <button className="sw-relogin-btn" onClick={handleLogout}>
-            Log out now
-          </button>
-        </div>
-      )}
-
-      {/* Fetch error */}
-      {drive.error && !needsRelogin && (
-        <div className="sw-error">
-          {drive.error}
-          <button className="sw-error-retry" onClick={drive.refetch}>Retry</button>
-        </div>
-      )}
-
-      {/* ── Bar 1: Personal Google Drive ── */}
-      {!needsRelogin && !drive.error && (
-        <BarRow
-          label="My Google Drive"
-          used={driveUsed}
-          total={driveTotal}
-          loading={drive.loading}
-          colorClass={driveColorCls}
-          subUsed={driveUsed - driveFiles}
-          subLabel="Gmail + Photos"
-        />
-      )}
-
-      {/* Divider */}
-      <div className="sw-divider" />
-
-      {/* ── Bar 2: StudyShala usage ── */}
-      {ss.error && (
-        <div className="sw-error">
-          {ss.error}
-          <button className="sw-error-retry" onClick={ss.refetch}>Retry</button>
-        </div>
-      )}
-
-      {!ss.error && (
-        <>
-          <div className="sw-row">
-            <div className="sw-row-header">
-              <span className="sw-row-label">
-                {role === 'student'
-                  ? '📚 StudyShala — Saved Materials'
-                  : '📤 StudyShala — Your Uploads'}
-              </span>
-              <span className="sw-row-stat">
-                {ss.loading
-                  ? <ImSpinner8 className="sw-spin sw-spin--sm" />
-                  : <strong>{fmtBytes(ssBytes)}</strong>}
-              </span>
-            </div>
-
-            {/* Purely informational bar — no hard cap, shows filled */}
-            <div className="sw-track">
-              {ss.loading
-                ? <div className="sw-fill sw-bar--green" style={{ width: '0%' }} />
-                : <div className="sw-fill sw-bar--green sw-fill--animated"
-                       style={{ width: ssBytes > 0 ? '100%' : '0%', opacity: ssBytes > 0 ? 0.6 : 0.15 }} />
-              }
-            </div>
-          </div>
-
-          {/* Stat pills */}
-          {!ss.loading && ss.data && (
-            <div className="sw-stats">
-              <div className="sw-stat">
-                <span className="sw-stat-val">{ssFiles}</span>
-                <span className="sw-stat-lbl">{ssLabel}</span>
-              </div>
-              <div className="sw-stat">
-                <span className="sw-stat-val">{ssMaterials}</span>
-                <span className="sw-stat-lbl">{ssMtLabel}</span>
-              </div>
-              {driveTotal > 0 && !drive.loading && !needsRelogin && (
-                <div className="sw-stat">
-                  <span className="sw-stat-val">{fmtBytes(driveTotal - driveUsed)}</span>
-                  <span className="sw-stat-lbl">Drive free space</span>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+    );
+  }
+  return <MyStudyshalaCard role={role} />;
 };
 
 export default StorageWidget;
