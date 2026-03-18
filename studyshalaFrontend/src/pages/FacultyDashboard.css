@@ -675,3 +675,16 @@ body.dark-mode .ann-banner-close:hover { background: #45260044; }
   .ann-banner-title { font-size: 0.82rem; }
   .ann-banner-msg   { font-size: 0.78rem; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   STORAGE WIDGETS ROW
+   ══════════════════════════════════════════════════════════════ */
+.fd-storage-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+@media (max-width: 700px) {
+  .fd-storage-row { grid-template-columns: 1fr; }
+}
