@@ -43,6 +43,9 @@ body.dark-mode {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   overflow: hidden;
   flex-shrink: 0;
   z-index: 200;
@@ -213,19 +216,19 @@ body.dark-mode .sb-link--active {
 }
 
 /* Starred Files — amber accent */
-.sb-link--starred:not(.sb-link--active) { color: #d97706; }
-body.dark-mode .sb-link--starred:not(.sb-link--active) { color: #fbbf24; }
-.sb-link--starred:hover:not(.sb-link--active) {
-  background-color: #fffbeb;
-  color: #b45309;
+.sb-link--fav:not(.sb-link--active) { color: #e11d48; }
+body.dark-mode .sb-link--fav:not(.sb-link--active) { color: #fb7185; }
+.sb-link--fav:hover:not(.sb-link--active) {
+  background-color: #fff1f2;
+  color: #be123c;
 }
-body.dark-mode .sb-link--starred:hover:not(.sb-link--active) {
-  background-color: #45260033;
-  color: #fbbf24;
+body.dark-mode .sb-link--fav:hover:not(.sb-link--active) {
+  background-color: #4c002133;
+  color: #fb7185;
 }
-.sb-link--starred.sb-link--active {
-  background: linear-gradient(135deg, #d97706, #b45309);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+.sb-link--fav.sb-link--active {
+  background: linear-gradient(135deg, #e11d48, #be123c);
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
 }
 
 .sb--collapsed .sb-link { justify-content: center; padding: 0.7rem; }
@@ -465,6 +468,32 @@ body.dark-mode .sb-feedback-btn:hover {
   border-color: #fbbf24;
 }
 
+/* Share App button */
+.sb-share-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px solid rgba(37,211,102,0.35);
+  cursor: pointer;
+  padding: 0.45rem 0.5rem;
+  border-radius: 7px;
+  width: 100%;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #16a34a;
+  text-align: left;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.sb-share-btn:hover {
+  background: rgba(37,211,102,0.1);
+  color: #15803d;
+  border-color: #25D366;
+}
+body.dark-mode .sb-share-btn { color: #4ade80; border-color: rgba(74,222,128,0.25); }
+body.dark-mode .sb-share-btn:hover { background: rgba(74,222,128,0.1); color: #86efac; border-color: #4ade80; }
+
 /* ══════════════════════════════════════════════════════════════
    FEEDBACK MODAL
    ══════════════════════════════════════════════════════════════ */
@@ -670,7 +699,6 @@ body.dark-mode .fb-success-msg { color: #94a3b8; }
 @keyframes fbSpin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
-   
 }
 
 /* ══════════════════════════════════════════════════════════════
