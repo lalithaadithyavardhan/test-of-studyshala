@@ -10,7 +10,6 @@ import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import FileManager from '../components/FileManager';
 import MessageBanner from '../components/MessageBanner';
 import { MdSave, MdFolder, MdArrowBack } from 'react-icons/md';
 import './StudentMaterialAccess.css';
@@ -26,9 +25,7 @@ const StudentMaterialAccess = () => {
   const [saving,     setSaving]     = useState(false);
   const [error,      setError]      = useState('');
   const [success,    setSuccess]    = useState('');
-  const [fmOpen,     setFmOpen]     = useState(false);
   const [fetching,   setFetching]   = useState(false);
-  const [fmLoading,  setFmLoading]  = useState(false);
 
   useEffect(() => { if (!material) fetchMaterial(); }, [id]);
 
@@ -44,18 +41,14 @@ const StudentMaterialAccess = () => {
     } finally { setFetching(false); }
   };
 
-  const openFileManager = async () => {
-    setFmLoading(true);
-    setFmOpen(true);
-    try {
-      const res = await api.get(`/student/materials/${id}/files`);
-      setFiles(res.data.files || []);
-      setSubFolders(res.data.subFolders || []);
-      setMaterial(prev => ({ ...prev, ...res.data.material }));
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load files.');
-      setFmOpen(false);
-    } finally { setFmLoading(false); }
+  // Navigate to BrowseMaterials with the material pre-opened
+  const openFileManager = () => {
+    navigate('/browse-materials', {
+      state: {
+        openFolderId: id,
+        from: 'material-access'
+      }
+    });
   };
 
   const handleSave = async () => {
@@ -64,7 +57,9 @@ const StudentMaterialAccess = () => {
     try {
       const res = await api.post('/student/save-material', { materialId: id });
       setSuccess(res.data.alreadySaved ? 'Already saved!' : 'Material saved!');
-      setTimeout(() => navigate('/student/saved-materials'), 2000);
+      setTimeout(() => navigate('/browse-materials', {
+        state: { openFolderId: id, from: 'after-save' }
+      }), 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save');
     } finally { setSaving(false); }
@@ -164,10 +159,10 @@ const StudentMaterialAccess = () => {
               <Button
                 variant="primary"
                 onClick={openFileManager}
-                disabled={!totalFiles || fmLoading}
+                disabled={!totalFiles}
                 className="w-full"
               >
-                {fmLoading ? 'Loading files…' : totalFiles ? `Open Files (${totalFiles})` : 'No files yet'}
+                {totalFiles ? `Open Files (${totalFiles})` : 'No files yet'}
               </Button>
             </Card>
           </div>
@@ -178,14 +173,6 @@ const StudentMaterialAccess = () => {
         </div>
       </div>
 
-      {fmOpen && !fmLoading && (
-        <FileManager
-          files={files}
-          subFolders={subFolders}
-          materialName={material.subjectName}
-          onClose={() => setFmOpen(false)}
-        />
-      )}
     </div>
   );
 };
