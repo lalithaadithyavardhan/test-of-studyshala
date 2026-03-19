@@ -62,6 +62,7 @@ const StudentStarred = () => {
   const [success,   setSuccess]   = useState('');
   const [search,    setSearch]    = useState('');
   const [pageReady, setPageReady] = useState(false);
+  const [sortBy,    setSortBy]    = useState('latest');  // 'latest' | 'oldest' | 'name'
 
   useEffect(() => {
     const t = setTimeout(() => setPageReady(true), 60);
@@ -98,10 +99,17 @@ const StudentStarred = () => {
     navigate('/browse-materials', { state: { openFolderId: materialId } });
   };
 
-  const filtered = starred.filter(s => {
-    const q = search.toLowerCase();
-    return !q || s.fileName?.toLowerCase().includes(q) || s.subjectName?.toLowerCase().includes(q);
-  });
+  const filtered = [...starred]
+    .filter(s => {
+      const q = search.toLowerCase();
+      return !q || s.fileName?.toLowerCase().includes(q) || s.subjectName?.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'latest') return new Date(b.starredAt) - new Date(a.starredAt);
+      if (sortBy === 'oldest') return new Date(a.starredAt) - new Date(b.starredAt);
+      if (sortBy === 'name')   return (a.fileName || '').localeCompare(b.fileName || '');
+      return 0;
+    });
 
   // Group by subject
   const groups = filtered.reduce((acc, f) => {
@@ -120,12 +128,12 @@ const StudentStarred = () => {
 
           {/* ── Hero ── */}
           <div className="ss-hero">
-            <div className="ss-hero-label ss-enter" style={{ animationDelay: '80ms' }}>— starred files</div>
+            <div className="ss-hero-label ss-enter" style={{ animationDelay: '80ms' }}>— favourites</div>
             <h1 className="ss-title ss-enter" style={{ animationDelay: '160ms' }}>
-              Your bookmarked<br /><span className="ss-title-accent">files.</span>
+              Your favourites,<br /><span className="ss-title-accent">all here.</span>
             </h1>
             <p className="ss-subtitle ss-enter" style={{ animationDelay: '240ms' }}>
-              Star any file while browsing to pin it here.
+              Mark any file as favourite while browsing to pin it here.
               Tap <strong>Open in Browser</strong> to jump straight to that material.
             </p>
           </div>
@@ -140,14 +148,29 @@ const StudentStarred = () => {
               <MdSearch className="ss-search-icon" />
               <input
                 className="ss-search"
-                placeholder="Search starred files or subjects…"
+                placeholder="Search favourites or subjects…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
               {search && <button className="ss-search-clear" onClick={() => setSearch('')}><MdClose /></button>}
             </div>
+            <div className="ss-sort-btns">
+              {[
+                { key: 'latest', label: '🕐 Latest' },
+                { key: 'oldest', label: '🕰 Oldest' },
+                { key: 'name',   label: '🔤 A–Z'    },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  className={`ss-sort-btn ${sortBy === opt.key ? 'ss-sort-btn--active' : ''}`}
+                  onClick={() => setSortBy(opt.key)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <span className="ss-count">
-              {starred.length} starred file{starred.length !== 1 ? 's' : ''}
+              {starred.length} favourite{starred.length !== 1 ? 's' : ''}
             </span>
           </div>
 
@@ -155,18 +178,18 @@ const StudentStarred = () => {
           {loading ? (
             <div className="ss-loading">
               <ImSpinner8 className="ss-spinner" />
-              <span>Loading starred files…</span>
+              <span>Loading favourites…</span>
             </div>
           ) : starred.length === 0 ? (
             <div className="ss-empty">
               <div className="ss-empty-icon"><MdStarBorder /></div>
-              <h3 className="ss-empty-title">No starred files yet</h3>
+              <h3 className="ss-empty-title">No favourites yet</h3>
               <p className="ss-empty-sub">
-                While browsing any material, click the ★ icon on a file to star it.<br />
+                While browsing any material, click the ★ icon on a file to favourite it.
                 It will appear here instantly — across every device.
               </p>
               <button className="ss-go-btn" onClick={() => navigate('/browse-materials')}>
-                <MdFolderOpen /> Browse Materials
+                <MdFolderOpen /> All Materials
               </button>
             </div>
           ) : filtered.length === 0 ? (
@@ -207,7 +230,7 @@ const StudentStarred = () => {
                             <div className="ss-file-info">
                               <div className="ss-file-name">{sf.fileName}</div>
                               <div className="ss-file-meta">
-                                {sf.subjectName} · Starred {fmtDate(sf.starredAt)}
+                                {sf.subjectName} · Added {fmtDate(sf.starredAt)}
                               </div>
                             </div>
                             {/* Open in BrowseMaterials */}
