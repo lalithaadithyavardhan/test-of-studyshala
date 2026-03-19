@@ -396,7 +396,7 @@ const Login = () => {
               Sign In
             </a>
           </div>
-<button
+          <button
             className={`clay-burger ${menuOpen ? 'open' : ''}`}
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
