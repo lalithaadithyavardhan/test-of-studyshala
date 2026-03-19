@@ -683,3 +683,114 @@ body.dark-mode .ann-banner-close:hover { background: #45260044; }
   margin-bottom: 1.75rem;
   max-width: 600px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SHARE MATERIAL — inside code box
+   ══════════════════════════════════════════════════════════════ */
+.fd-share-row {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  margin-top:      0.6rem;
+  padding-top:     0.6rem;
+  border-top:      1px solid var(--fd-border);
+  gap:             0.5rem;
+  flex-wrap:       wrap;
+}
+.fd-share-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size:   0.62rem;
+  font-weight: 600;
+  color:       var(--fd-ink3);
+  white-space: nowrap;
+  transition:  color 0.25s;
+}
+.fd-share-btns {
+  display: flex;
+  gap:     0.4rem;
+}
+.fd-share-btn {
+  display:       inline-flex;
+  align-items:   center;
+  gap:           0.3rem;
+  font-family:   'Lato', system-ui, sans-serif;
+  font-size:     0.72rem;
+  font-weight:   700;
+  padding:       0.32rem 0.7rem;
+  border-radius: 7px;
+  border:        none;
+  cursor:        pointer;
+  transition:    background 0.18s, transform 0.18s, color 0.18s;
+  white-space:   nowrap;
+}
+.fd-share-btn:hover { transform: translateY(-1px); }
+
+/* WhatsApp green */
+.fd-share-btn--wa {
+  background: #25D366;
+  color:      #fff;
+}
+.fd-share-btn--wa:hover { background: #1ebe5a; }
+body.dark-mode .fd-share-btn--wa { background: #128c3e; }
+body.dark-mode .fd-share-btn--wa:hover { background: #25D366; }
+
+/* Copy msg — neutral */
+.fd-share-btn--copy {
+  background: var(--fd-bg2);
+  color:      var(--fd-ink2);
+  border:     1px solid var(--fd-border);
+}
+.fd-share-btn--copy:hover { border-color: var(--fd-border2); color: var(--fd-ink); }
+.fd-share-btn--done {
+  background:  #dcfce7 !important;
+  color:       #166534 !important;
+  border-color:#bbf7d0 !important;
+}
+body.dark-mode .fd-share-btn--copy { background: var(--fd-bg2); border-color: var(--fd-border); color: var(--fd-ink3); }
+body.dark-mode .fd-share-btn--done { background: #14532d55 !important; color: #4ade80 !important; border-color: #166534 !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   FLOATING SHARE APP BUTTON (bottom-right corner)
+   ══════════════════════════════════════════════════════════════ */
+.fd-fab-share {
+  position:   fixed;
+  bottom:     2rem;
+  right:      2rem;
+  z-index:    500;
+  animation:  fdFabIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.8s both;
+}
+@keyframes fdFabIn {
+  from { opacity: 0; transform: scale(0.6) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.fd-fab-btn {
+  display:        flex;
+  align-items:    center;
+  gap:            0.5rem;
+  background:     #25D366;
+  color:          #fff;
+  border:         none;
+  border-radius:  999px;
+  padding:        0.7rem 1.25rem 0.7rem 1rem;
+  font-family:    'Lato', system-ui, sans-serif;
+  font-size:      0.875rem;
+  font-weight:    700;
+  cursor:         pointer;
+  box-shadow:     0 4px 20px rgba(37,211,102,0.45);
+  transition:     background 0.2s, transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
+}
+.fd-fab-btn:hover {
+  background:  #1ebe5a;
+  transform:   scale(1.07) translateY(-2px);
+  box-shadow:  0 8px 28px rgba(37,211,102,0.55);
+}
+.fd-fab-btn:active { transform: scale(0.97); }
+.fd-fab-icon  { font-size: 1.1rem; }
+.fd-fab-label { letter-spacing: 0.01em; }
+
+/* On mobile — icon only to save space */
+@media (max-width: 480px) {
+  .fd-fab-btn   { padding: 0.85rem; border-radius: 50%; }
+  .fd-fab-label { display: none; }
+  .fd-fab-icon  { font-size: 1.3rem; }
+}
