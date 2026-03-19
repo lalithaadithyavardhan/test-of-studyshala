@@ -248,6 +248,36 @@ body.dark-mode .ec-char-box--filled {
   box-shadow: 0 4px 12px rgba(96,165,250,0.12);
 }
 
+/* Active (next to type) box — highlighted with pulsing border */
+.ec-char-box--active {
+  border-color: var(--ec-accent) !important;
+  border-width: 2px;
+  background: var(--ec-accent-bg, rgba(45,91,227,0.04));
+  box-shadow: 0 0 0 3px rgba(45,91,227,0.12);
+  animation: ecBoxPulse 1.5s ease-in-out infinite;
+}
+body.dark-mode .ec-char-box--active {
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.15);
+}
+@keyframes ecBoxPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(45,91,227,0.12); }
+  50%       { box-shadow: 0 0 0 5px rgba(45,91,227,0.22); }
+}
+
+/* Blinking text cursor inside the active box */
+.ec-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.5rem;
+  background: var(--ec-accent);
+  border-radius: 2px;
+  animation: ecCaretBlink 1s step-start infinite;
+}
+@keyframes ecCaretBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
 /* Real input — transparent overlay, covers the char box row */
 .ec-real-input {
   position: absolute;
