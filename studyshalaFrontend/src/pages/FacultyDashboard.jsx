@@ -13,8 +13,10 @@ import Navbar from '../components/Navbar';
 import {
   MdAdd, MdContentCopy, MdCheck, MdDelete, MdUpload, MdBook,
   MdFolder, MdPerson, MdCampaign, MdEdit, MdCreateNewFolder,
-  MdFolderOpen, MdClose, MdKeyboardArrowDown
+  MdFolderOpen, MdClose, MdKeyboardArrowDown,
+  MdShare, MdWhatsapp, MdLink, MdOpenInNew
 } from 'react-icons/md';
+import { FaWhatsapp } from 'react-icons/fa';
 import { ImSpinner8 } from 'react-icons/im';
 import './FacultyDashboard.css';
 
@@ -257,6 +259,94 @@ const FacultyDashboard = () => {
     } finally { setSavingMsg(false); }
   };
 
+  // ── Share helpers ─────────────────────────────────────────────────────────
+
+  const APP_URL = 'https://studyshala.dev';
+
+  // Share the app itself via WhatsApp
+  const shareApp = () => {
+    const msg =
+      `📚 *StudyShala* — Study material sharing made easy!
+
+` +
+      `Faculty upload materials, students access them with a simple code.
+` +
+      `✓ Free · ✓ No ads · ✓ Google Drive backed
+
+` +
+      `🔗 ${APP_URL}`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank', 'noopener');
+  };
+
+  // Try native share → fallback to WhatsApp
+  const shareAppNative = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'StudyShala — Study Material Platform',
+          text:  'Free study material sharing platform for students and faculty.',
+          url:   APP_URL,
+        });
+        return;
+      } catch (_) {}
+    }
+    shareApp();
+  };
+
+  // Share a specific material via WhatsApp
+  const shareMaterial = (material) => {
+    const code    = material.accessCode || material.departmentCode || '—';
+    const subject = material.subjectName || 'Study Material';
+    const faculty = material.facultyName || '';
+    const dept    = material.department  || '';
+    const sem     = material.semester    ? `Semester ${material.semester}` : '';
+
+    const msg =
+      `📚 *${subject}*
+` +
+      (faculty ? `👨‍🏫 Faculty: ${faculty}
+` : '') +
+      (dept    ? `🏫 Department: ${dept}
+`   : '') +
+      (sem     ? `📅 ${sem}
+`                : '') +
+      `
+🔑 *Access Code: \`${code}\`*
+
+` +
+      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.
+
+` +
+      `🔗 Login at: ${APP_URL}`;
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank', 'noopener');
+  };
+
+  // Copy the material share message to clipboard
+  const [sharedId, setSharedId] = useState(null);
+  const copyShareMsg = async (material) => {
+    const code    = material.accessCode || material.departmentCode || '—';
+    const subject = material.subjectName || 'Study Material';
+    const faculty = material.facultyName || '';
+    const sem     = material.semester    ? `Semester ${material.semester}` : '';
+
+    const msg =
+      `📚 ${subject}` +
+      (faculty ? ` | ${faculty}` : '') +
+      (sem     ? ` | ${sem}`     : '') +
+      `
+🔑 Access Code: ${code}
+🔗 ${APP_URL}`;
+
+    try {
+      await navigator.clipboard.writeText(msg);
+      setSharedId(material._id);
+      setTimeout(() => setSharedId(null), 2000);
+    } catch (_) {}
+  };
+
   const copyCode = (code, id) => {
     navigator.clipboard.writeText(code); setCopiedId(id); setTimeout(() => setCopiedId(null), 2000);
   };
@@ -404,6 +494,27 @@ const FacultyDashboard = () => {
                           >
                             {copiedId === m._id ? <><MdCheck /> Copied</> : <><MdContentCopy /> Copy</>}
                           </button>
+                        </div>
+
+                        {/* Share material row */}
+                        <div className="fd-share-row">
+                          <span className="fd-share-label">Share material</span>
+                          <div className="fd-share-btns">
+                            <button
+                              className="fd-share-btn fd-share-btn--wa"
+                              onClick={() => shareMaterial(m)}
+                              title="Share on WhatsApp"
+                            >
+                              <FaWhatsapp /> WhatsApp
+                            </button>
+                            <button
+                              className={`fd-share-btn fd-share-btn--copy ${sharedId === m._id ? 'fd-share-btn--done' : ''}`}
+                              onClick={() => copyShareMsg(m)}
+                              title="Copy share message"
+                            >
+                              {sharedId === m._id ? <><MdCheck /> Copied!</> : <><MdLink /> Copy msg</>}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -622,6 +733,14 @@ const FacultyDashboard = () => {
           <button className="fd-clear-msg-btn" onClick={() => setMsgText('')}>🗑 Clear message</button>
         )}
       </FdModal>
+
+      {/* ── Floating Share App Button ── */}
+      <div className="fd-fab-share">
+        <button className="fd-fab-btn" onClick={shareAppNative} title="Share StudyShala with others">
+          <MdShare className="fd-fab-icon" />
+          <span className="fd-fab-label">Share App</span>
+        </button>
+      </div>
     </div>
   );
 };
