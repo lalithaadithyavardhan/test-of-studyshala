@@ -17,7 +17,8 @@ import {
   MdDownload, MdPreview, MdDelete, MdEdit, MdUpload, MdArrowBack,
   MdLightMode, MdDarkMode, MdMoreVert, MdCheck, MdContentCopy,
   MdFilterList, MdSort, MdInfo, MdKeyboardArrowRight, MdHome, MdBookmarkRemove,
-  MdCreateNewFolder, MdSelectAll, MdDeselect, MdDownloadForOffline, MdStar, MdStarBorder
+  MdCreateNewFolder, MdSelectAll, MdDeselect, MdDownloadForOffline, MdStar, MdStarBorder,
+  MdSave, MdBookmarkAdded
 } from 'react-icons/md';
 import JSZip from 'jszip';
 import './BrowseMaterials.css';
@@ -237,6 +238,25 @@ const BrowseMaterials = () => {
       } else {
         res = await api.get('/student/saved-materials');
         allFolders = res.data.materials || [];
+
+        // If coming from enter-code with a specific material, also fetch it
+        // directly so unsaved materials can still be browsed
+        const fromMaterialId = location.state?.openFolderId;
+        const fromAccess     = location.state?.from === 'material-access' || location.state?.from === 'after-save';
+        if (fromMaterialId && fromAccess) {
+          const alreadyInList = allFolders.some(f => String(f._id) === String(fromMaterialId));
+          if (!alreadyInList) {
+            try {
+              const mRes = await api.get(`/student/materials/${fromMaterialId}/files`);
+              const mat  = mRes.data.material;
+              if (mat) {
+                // Merge in: put at front so it's easy to find
+                allFolders = [{ ...mat, _files: mRes.data.files, _subFolders: mRes.data.subFolders }, ...allFolders];
+              }
+            } catch (_) { /* material may require access — ignore */ }
+          }
+        }
+
         setFolders(allFolders);
       }
 
@@ -258,10 +278,21 @@ const BrowseMaterials = () => {
 
   // ── Load files for selected folder ───────────────────────────────────────
   const openFolder = async (folder) => {
-    setSelectedFolder({ ...folder, files: [], subFolders: [] });
     setSelectedFile(null);
     setPreviewFile(null);
     setSelectedFiles(new Set());
+
+    // If folder already has pre-fetched files (from enter-code flow), use them directly
+    if (folder._files) {
+      setSelectedFolder({
+        ...folder,
+        files:      folder._files      || [],
+        subFolders: folder._subFolders || [],
+      });
+      return;
+    }
+
+    setSelectedFolder({ ...folder, files: [], subFolders: [] });
     try {
       const res = await api.get(
         isAdmin
@@ -568,6 +599,18 @@ const BrowseMaterials = () => {
     }
   };
 
+  // Save material from browse view (for students coming from enter-code)
+  const handleSaveMaterial = async (folderId) => {
+    try {
+      const res = await api.post('/student/save-material', { materialId: folderId });
+      setSuccess(res.data.alreadySaved ? 'Already saved to your materials!' : '✓ Saved! Now in your materials list.');
+      // Refresh to update the list — the material is now saved
+      setTimeout(() => fetchData(), 800);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save');
+    }
+  };
+
   const handleRemoveSaved = async (id) => {
     if (!window.confirm('Remove this material from your saved list?')) return;
     try {
@@ -667,7 +710,15 @@ const BrowseMaterials = () => {
       {/* ── Top Bar ── */}
       <div className="bm-topbar">
         <div className="bm-topbar-left">
-          <button className="bm-back-btn" onClick={() => navigate(-1)} title="Go back">
+          <button className="bm-back-btn" onClick={() => {
+              // If we came from material-access or after-save, go to enter-code, not back to material-access
+              const from = location.state?.from;
+              if (from === 'material-access' || from === 'after-save') {
+                navigate('/student/enter-code');
+              } else {
+                navigate(-1);
+              }
+            }} title="Go back">
             <MdArrowBack />
           </button>
           <span className="bm-topbar-title">
@@ -707,7 +758,14 @@ const BrowseMaterials = () => {
           </button>
 
           {/* Close */}
-          <button className="bm-close-btn" onClick={() => navigate(-1)} title="Close">
+          <button className="bm-close-btn" onClick={() => {
+              const from = location.state?.from;
+              if (from === 'material-access' || from === 'after-save') {
+                navigate('/student/enter-code');
+              } else {
+                navigate(-1);
+              }
+            }} title="Close">
             <MdClose />
           </button>
         </div>
@@ -1137,11 +1195,18 @@ const BrowseMaterials = () => {
                     <button className="bm-panel-btn bm-panel-btn--danger"     onClick={() => handleDeleteFolder(selectedFolder._id)}><MdDelete /> Delete</button>
                   </div>
                 )}
-                {!isFaculty && (
+                {!isFaculty && !isAdmin && (
                   <div className="bm-panel-actions">
-                    <button className="bm-panel-btn bm-panel-btn--danger" onClick={() => handleRemoveSaved(selectedFolder._id)}>
-                      <MdBookmarkRemove /> Remove Saved
-                    </button>
+                    {/* Show Save button if this material came from enter-code (not yet saved) */}
+                    {selectedFolder._files ? (
+                      <button className="bm-panel-btn bm-panel-btn--primary" onClick={() => handleSaveMaterial(selectedFolder._id)}>
+                        <MdBookmarkAdded /> Save Material
+                      </button>
+                    ) : (
+                      <button className="bm-panel-btn bm-panel-btn--danger" onClick={() => handleRemoveSaved(selectedFolder._id)}>
+                        <MdBookmarkRemove /> Remove Saved
+                      </button>
+                    )}
                   </div>
                 )}
               </>
