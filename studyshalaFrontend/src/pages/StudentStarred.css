@@ -216,3 +216,31 @@ body.dark-mode .ss-alert--ok  { background: #052e1633; border-color: #166534; }
   color: #fff;
   border-color: var(--ss-accent);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   SORT BUTTONS in toolbar
+   ══════════════════════════════════════════════════════════════ */
+.ss-sort-btns {
+  display:   flex;
+  gap:       0.35rem;
+  flex-wrap: wrap;
+}
+.ss-sort-btn {
+  padding:       0.28rem 0.65rem;
+  border-radius: 7px;
+  border:        1px solid var(--ss-border, #dddbd6);
+  background:    var(--ss-bg2, #eeecea);
+  font-family:   'IBM Plex Mono', monospace;
+  font-size:     0.65rem;
+  font-weight:   600;
+  color:         var(--ss-ink2, #4a4843);
+  cursor:        pointer;
+  transition:    background 0.18s, border-color 0.18s, color 0.18s;
+  white-space:   nowrap;
+}
+.ss-sort-btn:hover { background: var(--ss-border, #dddbd6); }
+.ss-sort-btn--active {
+  background:   var(--ss-ink, #1a1916);
+  color:        #fff;
+  border-color: var(--ss-ink, #1a1916);
+}
