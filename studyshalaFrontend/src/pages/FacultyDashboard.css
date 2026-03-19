@@ -197,7 +197,7 @@ body.dark-mode .fd-create-btn:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
 /* ══ MATERIAL CARDS GRID ══ */
 .fd-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 1.25rem;
 }
 
@@ -568,6 +568,18 @@ body.dark-mode .fd-btn--danger:hover { background: #7f1d1d; color: #fff; }
 @media (max-width: 480px) {
   .fd-page { padding: 1.75rem 1.25rem; }
   .fd-card-actions { flex-wrap: wrap; }
+  .fd-share-row  { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+  .fd-share-btns { width: 100%; }
+  .fd-share-btn  { flex: 1; justify-content: center; font-size: 0.7rem; }
+  .fd-stats-row  { gap: 0.5rem; }
+  .fd-stat       { padding: 0.75rem 0.5rem; }
+  .fd-stat-val   { font-size: 1.25rem; }
+}
+
+@media (max-width: 360px) {
+  .fd-page { padding: 1.5rem 0.875rem; }
+  .fd-card { padding: 1.125rem; }
+  .fd-code { font-size: 1rem; letter-spacing: 0.1em; }
 }
 @media (prefers-reduced-motion: reduce) {
   .fd-enter, .fd-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
