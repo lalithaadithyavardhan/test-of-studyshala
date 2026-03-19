@@ -139,10 +139,13 @@ body.dark-mode {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px; height: 28px;
+  width: 32px; height: 32px;
+  min-width: 32px; min-height: 32px;
   border-radius: 6px;
   transition: color 0.18s, background 0.18s, transform 0.25s var(--ease-spring);
   flex-shrink: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .sb-toggle:hover {
   color: var(--sb-accent);
@@ -196,6 +199,8 @@ body.dark-mode {
     background 0.18s,
     color      0.18s,
     box-shadow 0.2s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .sb--mounted .sb-link { opacity: 1; transform: translateX(0); }
 
