@@ -573,3 +573,21 @@
   .bm-grid { grid-template-columns: repeat(2, 1fr); }
   .bm-search { width: 80px; }
 }
+
+@media (max-width: 360px) {
+  .bm-topbar { height: auto; min-height: 44px; padding: 0.3rem 0.35rem; flex-wrap: nowrap; }
+  .bm-topbar-left { gap: 0.25rem; }
+  .bm-search { width: 70px; font-size: 0.72rem; }
+  .bm-back-btn, .bm-close-btn, .bm-theme-btn { width: 36px; height: 36px; font-size: 1rem; }
+  .bm-main { padding: 0.4rem; }
+  .bm-grid { gap: 0.4rem; }
+}
+
+/* iOS safe area support (notch/home bar) */
+@supports (padding: max(0px)) {
+  .bm-root {
+    padding-left:   env(safe-area-inset-left);
+    padding-right:  env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
