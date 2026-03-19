@@ -426,6 +426,14 @@ body.dark-mode .ec-submit:hover:not(.ec-submit--off) {
   .ec-input-chars { gap: 0.25rem; }
 }
 
+@media (max-width: 360px) {
+  .ec-page { padding: 1.5rem 0.875rem; }
+  .ec-char-box { width: 28px; height: 40px; font-size: 0.875rem; border-radius: 6px; }
+  .ec-input-chars { gap: 0.18rem; }
+  .ec-card { padding: 1.25rem 1rem; }
+  .ec-quick-btn { padding: 0.75rem 0.875rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ec-enter { opacity: 1 !important; transform: none !important; transition: none !important; }
   .ec-char-box, .ec-submit, .ec-quick-btn { transition: none !important; }
