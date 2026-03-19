@@ -734,13 +734,6 @@ const FacultyDashboard = () => {
         )}
       </FdModal>
 
-      {/* ── Floating Share App Button ── */}
-      <div className="fd-fab-share">
-        <button className="fd-fab-btn" onClick={shareAppNative} title="Share StudyShala with others">
-          <MdShare className="fd-fab-icon" />
-          <span className="fd-fab-label">Share App</span>
-        </button>
-      </div>
     </div>
   );
 };
