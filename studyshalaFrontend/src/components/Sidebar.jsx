@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  MdDashboard, MdLibraryBooks,
+  MdDashboard,
   MdHistory, MdKey, MdSettings, MdFolderOpen, MdSchool,
   MdChevronLeft, MdChevronRight, MdMenu, MdClose,
   MdInfoOutline, MdStar, MdChatBubbleOutline,
@@ -136,10 +136,9 @@ const Sidebar = ({ role }) => {
 
   const menuItems = {
     faculty: [
-      { path: '/faculty/dashboard', icon: <MdDashboard />,    label: 'Dashboard'     },
-      { path: '/faculty/materials', icon: <MdLibraryBooks />, label: 'My Materials'  },
-      { path: '/browse-materials',  icon: <MdAllInbox />,     label: 'All Materials' },
-      { path: '/admin-courses',     icon: <MdSchool />,       label: 'Admin Courses' },
+      { path: '/faculty/dashboard', icon: <MdDashboard />,  label: 'Dashboard'     },
+      { path: '/browse-materials',  icon: <MdAllInbox />,   label: 'All Materials' },
+      { path: '/admin-courses',     icon: <MdSchool />,     label: 'Admin Courses' },
     ],
     student: [
       { path: '/student/enter-code', icon: <MdKey />,        label: 'Enter Code'       },
