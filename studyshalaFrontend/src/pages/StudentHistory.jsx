@@ -33,6 +33,7 @@ const StudentHistory = () => {
   const [error,     setError]     = useState('');
   const [success,   setSuccess]   = useState('');
   const [pageReady, setPageReady] = useState(false);
+  const [sortBy,    setSortBy]    = useState('latest');  // 'latest' | 'oldest' | 'name'
 
   useEffect(() => {
     const t = setTimeout(() => setPageReady(true), 60);
@@ -73,12 +74,12 @@ const StudentHistory = () => {
         <div className={`sh-page ${pageReady ? 'sh-ready' : ''}`}>
 
           <div className="sh-hero">
-            <div className="sh-hero-label sh-enter" style={{ animationDelay: '80ms' }}>— access history</div>
+            <div className="sh-hero-label sh-enter" style={{ animationDelay: '80ms' }}>— recently opened</div>
             <h1 className="sh-title sh-enter" style={{ animationDelay: '160ms' }}>
-              Your history,<br /><span className="sh-title-accent">all in one place.</span>
+              Recently opened,<br /><span className="sh-title-accent">all in one place.</span>
             </h1>
             <p className="sh-subtitle sh-enter" style={{ animationDelay: '240ms' }}>
-              Every material you've accessed using a code appears below.
+              Every material you've recently opened appears below.
               Save ones you want to keep, or open them again anytime.
             </p>
           </div>
@@ -86,20 +87,50 @@ const StudentHistory = () => {
           {error   && <div className="sh-alert sh-alert--err sh-enter" style={{ animationDelay: '280ms' }}><span>⚠</span> {error}</div>}
           {success && <div className="sh-alert sh-alert--ok  sh-enter" style={{ animationDelay: '280ms' }}><span>✓</span> {success}</div>}
 
+          {/* ── Sort toolbar ── */}
+          {!loading && history.length > 0 && (
+            <div className="sh-toolbar sh-enter" style={{ animationDelay: '280ms' }}>
+              <span className="sh-toolbar-label">Sort by</span>
+              <div className="sh-sort-btns">
+                {[
+                  { key: 'latest', label: '🕐 Latest first' },
+                  { key: 'oldest', label: '🕰 Oldest first' },
+                  { key: 'name',   label: '🔤 Name A–Z'    },
+                ].map(opt => (
+                  <button
+                    key={opt.key}
+                    className={`sh-sort-btn ${sortBy === opt.key ? 'sh-sort-btn--active' : ''}`}
+                    onClick={() => setSortBy(opt.key)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <span className="sh-count">{history.length} item{history.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+
           {loading ? (
             <div className="sh-loading sh-enter" style={{ animationDelay: '300ms' }}>
               <ImSpinner8 className="sh-spinner" />
-              <span>Loading your history…</span>
+              <span>Loading recently opened…</span>
             </div>
           ) : history.length === 0 ? (
             <div className="sh-empty sh-enter" style={{ animationDelay: '320ms' }}>
               <div className="sh-empty-icon"><MdHistory /></div>
-              <h3 className="sh-empty-title">No history yet</h3>
-              <p className="sh-empty-sub">Materials you access with codes will appear here</p>
+              <h3 className="sh-empty-title">Nothing opened yet</h3>
+              <p className="sh-empty-sub">Materials you open with codes will appear here</p>
             </div>
           ) : (
             <div className="sh-list">
-              {history.map((item, i) => {
+              {[...history]
+                .sort((a, b) => {
+                  if (sortBy === 'latest') return new Date(b.accessedAt) - new Date(a.accessedAt);
+                  if (sortBy === 'oldest') return new Date(a.accessedAt) - new Date(b.accessedAt);
+                  if (sortBy === 'name')   return (a.subjectName || '').localeCompare(b.subjectName || '');
+                  return 0;
+                })
+                .map((item, i) => {
                 const hasMsg  = !!item.messageToStudents?.trim();
                 const sfCount = item.subFolderCount || 0;
                 return (
