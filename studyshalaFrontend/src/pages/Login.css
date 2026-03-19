@@ -158,8 +158,14 @@ html { scroll-behavior: smooth; }
   font-family: 'Lora', serif;
   font-size: 1.2rem;
   font-weight: 700;
-  color: var(--ink);
+  color: #F0EEEC;              /* always light — readable over video */
   letter-spacing: -.02em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  transition: color .3s, text-shadow .3s;
+}
+.clay-nav--solid .clay-brand-name {
+  color: var(--ink);           /* dark once navbar has background */
+  text-shadow: none;
 }
 
 /* Nav links */
@@ -171,26 +177,16 @@ html { scroll-behavior: smooth; }
 }
 .clay-nav-link {
   text-decoration: none;
-  color: var(--ink2);
+  color: rgba(240,238,236,0.9);  /* always light on transparent nav */
   font-size: .875rem;
   font-weight: 700;
   letter-spacing: .01em;
-  transition: color .2s;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  transition: color .2s, text-shadow .2s;
 }
-.clay-nav-link:hover { color: var(--ink); }
-
-.clay-admin-link {
-  text-decoration: none;
-  font-size: .8rem;
-  font-weight: 800;
-  color: var(--cta-text);
-  background: var(--cta);
-  padding: .38rem 1rem;
-  border-radius: var(--r-sm);
-  box-shadow: var(--shadow-sm);
-  transition: transform .2s var(--ease-spring), box-shadow .2s;
-}
-.clay-admin-link:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.clay-nav-link:hover { color: #fff; }
+.clay-nav--solid .clay-nav-link       { color: var(--ink2); text-shadow: none; }
+.clay-nav--solid .clay-nav-link:hover { color: var(--ink); }
 
 /* Burger */
 .clay-burger {
@@ -207,9 +203,14 @@ html { scroll-behavior: smooth; }
   display: block;
   width: 22px;
   height: 2px;
-  background: var(--ink);
+  background: #F0EEEC;         /* white bars — visible over video */
   border-radius: 2px;
   transition: .3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+.clay-nav--solid .clay-burger span {
+  background: var(--ink);      /* dark bars once nav has bg */
+  box-shadow: none;
 }
 .clay-burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .clay-burger.open span:nth-child(2) { opacity: 0; }
@@ -643,7 +644,7 @@ html { scroll-behavior: smooth; }
 /* Loading state — pulsing dash while backend wakes up */
 .clay-stat-loading {
   font-size: 2rem;
-  color: var(--surface);
+  color: var(--ink3);          /* --ink3 instead of --surface: visible even without animation */
   animation: statPulse 1.4s ease-in-out infinite;
   display: inline-block;
 }
@@ -761,7 +762,7 @@ html { scroll-behavior: smooth; }
   letter-spacing: .12em;
   text-transform: uppercase;
   margin-bottom: 1.5rem;
-  color: var(--ink3);
+  color: var(--ink2);          /* bumped from --ink3 for better contrast */
 }
 
 .clay-step {
@@ -851,77 +852,6 @@ html { scroll-behavior: smooth; }
 .clay-testimonial-from   { font-weight: 800; font-size: .875rem; color: var(--ink); }
 .clay-testimonial-role   { font-size: .75rem; color: var(--ink3); font-weight: 600; }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   ABOUT  (#E8E5E1 — slightly deeper warm white)
-   ══════════════════════════════════════════════════════════════════════════ */
-.clay-about-section {
-  padding: 6rem 0;
-  background: var(--bg2);        /* #E8E5E1 */
-}
-.clay-about-section .clay-section-label { color: var(--ink3); }
-.clay-about-section .clay-section-h2    { color: var(--ink); }
-.clay-about-section .clay-section-body  { color: var(--ink2); }
-
-.clay-about-grid {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 4rem;
-  align-items: start;
-  margin-top: 1rem;
-}
-.clay-about-avatar-wrap {
-  width: 200px; height: 200px;
-  border-radius: 50%;
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  background: var(--bg);
-  border: 3px solid var(--surface);
-}
-.clay-about-avatar { width: 100%; height: 100%; object-fit: cover; }
-
-.clay-about-role {
-  font-size: .75rem;
-  font-weight: 900;
-  color: var(--ink2);            /* #3D3A35 on #E8E5E1 — readable */
-  letter-spacing: .1em;
-  margin-bottom: .875rem;
-  text-transform: uppercase;
-}
-.clay-about-quote {
-  background: #fff;
-  border-left: 4px solid var(--ink);
-  border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  padding: 1rem 1.25rem;
-  font-family: 'Lora', serif;
-  font-style: italic;
-  font-size: .95rem;
-  color: var(--ink);             /* #1C1A17 on white */
-  margin: 1rem 0;
-  box-shadow: var(--shadow-sm);
-}
-.clay-about-links { display: flex; gap: .875rem; flex-wrap: wrap; margin-top: .625rem; }
-.clay-about-link {
-  display: inline-flex;
-  align-items: center;
-  gap: .4rem;
-  text-decoration: none;
-  padding: .5rem 1.1rem;
-  background: #fff;
-  border-radius: var(--r-sm);
-  font-size: .875rem;
-  font-weight: 800;
-  color: var(--ink);             /* #1C1A17 on white */
-  box-shadow: var(--shadow-sm);
-  border: 1.5px solid var(--surface);
-  transition: transform .2s var(--ease-spring), box-shadow .2s, background .2s, color .2s;
-}
-.clay-about-link:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
-  background: var(--ink);
-  color: var(--bg);              /* #F0EEEC on #1C1A17 */
-  border-color: var(--ink);
-}
 
 /* ══════════════════════════════════════════════════════════════════════════
    FOOTER  (#1C1A17 near-black)
@@ -988,7 +918,7 @@ html { scroll-behavior: smooth; }
   flex-wrap: wrap;
   justify-content: center;
   font-size: .75rem;
-  color: rgba(240,238,236,.4);   /* low opacity on dark — readable as hint text */
+  color: rgba(240,238,236,.58);  /* bumped from .4 → better contrast on dark footer */
   padding-top: 1rem;
   border-top: 1px solid rgba(240,238,236,.1);
   width: 100%;
@@ -1127,10 +1057,7 @@ html { scroll-behavior: smooth; }
   .clay-features-illustration { max-width: 140px; }
   .clay-how-grid           { grid-template-columns: 1fr; }
   .clay-testimonials-grid  { grid-template-columns: 1fr; }
-  .clay-about-grid         { grid-template-columns: 1fr; }
-  .clay-about-avatar-wrap  { width: 140px; height: 140px; }
   .clay-nav-links          { display: none; }
-  .clay-admin-link         { display: none; }
   .clay-burger             { display: flex; }
 }
 
@@ -1145,7 +1072,6 @@ html { scroll-behavior: smooth; }
   .clay-features-section,
   .clay-how-section,
   .clay-testimonials-section,
-  .clay-about-section     { padding: 4rem 0; }
   .clay-footer-bottom     { gap: 1rem; flex-direction: column; align-items: center; }
 }
 
