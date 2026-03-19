@@ -115,10 +115,13 @@ p  { line-height: 1.7; margin-bottom: var(--sp-md); }
 /* ── App layout ─────────────────────────────────────────── */
 .app-container {
   display: flex;
+  /* KEY: use fixed viewport height so sticky sidebar stays within bounds */
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg);
-  overflow-x: hidden;
+  overflow: hidden;  /* sidebar hidden, main-content scrolls independently */
 }
 
 .main-content {
@@ -127,6 +130,7 @@ p  { line-height: 1.7; margin-bottom: var(--sp-md); }
   flex-direction: column;
   min-width: 0;
   background: var(--bg);
+  overflow-y: auto;   /* main content scrolls, sidebar stays fixed */
   overflow-x: hidden;
 }
 
