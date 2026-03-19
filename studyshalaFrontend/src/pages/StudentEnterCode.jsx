@@ -88,8 +88,8 @@ const StudentEnterCode = () => {
   };
 
   const quickLinks = [
-    { icon: <MdFolderOpen />, label: 'Browse Materials', sub: 'View your saved materials', path: '/browse-materials' },
-    { icon: <MdHistory />,    label: 'History',          sub: "See codes you've used",     path: '/student/history'  },
+    { icon: <MdFolderOpen />, label: 'All Materials',    sub: 'View all your saved materials',  path: '/browse-materials' },
+    { icon: <MdHistory />,    label: 'Recently Opened',  sub: 'Materials you accessed before', path: '/student/history'  },
   ];
 
   return (
@@ -139,14 +139,22 @@ const StudentEnterCode = () => {
                 onClick={() => inputRef.current?.focus()}
               >
                 <div className="ec-input-chars" aria-hidden="true">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`ec-char-box ${code[i] ? 'ec-char-box--filled' : ''}`}
-                    >
-                      {code[i] || ''}
-                    </div>
-                  ))}
+                  {Array.from({ length: 8 }).map((_, i) => {
+                    const isFilled  = !!code[i];
+                    const isActive  = i === code.length && code.length < 8; // next empty slot
+                    return (
+                      <div
+                        key={i}
+                        className={[
+                          'ec-char-box',
+                          isFilled  ? 'ec-char-box--filled'  : '',
+                          isActive  ? 'ec-char-box--active'  : '',
+                        ].join(' ').trim()}
+                      >
+                        {isFilled ? code[i] : isActive ? <span className="ec-caret" /> : ''}
+                      </div>
+                    );
+                  })}
                 </div>
                 <input
                   ref={inputRef}
