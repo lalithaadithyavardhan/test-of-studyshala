@@ -479,4 +479,31 @@ body.dark-mode .badge-danger  { background: #7f1d1d44; color: #fca5a5; }
     padding-top: calc(0.5rem + 58px);
   }
   .btn { padding: 0.5rem 0.875rem; font-size: 0.8125rem; }
+  .card { padding: 0.75rem; }
+  h1 { font-size: 1.25rem; }
+  h2 { font-size: 1.05rem; }
+}
+
+/* iOS safe area support — applies globally to page containers */
+@supports (padding: max(0px)) {
+  .app-container {
+    padding-left:   env(safe-area-inset-left);
+    padding-right:  env(safe-area-inset-right);
+  }
+  .page-container {
+    padding-left:   max(var(--sp-xl), env(safe-area-inset-left));
+    padding-right:  max(var(--sp-xl), env(safe-area-inset-right));
+  }
+  @media (max-width: 768px) {
+    .page-container {
+      padding-left:   max(var(--sp-md), env(safe-area-inset-left));
+      padding-right:  max(var(--sp-md), env(safe-area-inset-right));
+    }
+  }
+  @media (max-width: 480px) {
+    .page-container {
+      padding-left:   max(0.75rem, env(safe-area-inset-left));
+      padding-right:  max(0.75rem, env(safe-area-inset-right));
+    }
+  }
 }
