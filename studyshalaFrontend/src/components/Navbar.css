@@ -298,4 +298,10 @@ body.dark-mode .dropdown-item--danger:hover { background: #7f1d1d22; color: #fca
 
 @media (max-width: 380px) {
   .navbar { padding-left: 3.25rem; }
+  .dropdown-menu { min-width: 200px; right: -0.5rem; }
+  .profile-name  { max-width: 90px; }
+}
+
+@media (max-width: 320px) {
+  .dropdown-menu { min-width: 180px; right: 0; left: auto; }
 }
