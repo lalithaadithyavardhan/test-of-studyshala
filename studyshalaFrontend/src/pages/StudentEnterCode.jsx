@@ -56,13 +56,15 @@ const AnnouncementBanner = () => {
 const StudentEnterCode = () => {
   const navigate    = useNavigate();
   const inputRef    = useRef(null);
-  const [code,      setCode]      = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState('');
-  const [pageReady, setPageReady] = useState(false);
+  const [code,          setCode]          = useState('');
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState('');
+  const [pageReady,     setPageReady]     = useState(false);
+  const [platformStats, setPlatformStats] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setPageReady(true), 60);
+    api.get('/stats').then(res => setPlatformStats(res.data)).catch(() => {});
     return () => clearTimeout(t);
   }, []);
 
@@ -182,6 +184,26 @@ const StudentEnterCode = () => {
               </button>
             </form>
           </div>
+
+          {/* Platform stats strip */}
+          {platformStats && (
+            <div className="ec-stats-strip ec-enter" style={{ animationDelay: '380ms' }}>
+              <div className="ec-stat-chip">
+                <span className="ec-stat-chip-val">{platformStats.totalStudents?.toLocaleString()}</span>
+                <span className="ec-stat-chip-lbl">Students</span>
+              </div>
+              <div className="ec-stat-divider" />
+              <div className="ec-stat-chip">
+                <span className="ec-stat-chip-val">{platformStats.totalMaterials?.toLocaleString()}</span>
+                <span className="ec-stat-chip-lbl">Materials</span>
+              </div>
+              <div className="ec-stat-divider" />
+              <div className="ec-stat-chip">
+                <span className="ec-stat-chip-val">{platformStats.totalVisits?.toLocaleString()}</span>
+                <span className="ec-stat-chip-lbl">Visits</span>
+              </div>
+            </div>
+          )}
 
           {/* Quick links */}
           <div className="ec-quick">
