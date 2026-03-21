@@ -121,6 +121,7 @@ const FacultyDashboard = () => {
   const [error,           setError]           = useState('');
   const [success,         setSuccess]         = useState('');
   const [pageReady,       setPageReady]       = useState(false);
+  const [platformStats,   setPlatformStats]   = useState(null);
 
   const [showCreate,      setShowCreate]      = useState(false);
   const [showUpload,      setShowUpload]      = useState(false);
@@ -149,6 +150,7 @@ const FacultyDashboard = () => {
   const semesters   = ['1','2','3','4','5','6','7','8'];
 
   useEffect(() => {
+    api.get('/stats').then(res => setPlatformStats(res.data)).catch(() => {});
     const t = setTimeout(() => setPageReady(true), 60);
     fetchMaterials();
     return () => clearTimeout(t);
@@ -384,7 +386,7 @@ const FacultyDashboard = () => {
                   <span className="fd-profile-role">{user?.role}</span>
                 </div>
               </div>
-              {/* Stats row */}
+              {/* Your stats */}
               <div className="fd-stats-row">
                 <div className="fd-stat">
                   <div className="fd-stat-val">{materials.length}</div>
@@ -399,6 +401,28 @@ const FacultyDashboard = () => {
                 <div className="fd-stat">
                   <div className="fd-stat-val">{materials.filter(m => m.messageToStudents?.trim()).length}</div>
                   <div className="fd-stat-lbl">With Messages</div>
+                </div>
+              </div>
+
+              {/* Platform stats — subtle live metrics */}
+              <div className="fd-stats-row fd-platform-stats">
+                <div className="fd-stat fd-stat--platform">
+                  <div className="fd-stat-val fd-stat-val--sm">
+                    {platformStats ? platformStats.totalStudents?.toLocaleString() : '—'}
+                  </div>
+                  <div className="fd-stat-lbl">Students</div>
+                </div>
+                <div className="fd-stat fd-stat--platform">
+                  <div className="fd-stat-val fd-stat-val--sm">
+                    {platformStats ? platformStats.totalMaterials?.toLocaleString() : '—'}
+                  </div>
+                  <div className="fd-stat-lbl">Shared</div>
+                </div>
+                <div className="fd-stat fd-stat--platform">
+                  <div className="fd-stat-val fd-stat-val--sm">
+                    {platformStats ? platformStats.totalVisits?.toLocaleString() : '—'}
+                  </div>
+                  <div className="fd-stat-lbl">Visits</div>
                 </div>
               </div>
             </div>
