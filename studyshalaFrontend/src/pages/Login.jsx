@@ -262,7 +262,16 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
 
-  const [selectedRole, setSelectedRole] = useState(null);
+  // Pre-select last used role so returning users don't have to pick again
+  const [selectedRole, setSelectedRole] = useState(() => {
+    try { return localStorage.getItem('lastRole') || null; } catch { return null; }
+  });
+  const lastUserName = (() => {
+    try {
+      const u = localStorage.getItem('lastUser');
+      return u ? JSON.parse(u) : null;
+    } catch { return null; }
+  })();
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
   // null = not yet loaded (shows "—"), object = real data
@@ -349,10 +358,12 @@ const Login = () => {
     );
   }
 
-  const handleSignIn = () => {
-    if (!selectedRole) { setError('Please select a role first.'); return; }
+  const handleSignIn = (role) => {
+    const roleToUse = role || selectedRole;
+    if (!roleToUse) { setError('Please select a role first.'); return; }
     setLoading(true); setError('');
-    window.location.href = 'https://test-of-studyshala.onrender.com/api/auth/google?role=' + selectedRole;
+    try { localStorage.setItem('lastRole', roleToUse); } catch {}
+    window.location.href = 'https://test-of-studyshala.onrender.com/api/auth/google?role=' + roleToUse;
   };
 
   const studentFeatures = [
@@ -463,14 +474,49 @@ const Login = () => {
 
             {/* Right — login card */}
             <div id="signin" className="clay-hero-right clay-enter" style={{ animationDelay: '300ms' }}>
-              <LoginCard
-                selectedRole={selectedRole}
-                setSelectedRole={(r) => { setSelectedRole(r); setError(''); }}
-                onSignIn={handleSignIn}
-                loading={loading}
-                error={error}
-              />
-              <div className="clay-hero-hint">← sign in to get started :)</div>
+
+              {/* Quick return banner — shown when we know who last logged in */}
+              {lastUserName && !loading && (
+                <div className="clay-quick-return">
+                  <div className="clay-quick-return-label">Welcome back!</div>
+                  <div className="clay-quick-return-name">{lastUserName.name}</div>
+                  <div className="clay-quick-return-meta">
+                    Last signed in as <strong>{lastUserName.role}</strong>
+                  </div>
+                  <button
+                    className="clay-quick-return-btn"
+                    onClick={() => handleSignIn(lastUserName.role)}
+                    disabled={loading}
+                  >
+                    <FcGoogle className="clay-google-ico" style={{ fontSize: '1.1rem', background: '#fff', borderRadius: '50%', padding: '2px' }} />
+                    Continue as {lastUserName.name.split(' ')[0]}
+                    <FaArrowRight style={{ fontSize: '.85rem', marginLeft: 'auto' }} />
+                  </button>
+                  <button
+                    className="clay-quick-return-switch"
+                    onClick={() => {
+                      try { localStorage.removeItem('lastUser'); localStorage.removeItem('lastRole'); } catch {}
+                      setSelectedRole(null);
+                    }}
+                  >
+                    Switch account or role
+                  </button>
+                </div>
+              )}
+
+              {/* Full login card — shown when no previous user remembered */}
+              {!lastUserName && (
+                <>
+                  <LoginCard
+                    selectedRole={selectedRole}
+                    setSelectedRole={(r) => { setSelectedRole(r); setError(''); }}
+                    onSignIn={handleSignIn}
+                    loading={loading}
+                    error={error}
+                  />
+                  <div className="clay-hero-hint">← sign in to get started :)</div>
+                </>
+              )}
             </div>
           </div>
         </div>
