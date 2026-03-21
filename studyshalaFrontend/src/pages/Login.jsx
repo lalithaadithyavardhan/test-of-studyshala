@@ -229,7 +229,7 @@ const LoginCard = ({ selectedRole, setSelectedRole, onSignIn, loading, error }) 
 
     <button
       className={`clay-google-btn ${!selectedRole ? 'clay-google-btn--off' : ''}`}
-      onClick={onSignIn}
+      onClick={() => onSignIn()}
       disabled={loading || !selectedRole}
     >
       {loading
@@ -359,7 +359,8 @@ const Login = () => {
   }
 
   const handleSignIn = (role) => {
-    const roleToUse = role || selectedRole;
+    // Guard: if role is a React event (from direct onClick) treat it as undefined
+    const roleToUse = (role && typeof role === 'string') ? role : selectedRole;
     if (!roleToUse) { setError('Please select a role first.'); return; }
     setLoading(true); setError('');
     try { localStorage.setItem('lastRole', roleToUse); } catch {}
