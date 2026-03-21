@@ -266,7 +266,24 @@ const BrowseMaterials = () => {
         sessionStorage.removeItem('bm_open_folder');
         const target = allFolders.find(f => String(f._id) === String(targetId));
         if (target) {
+          // Found in main list (saved materials / faculty folders) — open directly
           setTimeout(() => openFolder(target), 150);
+        } else {
+          // Not in main list — could be an admin course or unsaved material.
+          // Fetch it directly from the public admin courses endpoint and open it.
+          try {
+            const publicRes = await api.get('/admin/courses/public');
+            const adminCourses = publicRes.data.courses || [];
+            const adminTarget  = adminCourses.find(f => String(f._id) === String(targetId));
+            if (adminTarget) {
+              // Merge admin courses into the folder list so the sidebar shows them
+              const merged = [...allFolders, ...adminCourses.filter(
+                ac => !allFolders.some(f => String(f._id) === String(ac._id))
+              )];
+              setFolders(merged);
+              setTimeout(() => openFolder(adminTarget), 150);
+            }
+          } catch (_) { /* silently ignore — folder just won't auto-open */ }
         }
       }
     } catch (err) {
@@ -294,19 +311,45 @@ const BrowseMaterials = () => {
 
     setSelectedFolder({ ...folder, files: [], subFolders: [] });
     try {
-      const res = await api.get(
-        isAdmin
-          ? `/admin/browse/${folder._id}`
-          : isFaculty
-            ? `/faculty/folders/${folder._id}`
-            : `/student/materials/${folder._id}/files`
-      );
-      const data = (isAdmin || isFaculty) ? res.data.folder : res.data;
+      // Admin courses (isAdminCourse:true) are public — use the public endpoint
+      // for all roles so students/faculty don't need to have saved the material
+      const isAdminCourse = folder.isAdminCourse === true;
+      let url;
+      if (isAdminCourse) {
+        // Public admin course endpoint — works for student, faculty, and admin
+        url = `/admin/courses/public`;
+      } else if (isAdmin) {
+        url = `/admin/browse/${folder._id}`;
+      } else if (isFaculty) {
+        url = `/faculty/folders/${folder._id}`;
+      } else {
+        url = `/student/materials/${folder._id}/files`;
+      }
+
+      const res = await api.get(url);
+
+      let files      = [];
+      let subFolders = [];
+      let message    = '';
+
+      if (isAdminCourse) {
+        // Public endpoint returns all courses — find the specific one
+        const courses = res.data.courses || [];
+        const course  = courses.find(course => String(course._id) === String(folder._id));
+        files      = course?.files      || [];
+        subFolders = course?.subFolders || [];
+      } else {
+        const data = (isAdmin || isFaculty) ? res.data.folder : res.data;
+        files      = data.files      || [];
+        subFolders = data.subFolders || [];
+        message    = data.messageToStudents || data.material?.messageToStudents || '';
+      }
+
       setSelectedFolder(prev => ({
         ...prev,
-        files:             data.files || [],
-        subFolders:        data.subFolders || [],
-        messageToStudents: data.messageToStudents || data.material?.messageToStudents || ''
+        files,
+        subFolders,
+        messageToStudents: message,
       }));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load files');
