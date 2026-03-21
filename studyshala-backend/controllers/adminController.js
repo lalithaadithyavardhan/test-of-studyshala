@@ -318,15 +318,35 @@ const createAdminCourse = async (req, res) => {
     const { subjectName, department, semester, courseCategory } = req.body;
     if (!subjectName?.trim() || !department?.trim() || !semester?.trim())
       return res.status(400).json({ message: 'Subject name, department and semester are required' });
+
+    // Create a Drive folder for this admin course so uploaded files stay organised
+    let driveFolderId = `local-${Date.now()}`;
+    let driveUrl      = '#';
+    if (driveService.enabled) {
+      try {
+        const folderName  = `[Admin] ${subjectName.trim()} — ${department.trim()} Sem${semester.trim()}`;
+        const driveFolder = await driveService.createFolder(folderName);
+        driveFolderId     = driveFolder.folderId;
+        driveUrl          = driveFolder.folderUrl;
+        logger.info(`Admin course Drive folder created: ${folderName} → ${driveFolderId}`);
+      } catch (driveErr) {
+        logger.warn(`Admin course Drive folder creation failed (files will upload to root): ${driveErr.message}`);
+      }
+    }
+
     const course = await Folder.create({
       facultyId: req.user._id, facultyName: 'Admin',
       subjectName: subjectName.trim(), department: department.trim(),
       semester: semester.trim(), courseCategory: courseCategory?.trim() || '',
       isAdminCourse: true, active: true,
+      driveFolderId, driveUrl,
     });
     await logAction(req, 'CREATE_ADMIN_COURSE', 'Folder', course._id, { subjectName: course.subjectName });
     res.status(201).json({ course });
-  } catch (err) { res.status(500).json({ message: 'Failed to create course' }); }
+  } catch (err) {
+    logger.error(`createAdminCourse: ${err.message}`);
+    res.status(500).json({ message: 'Failed to create course' });
+  }
 };
 
 const updateAdminCourse = async (req, res) => {
@@ -342,6 +362,11 @@ const deleteAdminCourse = async (req, res) => {
   try {
     const course = await Folder.findOneAndDelete({ _id: req.params.id, isAdminCourse: true });
     if (!course) return res.status(404).json({ message: 'Course not found' });
+    // Delete Drive folder if it was created
+    if (driveService.enabled && course.driveFolderId && !course.driveFolderId.startsWith('local')) {
+      try { await driveService.deleteFolder(course.driveFolderId); }
+      catch (e) { logger.warn(`Could not delete admin course Drive folder: ${e.message}`); }
+    }
     await logAction(req, 'DELETE_ADMIN_COURSE', 'Folder', course._id, { subjectName: course.subjectName });
     res.json({ message: 'Course deleted' });
   } catch (err) { res.status(500).json({ message: 'Failed to delete course' }); }
