@@ -45,7 +45,7 @@ async function refreshCache() {
       User.countDocuments({ role: 'student', active: { $ne: false } }),
       User.countDocuments({ role: 'faculty', active: { $ne: false } }),
       Folder.countDocuments({ active: true }),
-      Visit.countDocuments(),
+      Visit.findOne({ _singleton: 'visits' }).then(doc => doc?.totalCount || 0),
     ]);
     cache.totalStudents  = totalStudents;
     cache.totalFaculty   = totalFaculty;
@@ -82,20 +82,19 @@ exports.getStats = async (req, res) => {
 };
 
 /* ── POST /api/stats/visit ───────────────────────────────────────────── */
-// Called by the frontend login page on every load.
-// This is how we count real website visits (frontend is on a separate host,
-// so the old GET / tracker on the backend never fires for real visitors).
+// Increments the singleton visit counter atomically.
+// Uses findOneAndUpdate + upsert so the doc is created on first visit.
+// No individual visit records stored — just the running total.
 exports.recordVisit = async (req, res) => {
   try {
-    await Visit.create({
-      ip:        req.ip || req.headers['x-forwarded-for'] || 'unknown',
-      userAgent: req.headers['user-agent'] || '',
-    });
-    // Increment cached count immediately so next stats call reflects it
-    cache.totalVisits += 1;
+    const result = await Visit.findOneAndUpdate(
+      { _singleton: 'visits' },
+      { $inc: { totalCount: 1 } },
+      { upsert: true, new: true }
+    );
+    cache.totalVisits = result.totalCount;
     res.json({ ok: true });
   } catch (err) {
-    // Non-critical — don't error the client
     logger.error(`recordVisit: ${err.message}`);
     res.json({ ok: false });
   }
