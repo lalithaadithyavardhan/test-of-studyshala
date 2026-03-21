@@ -39,6 +39,12 @@ export const AuthProvider = ({ children }) => {
   const login = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
+    // Remember who last logged in so Login page can show quick-return banner
+    localStorage.setItem('lastRole', userData.role);
+    localStorage.setItem('lastUser', JSON.stringify({
+      name: userData.name,
+      role: userData.role,
+    }));
     setUser(userData);
   };
 
@@ -55,6 +61,8 @@ export const AuthProvider = ({ children }) => {
     } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      // Keep lastUser + lastRole so quick-return banner shows on next visit
+      // User can clear it manually with "Switch account" button
       setUser(null);
     }
   };
