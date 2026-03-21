@@ -1,8 +1,6 @@
 /**
- * FacultyDashboard.jsx — Editorial redesign
- * Same design system as student pages:
- * Lora serif · IBM Plex Mono · Lato body
- * Warm off-white palette · Full dark mode · Scroll-reveal
+ * FacultyDashboard.jsx — Modern SaaS theme
+ * Plus Jakarta Sans · JetBrains Mono · Inter
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -69,7 +67,6 @@ const FdModal = ({ open, onClose, title, children, footer }) => {
     </div>
   );
 };
-
 
 // ── Announcement Banner ───────────────────────────────────────────────────────
 const AnnouncementBanner = () => {
@@ -265,23 +262,16 @@ const FacultyDashboard = () => {
 
   const APP_URL = 'https://studyshala.dev';
 
-  // Share the app itself via WhatsApp
   const shareApp = () => {
     const msg =
-      `📚 *StudyShala* — Study material sharing made easy!
-
-` +
-      `Faculty upload materials, students access them with a simple code.
-` +
-      `✓ Free · ✓ No ads · ✓ Google Drive backed
-
-` +
+      `📚 *StudyShala* — Study material sharing made easy!\n\n` +
+      `Faculty upload materials, students access them with a simple code.\n` +
+      `✓ Free · ✓ No ads · ✓ Google Drive backed\n\n` +
       `🔗 ${APP_URL}`;
     const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, '_blank', 'noopener');
   };
 
-  // Try native share → fallback to WhatsApp
   const shareAppNative = async () => {
     if (navigator.share) {
       try {
@@ -296,7 +286,6 @@ const FacultyDashboard = () => {
     shareApp();
   };
 
-  // Share a specific material via WhatsApp
   const shareMaterial = (material) => {
     const code    = material.accessCode || material.departmentCode || '—';
     const subject = material.subjectName || 'Study Material';
@@ -305,28 +294,18 @@ const FacultyDashboard = () => {
     const sem     = material.semester    ? `Semester ${material.semester}` : '';
 
     const msg =
-      `📚 *${subject}*
-` +
-      (faculty ? `👨‍🏫 Faculty: ${faculty}
-` : '') +
-      (dept    ? `🏫 Department: ${dept}
-`   : '') +
-      (sem     ? `📅 ${sem}
-`                : '') +
-      `
-🔑 *Access Code: \`${code}\`*
-
-` +
-      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.
-
-` +
+      `📚 *${subject}*\n` +
+      (faculty ? `👨‍🏫 Faculty: ${faculty}\n` : '') +
+      (dept    ? `🏫 Department: ${dept}\n`   : '') +
+      (sem     ? `📅 ${sem}\n`                : '') +
+      `\n🔑 *Access Code: \`${code}\`*\n\n` +
+      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.\n\n` +
       `🔗 Login at: ${APP_URL}`;
 
     const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, '_blank', 'noopener');
   };
 
-  // Copy the material share message to clipboard
   const [sharedId, setSharedId] = useState(null);
   const copyShareMsg = async (material) => {
     const code    = material.accessCode || material.departmentCode || '—';
@@ -338,9 +317,7 @@ const FacultyDashboard = () => {
       `📚 ${subject}` +
       (faculty ? ` | ${faculty}` : '') +
       (sem     ? ` | ${sem}`     : '') +
-      `
-🔑 Access Code: ${code}
-🔗 ${APP_URL}`;
+      `\n🔑 Access Code: ${code}\n🔗 ${APP_URL}`;
 
     try {
       await navigator.clipboard.writeText(msg);
@@ -404,7 +381,7 @@ const FacultyDashboard = () => {
                 </div>
               </div>
 
-              {/* Platform stats — clearly labelled separate section */}
+              {/* Platform stats */}
               {platformStats && (
                 <div className="fd-platform-card">
                   <div className="fd-platform-card-heading">
@@ -434,7 +411,6 @@ const FacultyDashboard = () => {
             </div>
           </div>
 
-          {/* ── Storage Widgets ── */}
           {/* ── Alerts ── */}
           {error   && <div className="fd-alert fd-alert--err fd-enter"><span>⚠</span> {error}</div>}
           {success && <div className="fd-alert fd-alert--ok  fd-enter"><span>✓</span> {success}</div>}
@@ -576,24 +552,26 @@ const FacultyDashboard = () => {
         title="Create New Material"
         footer={
           <>
-            <button className="fd-btn fd-btn--ghost" onClick={() => setShowCreate(false)}>Cancel</button>
+            <button className="fd-btn fd-btn--secondary" onClick={() => setShowCreate(false)}>Cancel</button>
             <button className="fd-btn fd-btn--primary" onClick={handleCreate} disabled={submitting}>
               {submitting ? <><ImSpinner8 className="fd-spin" /> Creating…</> : 'Create Material'}
             </button>
           </>
         }
       >
-        <p className="fd-modal-hint">A unique 8-character code will be generated for students automatically.</p>
+        <p className="fd-modal-hint" style={{ fontSize: '0.85rem', color: 'var(--fd-ink3)', marginBottom: '1.25rem' }}>
+          A unique 8-character code will be generated for students automatically.
+        </p>
         <form onSubmit={handleCreate} className="fd-form">
-          <div className="fd-field">
-            <label className="fd-label">Faculty Name <span>*</span></label>
+          <div className="fd-field" style={{ marginBottom: '1.25rem' }}>
+            <label className="fd-label">Faculty Name <span style={{ color: 'var(--fd-accent)' }}>*</span></label>
             <input className="fd-input" value={formData.facultyName}
               onChange={e => setFormData(p => ({ ...p, facultyName: e.target.value }))}
               placeholder="e.g., Dr. John Smith" required />
           </div>
-          <div className="fd-field-row">
+          <div className="fd-field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
             <div className="fd-field">
-              <label className="fd-label">Department <span>*</span></label>
+              <label className="fd-label">Department <span style={{ color: 'var(--fd-accent)' }}>*</span></label>
               <select className="fd-input" value={formData.department}
                 onChange={e => setFormData(p => ({ ...p, department: e.target.value }))} required>
                 <option value="">Select</option>
@@ -601,7 +579,7 @@ const FacultyDashboard = () => {
               </select>
             </div>
             <div className="fd-field">
-              <label className="fd-label">Semester <span>*</span></label>
+              <label className="fd-label">Semester <span style={{ color: 'var(--fd-accent)' }}>*</span></label>
               <select className="fd-input" value={formData.semester}
                 onChange={e => setFormData(p => ({ ...p, semester: e.target.value }))} required>
                 <option value="">Select</option>
@@ -609,23 +587,25 @@ const FacultyDashboard = () => {
               </select>
             </div>
           </div>
-          <div className="fd-field">
-            <label className="fd-label">Subject Name <span>*</span></label>
+          <div className="fd-field" style={{ marginBottom: '1.25rem' }}>
+            <label className="fd-label">Subject Name <span style={{ color: 'var(--fd-accent)' }}>*</span></label>
             <input className="fd-input" value={formData.subjectName}
               onChange={e => setFormData(p => ({ ...p, subjectName: e.target.value }))}
               placeholder="e.g., Data Structures & Algorithms" required />
           </div>
-          <div className="fd-field">
+          <div className="fd-field" style={{ marginBottom: '1.25rem' }}>
             <label className="fd-label">
               <MdCampaign style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} />
-              Message to Students <span className="fd-optional">(optional)</span>
+              Message to Students <span style={{ color: 'var(--fd-ink4)', fontWeight: 'normal', fontSize: '0.75rem' }}>(optional)</span>
             </label>
             <textarea className="fd-textarea"
               value={formData.messageToStudents}
               onChange={e => setFormData(p => ({ ...p, messageToStudents: e.target.value }))}
               placeholder="e.g., Unit 1 exam on Friday. Submit assignments by Sunday."
               rows={3} maxLength={2000} />
-            <div className="fd-char-count">{formData.messageToStudents.length}/2000</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem', color: 'var(--fd-ink4)', textAlign: 'right', marginTop: '0.3rem' }}>
+              {formData.messageToStudents.length}/2000
+            </div>
           </div>
         </form>
       </FdModal>
@@ -637,19 +617,18 @@ const FacultyDashboard = () => {
         title={`Upload Files — ${selectedFolder?.subjectName || ''}`}
         footer={
           <>
-            {/* Progress bar — visible while uploading */}
             {uploading && (
               <div style={{ flex: 1, marginRight: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#0369a1', marginBottom: '0.3rem', fontWeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--fd-accent)', marginBottom: '0.4rem', fontWeight: 600 }}>
                   <span>⏳ Uploading to Google Drive…</span>
                   <span>{uploadProgress}%</span>
                 </div>
-                <div style={{ height: '7px', background: '#e0f2fe', borderRadius: '99px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'linear-gradient(90deg, #0891b2, #14b8a6)', borderRadius: '99px', transition: 'width 0.3s ease' }} />
+                <div style={{ height: '8px', background: 'var(--fd-bg)', border: '1px solid var(--fd-border2)', borderRadius: '99px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'var(--fd-accent-grad)', borderRadius: '99px', transition: 'width 0.3s ease' }} />
                 </div>
               </div>
             )}
-            <button className="fd-btn fd-btn--ghost"
+            <button className="fd-btn fd-btn--secondary"
               onClick={() => { setShowUpload(false); setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); setUploadProgress(0); }}
               disabled={uploading}>
               Cancel
@@ -664,10 +643,12 @@ const FacultyDashboard = () => {
           </>
         }
       >
-        <p className="fd-modal-hint">Max 50 MB per file · PDF, DOC, PPT, XLS, images, video, ZIP</p>
+        <p className="fd-modal-hint" style={{ fontSize: '0.85rem', color: 'var(--fd-ink3)', marginBottom: '1.25rem' }}>
+          Max 50 MB per file · PDF, DOC, PPT, XLS, images, video, ZIP
+        </p>
 
         {/* Destination */}
-        <div className="fd-field">
+        <div className="fd-field" style={{ marginBottom: '1.25rem' }}>
           <label className="fd-label"><MdFolder style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Upload destination</label>
           <select className="fd-input" value={selectedSfId} onChange={e => setSelectedSfId(e.target.value)}>
             <option value="">📂 Root (no sub-folder)</option>
@@ -678,17 +659,17 @@ const FacultyDashboard = () => {
         </div>
 
         {/* Create sub-folder */}
-        <div className="fd-sf-create">
-          <MdCreateNewFolder className="fd-sf-create-icon" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--fd-bg)', border: '1px solid var(--fd-border2)', borderRadius: '10px', padding: '0.5rem 0.75rem', marginBottom: '1.25rem' }}>
+          <MdCreateNewFolder style={{ fontSize: '1.2rem', color: 'var(--fd-accent)', flexShrink: 0 }} />
           <input
-            className="fd-sf-input"
+            style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '0.9rem', color: 'var(--fd-ink)', outline: 'none', fontFamily: "'Inter', sans-serif" }}
             placeholder="New folder name (e.g. Unit 1, Lab Sheets)"
             value={newSfName}
             onChange={e => setNewSfName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateSubFolder(); } }}
             maxLength={60}
           />
-          <button className="fd-btn fd-btn--ghost fd-sf-btn"
+          <button className="fd-btn fd-btn--secondary" style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', border: 'none', background: 'var(--fd-card)' }}
             onClick={handleCreateSubFolder}
             disabled={!newSfName.trim() || creatingFolder}>
             {creatingFolder ? <ImSpinner8 className="fd-spin" /> : '+ Create'}
@@ -706,7 +687,7 @@ const FacultyDashboard = () => {
         >
           <div className="fd-dropzone-icon">📂</div>
           <p className="fd-dropzone-text">Drag &amp; drop files here</p>
-          <p className="fd-dropzone-sub">or click to browse</p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--fd-ink3)', margin: 0 }}>or click to browse</p>
           <input id="fd-file-input" type="file" multiple style={{ display: 'none' }}
             onChange={e => addFiles(Array.from(e.target.files))}
             accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar,.7z,.mp4,.mp3" />
@@ -714,27 +695,27 @@ const FacultyDashboard = () => {
 
         {/* File list */}
         {uploadFiles.length > 0 && (
-          <div className="fd-file-list">
-            <div className="fd-file-list-header">
+          <div className="fd-file-list" style={{ marginTop: '1rem', maxHeight: '240px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', marginBottom: '0.5rem', borderBottom: '1px solid var(--fd-border2)', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.75rem', fontWeight: 600, color: 'var(--fd-ink2)' }}>
               <span>{uploadFiles.length} file(s) · {fmtSize(totalSize)}</span>
-              <button className="fd-clear-btn" onClick={() => setUploadFiles([])}>Clear All</button>
+              <button style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--fd-red)', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setUploadFiles([])}>Clear All</button>
             </div>
             {uploadFiles.map((file, i) => (
               <div key={i} className="fd-file-row">
-                <span className="fd-file-emoji">📄</span>
-                <div className="fd-file-info">
-                  <div className="fd-file-name">{file.name}</div>
-                  <div className="fd-file-size">{fmtSize(file.size)}</div>
+                <span style={{ fontSize: '1.25rem' }}>📄</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="fd-file-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--fd-ink)' }}>{file.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--fd-ink3)', marginTop: '2px' }}>{fmtSize(file.size)}</div>
                 </div>
-                <button className="fd-file-remove" onClick={() => setUploadFiles(p => p.filter((_, j) => j !== i))}>✕</button>
+                <button style={{ padding: '0.3rem 0.6rem', border: 'none', background: 'color-mix(in srgb, var(--fd-red) 10%, transparent)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, color: 'var(--fd-red)', cursor: 'pointer' }} onClick={() => setUploadFiles(p => p.filter((_, j) => j !== i))}>✕</button>
               </div>
             ))}
           </div>
         )}
 
         {selectedSfId && (
-          <div className="fd-dest-badge">
-            📁 Uploading into: <strong>{selectedFolder?.subFolders?.find(sf => sf._id === selectedSfId)?.name}</strong>
+          <div style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: 'color-mix(in srgb, var(--fd-accent) 10%, transparent)', border: '1px dashed var(--fd-accent)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--fd-accent)', fontWeight: 600 }}>
+            📁 Uploading into: {selectedFolder?.subFolders?.find(sf => sf._id === selectedSfId)?.name}
           </div>
         )}
       </FdModal>
@@ -746,22 +727,26 @@ const FacultyDashboard = () => {
         title={`Message to Students — ${selectedFolder?.subjectName || ''}`}
         footer={
           <>
-            <button className="fd-btn fd-btn--ghost" onClick={() => setShowMsg(false)}>Cancel</button>
+            <button className="fd-btn fd-btn--secondary" onClick={() => setShowMsg(false)}>Cancel</button>
             <button className="fd-btn fd-btn--primary" onClick={handleSaveMessage} disabled={savingMsg}>
               {savingMsg ? <><ImSpinner8 className="fd-spin" /> Saving…</> : 'Save Message'}
             </button>
           </>
         }
       >
-        <p className="fd-modal-hint">Shown to students whenever they access or browse this material.</p>
+        <p className="fd-modal-hint" style={{ fontSize: '0.85rem', color: 'var(--fd-ink3)', marginBottom: '1.25rem' }}>
+          Shown to students whenever they access or browse this material.
+        </p>
         <textarea className="fd-textarea" value={msgText}
           onChange={e => setMsgText(e.target.value)}
           placeholder="e.g., Unit 2 exam next week. Assignment deadline Sunday midnight."
-          rows={5} maxLength={2000} style={{ width: '100%' }} />
-        <div className="fd-char-count">{msgText.length}/2000</div>
-        {msgText.trim() && (
-          <button className="fd-clear-msg-btn" onClick={() => setMsgText('')}>🗑 Clear message</button>
-        )}
+          rows={5} maxLength={2000} style={{ width: '100%', marginBottom: '0.5rem' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {msgText.trim() ? (
+            <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--fd-red)', padding: 0, fontWeight: 600 }} onClick={() => setMsgText('')}>🗑 Clear message</button>
+          ) : <div />}
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem', color: 'var(--fd-ink4)' }}>{msgText.length}/2000</div>
+        </div>
       </FdModal>
 
     </div>
