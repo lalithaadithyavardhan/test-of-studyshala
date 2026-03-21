@@ -211,6 +211,11 @@ const AdminDashboard = () => {
   const [courseForm,    setCourseForm]    = useState({ subjectName:'', department:'', semester:'', courseCategory:'' });
   const [editingCourse, setEditingCourse] = useState(null);
   const [courseSaving,  setCourseSaving]  = useState(false);
+  const [uploadingTo,   setUploadingTo]   = useState(null);
+  const [uploadFiles,   setUploadFiles]   = useState([]);
+  const [uploading,     setUploading]     = useState(false);
+  const [uploadError,   setUploadError]   = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState('');
 
   const fetchCourses = async () => {
     setCoursesLoading(true);
@@ -239,7 +244,25 @@ const AdminDashboard = () => {
   };
   const handleEditCourse   = c => { setEditingCourse(c._id); setCourseForm({ subjectName:c.subjectName, department:c.department, semester:c.semester, courseCategory:c.courseCategory||'' }); };
   const handleDeleteCourse = async id => { if (!window.confirm('Delete this course?')) return; try { await api.delete(`/admin/courses/${id}`); setCourses(p=>p.filter(c=>c._id!==id)); flash('success','Deleted'); } catch{flash('error','Failed');} };
-  const handleOpenCourse   = id => navigate('/browse-materials', { state: { openFolderId: id } });
+  const handleOpenCourse = id => navigate('/browse-materials', { state: { openFolderId: id } });
+
+  const handleUploadToCourse = async (courseId) => {
+    if (!uploadFiles.length) { setUploadError('Select at least one file.'); return; }
+    setUploading(true); setUploadError(''); setUploadSuccess('');
+    try {
+      const form = new FormData();
+      uploadFiles.forEach(f => form.append('files', f));
+      await api.post(`/admin/courses/${courseId}/files`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setUploadSuccess(`${uploadFiles.length} file(s) uploaded to Drive!`);
+      setUploadFiles([]);
+      setUploadingTo(null);
+      fetchCourses();
+    } catch (err) {
+      setUploadError(err.response?.data?.message || 'Upload failed. Make sure Google Drive is configured in your backend .env');
+    } finally { setUploading(false); }
+  };
 
   /* ── FEEDBACK ─────────────────────────────────────────────────────────── */
   const [feedbacks,       setFeedbacks]       = useState([]);
@@ -704,6 +727,54 @@ const AdminDashboard = () => {
                         <Button variant="danger"    size="sm" onClick={()=>handleDeleteCourse(c._id)}><MdDelete/> Delete</Button>
                       </div>
                     </div>
+
+                    {/* Upload panel */}
+                    {uploadingTo === c._id ? (
+                      <div className="ad-upload-panel">
+                        <div className="ad-upload-panel-header">
+                          <span>Upload files → <strong>{c.subjectName}</strong></span>
+                          <button className="ad-icon-btn" onClick={()=>{setUploadingTo(null);setUploadFiles([]);setUploadError('');setUploadSuccess('');}}>
+                            <MdClose/>
+                          </button>
+                        </div>
+                        <label className="ad-upload-drop">
+                          <input type="file" multiple style={{display:'none'}}
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar,.7z,.mp4,.mp3"
+                            onChange={e=>{setUploadFiles(Array.from(e.target.files));setUploadError('');setUploadSuccess('');}}
+                          />
+                          <MdUpload style={{fontSize:'1.8rem',color:'var(--primary)',marginBottom:'0.3rem'}}/>
+                          <span style={{fontWeight:700,fontSize:'0.88rem'}}>
+                            {uploadFiles.length ? `${uploadFiles.length} file(s) selected` : 'Click to choose files'}
+                          </span>
+                          <span style={{fontSize:'0.72rem',color:'var(--text-sub)',marginTop:'0.15rem'}}>
+                            PDF, Word, PPT, Excel, Images, ZIP, MP4, MP3
+                          </span>
+                        </label>
+                        {uploadFiles.length > 0 && (
+                          <div className="ad-upload-filelist">
+                            {uploadFiles.map((f,i)=>(
+                              <div key={i} className="ad-upload-filerow">
+                                <span className="ad-upload-fname">{f.name}</span>
+                                <span className="ad-upload-fsize">{(f.size/1024/1024).toFixed(1)} MB</span>
+                                <button className="ad-icon-btn" style={{width:'22px',height:'22px',fontSize:'0.8rem'}}
+                                  onClick={()=>setUploadFiles(p=>p.filter((_,j)=>j!==i))}><MdClose/></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {uploadError   && <div className="alert alert-error"   style={{marginTop:'0.5rem',padding:'0.45rem 0.75rem',fontSize:'0.8rem'}}>{uploadError}</div>}
+                        {uploadSuccess && <div className="alert alert-success" style={{marginTop:'0.5rem',padding:'0.45rem 0.75rem',fontSize:'0.8rem'}}>{uploadSuccess}</div>}
+                        <Button variant="primary" style={{width:'100%',marginTop:'0.625rem'}}
+                          onClick={()=>handleUploadToCourse(c._id)} disabled={uploading||!uploadFiles.length}>
+                          {uploading ? <><Spin/> Uploading to Drive…</> : <><MdUpload/> Upload to Google Drive</>}
+                        </Button>
+                      </div>
+                    ) : (
+                      <button className="ad-upload-trigger"
+                        onClick={()=>{setUploadingTo(c._id);setUploadFiles([]);setUploadError('');setUploadSuccess('');setEditingCourse(null);}}>
+                        <MdUpload/> Upload Files to this Course
+                      </button>
+                    )}
                   </div>
                 )) : (
                   <div className="empty-state" style={{padding:'3rem',textAlign:'center'}}><p>No admin courses yet. Create one above.</p></div>
