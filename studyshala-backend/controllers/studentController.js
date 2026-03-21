@@ -53,9 +53,14 @@ const validateAccessCode = async (req, res) => {
 
     if (!folder) return res.json({ valid: false, message: 'Code not found or inactive' });
 
+    // Only record FIRST access per material — prevents duplicate entries growing the doc
     const seen = req.user.accessHistory.find(h => h.materialId.toString() === folder._id.toString());
     if (!seen) {
       req.user.accessHistory.push({ materialId: folder._id, accessCode: code, accessedAt: new Date() });
+      // Safety cap: keep only the 50 most recent entries (each is ~35 bytes)
+      if (req.user.accessHistory.length > 50) {
+        req.user.accessHistory = req.user.accessHistory.slice(-50);
+      }
       await req.user.save();
       folder.accessCount += 1;
       await folder.save();
