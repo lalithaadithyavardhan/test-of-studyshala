@@ -309,6 +309,7 @@ const getPublicAdminCourses = async (req, res) => {
       courseCategory: c.courseCategory || '', accessCount: c.accessCount || 0,
       fileCount: (c.files || []).length + (c.subFolders || []).reduce((s, sf) => s + sf.files.length, 0),
       files: c.files, subFolders: c.subFolders, createdAt: c.createdAt,
+      isAdminCourse: true,  // needed by BrowseMaterials to use the public endpoint
     })) });
   } catch (err) { res.status(500).json({ message: 'Failed to fetch courses' }); }
 };
