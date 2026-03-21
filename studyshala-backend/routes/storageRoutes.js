@@ -6,3 +6,4 @@ const { authenticate } = require('../middleware/auth');
 router.get('/my-studyshala', authenticate, getMyStudyshalaUsage);
 
 module.exports = router;
+
