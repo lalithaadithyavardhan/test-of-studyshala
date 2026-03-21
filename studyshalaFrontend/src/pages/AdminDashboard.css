@@ -307,3 +307,105 @@ body.dark-mode .activity-metric p {
 /* ── Alert overlap fix ─────────────────────────────────── */
 /* Reset default margin-bottom so the wrapper gap controls spacing */
 .page-container > div > .alert { margin-bottom: 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN COURSE — File Upload UI
+   ══════════════════════════════════════════════════════════════ */
+.ad-upload-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  margin-top: 0.625rem;
+  padding: 0.45rem 0.875rem;
+  background: transparent;
+  border: 1.5px dashed var(--border-solid);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+  font-family: inherit;
+}
+.ad-upload-trigger:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  border-style: solid;
+}
+
+.ad-upload-panel {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: var(--bg);
+  border: 1.5px solid var(--border-solid);
+  border-radius: 10px;
+}
+.ad-upload-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.ad-upload-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  border: 2px dashed var(--border-solid);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  background: var(--surface);
+  transition: border-color 0.18s, background 0.18s;
+  color: var(--text);
+}
+.ad-upload-drop:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.ad-upload-filelist {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.ad-upload-filerow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.625rem;
+  background: var(--surface);
+  border: 1px solid var(--border-solid);
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+.ad-upload-fname {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 500;
+}
+.ad-upload-fsize {
+  color: var(--text-sub);
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+body.dark-mode .ad-upload-panel    { background: var(--surface); border-color: var(--border-solid); }
+body.dark-mode .ad-upload-drop     { background: var(--bg); }
+body.dark-mode .ad-upload-filerow  { background: var(--bg); }
+body.dark-mode .ad-upload-trigger  { border-color: var(--border-solid); }
+
+@media (max-width: 480px) {
+  .ad-upload-drop   { padding: 1rem 0.75rem; }
+  .ad-upload-panel  { padding: 0.75rem; }
+}
