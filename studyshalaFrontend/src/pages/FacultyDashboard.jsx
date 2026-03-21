@@ -404,27 +404,33 @@ const FacultyDashboard = () => {
                 </div>
               </div>
 
-              {/* Platform stats — subtle live metrics */}
-              <div className="fd-stats-row fd-platform-stats">
-                <div className="fd-stat fd-stat--platform">
-                  <div className="fd-stat-val fd-stat-val--sm">
-                    {platformStats ? platformStats.totalStudents?.toLocaleString() : '—'}
+              {/* Platform stats — clearly labelled separate section */}
+              {platformStats && (
+                <div className="fd-platform-card">
+                  <div className="fd-platform-card-heading">
+                    <span className="fd-platform-dot" />
+                    StudyShala at a glance
                   </div>
-                  <div className="fd-stat-lbl">Students</div>
-                </div>
-                <div className="fd-stat fd-stat--platform">
-                  <div className="fd-stat-val fd-stat-val--sm">
-                    {platformStats ? platformStats.totalMaterials?.toLocaleString() : '—'}
+                  <div className="fd-platform-card-grid">
+                    <div className="fd-platform-item">
+                      <span className="fd-platform-val">{platformStats.totalStudents?.toLocaleString()}</span>
+                      <span className="fd-platform-lbl">Students joined</span>
+                    </div>
+                    <div className="fd-platform-item">
+                      <span className="fd-platform-val">{platformStats.totalFaculty?.toLocaleString()}</span>
+                      <span className="fd-platform-lbl">Faculty members</span>
+                    </div>
+                    <div className="fd-platform-item">
+                      <span className="fd-platform-val">{platformStats.totalMaterials?.toLocaleString()}</span>
+                      <span className="fd-platform-lbl">Materials shared</span>
+                    </div>
+                    <div className="fd-platform-item">
+                      <span className="fd-platform-val">{platformStats.totalVisits?.toLocaleString()}</span>
+                      <span className="fd-platform-lbl">Total visits</span>
+                    </div>
                   </div>
-                  <div className="fd-stat-lbl">Shared</div>
                 </div>
-                <div className="fd-stat fd-stat--platform">
-                  <div className="fd-stat-val fd-stat-val--sm">
-                    {platformStats ? platformStats.totalVisits?.toLocaleString() : '—'}
-                  </div>
-                  <div className="fd-stat-lbl">Visits</div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
