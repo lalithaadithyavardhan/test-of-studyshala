@@ -806,3 +806,42 @@ body.dark-mode .fd-share-btn--done { background: #14532d55 !important; color: #4
   .fd-fab-label { display: none; }
   .fd-fab-icon  { font-size: 1.3rem; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   PLATFORM STATS ROW — live metrics, subtle visual treatment
+   Uses same fd-stat shell but smaller values + muted accent
+   ══════════════════════════════════════════════════════════════ */
+.fd-platform-stats {
+  margin-top: 0.5rem;
+  position: relative;
+}
+.fd-platform-stats::before {
+  content: 'LIVE — studyshala platform';
+  display: block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fd-ink4);
+  margin-bottom: 0.35rem;
+  transition: color 0.25s;
+}
+.fd-stat--platform {
+  background: var(--fd-bg2);
+  border-color: transparent;
+  border-style: dashed;
+  border-width: 1px;
+  border-color: var(--fd-border);
+}
+body.dark-mode .fd-stat--platform {
+  background: rgba(255,255,255,0.03);
+}
+.fd-stat-val--sm {
+  font-size: 1.15rem !important;
+  color: var(--fd-ink2) !important;
+}
+
+@media (max-width: 480px) {
+  .fd-stat-val--sm { font-size: 1rem !important; }
+}
