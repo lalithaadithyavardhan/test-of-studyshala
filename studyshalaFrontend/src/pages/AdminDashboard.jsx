@@ -10,7 +10,7 @@ import Input from '../components/Input';
 import {
   MdBarChart, MdPeople, MdFolder, MdFeedback, MdCampaign,
   MdSchool, MdSettings, MdEdit, MdDelete, MdRefresh,
-  MdOpenInNew, MdDownload, MdPerson, MdClose, MdAdd
+  MdOpenInNew, MdDownload, MdPerson, MdClose, MdAdd, MdUpload
 } from 'react-icons/md';
 import { ImSpinner8 } from 'react-icons/im';
 import './AdminDashboard.css';
