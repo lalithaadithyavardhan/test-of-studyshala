@@ -119,109 +119,140 @@ const StudentEnterCode = () => {
             </p>
           </div>
 
-          {/* Card */}
-          <div className="ec-card ec-enter" style={{ animationDelay: '320ms' }}>
-            <div className="ec-card-header">
-              <div className="ec-card-icon"><MdKey /></div>
-              <div>
-                <div className="ec-card-title">Access Code</div>
-                <div className="ec-card-sub">8 characters · case-insensitive</div>
+          {/* ── Two-column layout on desktop: code left, metrics right ── */}
+          <div className="ec-body-grid">
+
+            {/* LEFT — code card + quick links */}
+            <div className="ec-body-left">
+
+              {/* Card */}
+              <div className="ec-card ec-enter" style={{ animationDelay: '320ms' }}>
+                <div className="ec-card-header">
+                  <div className="ec-card-icon"><MdKey /></div>
+                  <div>
+                    <div className="ec-card-title">Access Code</div>
+                    <div className="ec-card-sub">8 characters · case-insensitive</div>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="ec-error">
+                    <span>⚠</span> {error}
+                  </div>
+                )}
+
+                <form onSubmit={handleValidate} className="ec-form">
+                  <div
+                    className="ec-input-wrap"
+                    onClick={() => inputRef.current?.focus()}
+                  >
+                    <div className="ec-input-chars" aria-hidden="true">
+                      {Array.from({ length: 8 }).map((_, i) => {
+                        const isFilled  = !!code[i];
+                        const isActive  = i === code.length && code.length < 8;
+                        return (
+                          <div
+                            key={i}
+                            className={[
+                              'ec-char-box',
+                              isFilled  ? 'ec-char-box--filled'  : '',
+                              isActive  ? 'ec-char-box--active'  : '',
+                            ].join(' ').trim()}
+                          >
+                            {isFilled ? code[i] : isActive ? <span className="ec-caret" /> : ''}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <input
+                      ref={inputRef}
+                      className="ec-real-input"
+                      value={code}
+                      onChange={e => { setCode(e.target.value.toUpperCase().slice(0, 8)); setError(''); }}
+                      maxLength={8}
+                      required
+                      autoFocus
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-label="Access code"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className={`ec-submit ${loading ? 'ec-submit--loading' : ''} ${!code.trim() ? 'ec-submit--off' : ''}`}
+                    disabled={loading || !code.trim()}
+                  >
+                    {loading
+                      ? <><ImSpinner8 className="ec-spin" /><span>Validating…</span></>
+                      : <><MdLockOpen /><span>Unlock Materials</span></>
+                    }
+                  </button>
+                </form>
+              </div>
+
+              {/* Quick links */}
+              <div className="ec-quick">
+                {quickLinks.map((ql, i) => (
+                  <button
+                    key={ql.path}
+                    className="ec-quick-btn ec-enter"
+                    style={{ animationDelay: `${420 + i * 80}ms` }}
+                    onClick={() => navigate(ql.path)}
+                  >
+                    <span className="ec-quick-icon">{ql.icon}</span>
+                    <div className="ec-quick-text">
+                      <span className="ec-quick-label">{ql.label}</span>
+                      <span className="ec-quick-sub">{ql.sub}</span>
+                    </div>
+                    <span className="ec-quick-arrow">→</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {error && (
-              <div className="ec-error">
-                <span>⚠</span> {error}
+            {/* RIGHT — platform stats panel (desktop) / below (mobile) */}
+            {platformStats && (
+              <div className="ec-stats-panel ec-enter" style={{ animationDelay: '380ms' }}>
+                <div className="ec-stats-panel-heading">
+                  <span className="ec-stats-panel-dot" />
+                  StudyShala at a glance
+                </div>
+                <p className="ec-stats-panel-sub">
+                  Live numbers from across the platform
+                </p>
+                <div className="ec-stats-panel-grid">
+                  <div className="ec-stats-panel-item">
+                    <span className="ec-stats-panel-val">
+                      {platformStats.totalStudents?.toLocaleString()}
+                    </span>
+                    <span className="ec-stats-panel-lbl">Students joined</span>
+                  </div>
+                  <div className="ec-stats-panel-item">
+                    <span className="ec-stats-panel-val">
+                      {platformStats.totalFaculty?.toLocaleString()}
+                    </span>
+                    <span className="ec-stats-panel-lbl">Faculty members</span>
+                  </div>
+                  <div className="ec-stats-panel-item">
+                    <span className="ec-stats-panel-val">
+                      {platformStats.totalMaterials?.toLocaleString()}
+                    </span>
+                    <span className="ec-stats-panel-lbl">Materials shared</span>
+                  </div>
+                  <div className="ec-stats-panel-item">
+                    <span className="ec-stats-panel-val">
+                      {platformStats.totalVisits?.toLocaleString()}
+                    </span>
+                    <span className="ec-stats-panel-lbl">Total visits</span>
+                  </div>
+                </div>
+                <div className="ec-stats-panel-footer">
+                  Free · Ad-free · Always
+                </div>
               </div>
             )}
 
-            <form onSubmit={handleValidate} className="ec-form">
-              <div
-                className="ec-input-wrap"
-                onClick={() => inputRef.current?.focus()}
-              >
-                <div className="ec-input-chars" aria-hidden="true">
-                  {Array.from({ length: 8 }).map((_, i) => {
-                    const isFilled  = !!code[i];
-                    const isActive  = i === code.length && code.length < 8; // next empty slot
-                    return (
-                      <div
-                        key={i}
-                        className={[
-                          'ec-char-box',
-                          isFilled  ? 'ec-char-box--filled'  : '',
-                          isActive  ? 'ec-char-box--active'  : '',
-                        ].join(' ').trim()}
-                      >
-                        {isFilled ? code[i] : isActive ? <span className="ec-caret" /> : ''}
-                      </div>
-                    );
-                  })}
-                </div>
-                <input
-                  ref={inputRef}
-                  className="ec-real-input"
-                  value={code}
-                  onChange={e => { setCode(e.target.value.toUpperCase().slice(0, 8)); setError(''); }}
-                  maxLength={8}
-                  required
-                  autoFocus
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label="Access code"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className={`ec-submit ${loading ? 'ec-submit--loading' : ''} ${!code.trim() ? 'ec-submit--off' : ''}`}
-                disabled={loading || !code.trim()}
-              >
-                {loading
-                  ? <><ImSpinner8 className="ec-spin" /><span>Validating…</span></>
-                  : <><MdLockOpen /><span>Unlock Materials</span></>
-                }
-              </button>
-            </form>
-          </div>
-
-          {/* Platform stats strip */}
-          {platformStats && (
-            <div className="ec-stats-strip ec-enter" style={{ animationDelay: '380ms' }}>
-              <div className="ec-stat-chip">
-                <span className="ec-stat-chip-val">{platformStats.totalStudents?.toLocaleString()}</span>
-                <span className="ec-stat-chip-lbl">Students</span>
-              </div>
-              <div className="ec-stat-divider" />
-              <div className="ec-stat-chip">
-                <span className="ec-stat-chip-val">{platformStats.totalMaterials?.toLocaleString()}</span>
-                <span className="ec-stat-chip-lbl">Materials</span>
-              </div>
-              <div className="ec-stat-divider" />
-              <div className="ec-stat-chip">
-                <span className="ec-stat-chip-val">{platformStats.totalVisits?.toLocaleString()}</span>
-                <span className="ec-stat-chip-lbl">Visits</span>
-              </div>
-            </div>
-          )}
-
-          {/* Quick links */}
-          <div className="ec-quick">
-            {quickLinks.map((ql, i) => (
-              <button
-                key={ql.path}
-                className="ec-quick-btn ec-enter"
-                style={{ animationDelay: `${420 + i * 80}ms` }}
-                onClick={() => navigate(ql.path)}
-              >
-                <span className="ec-quick-icon">{ql.icon}</span>
-                <div className="ec-quick-text">
-                  <span className="ec-quick-label">{ql.label}</span>
-                  <span className="ec-quick-sub">{ql.sub}</span>
-                </div>
-                <span className="ec-quick-arrow">→</span>
-              </button>
-            ))}
           </div>
 
         </div>
