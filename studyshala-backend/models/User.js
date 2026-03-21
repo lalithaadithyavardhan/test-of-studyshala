@@ -45,11 +45,11 @@ const userSchema = new mongoose.Schema({
   departmentCode: String,  // legacy - current active code
 
   token:               { type: String, default: null },
-  googleAccessToken:   { type: String, default: null },  // user's personal Google OAuth token
+
   
   // Student-specific fields
   savedMaterials: [savedMaterialSchema],
-  accessHistory:  [accessHistorySchema],
+  accessHistory:  { type: [accessHistorySchema], default: [] },
   recentFiles:    { type: [recentFileSchema], default: [] },   // last 10 viewed files
   starredFiles:   { type: [starredFileSchema], default: [] },  // bookmarked files
   
