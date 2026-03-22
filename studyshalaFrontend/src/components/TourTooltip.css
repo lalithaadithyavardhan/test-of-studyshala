@@ -1,0 +1,231 @@
+/* ══════════════════════════════════════════════════════════════
+   TOUR TOOLTIP — guided onboarding overlay
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Root wrapper ── */
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.tour-root--visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── Dim overlay with spotlight hole ── */
+.tour-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.58);
+  transition: clip-path 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer; /* clicking outside skips */
+}
+
+/* ── Highlight ring around target ── */
+.tour-highlight {
+  position: fixed;
+  border-radius: 10px;
+  border: 2.5px solid #fff;
+  box-shadow:
+    0 0 0 4px rgba(255,255,255,0.15),
+    0 0 24px rgba(255,255,255,0.2);
+  pointer-events: none;
+  transition:
+    top    0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    left   0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    width  0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: tourPulse 2s ease-in-out infinite;
+}
+@keyframes tourPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255,255,255,0.15), 0 0 24px rgba(255,255,255,0.2); }
+  50%       { box-shadow: 0 0 0 6px rgba(255,255,255,0.25), 0 0 32px rgba(255,255,255,0.3); }
+}
+
+/* ── Tooltip card ── */
+.tour-tooltip {
+  position: fixed;
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.25rem 1.375rem 1.125rem;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.28),
+    0 4px 16px rgba(0,0,0,0.12);
+  z-index: 100000;
+  pointer-events: all;
+  transition: top 0.35s cubic-bezier(0.4,0,0.2,1), left 0.35s cubic-bezier(0.4,0,0.2,1);
+  border: 1.5px solid rgba(0,0,0,0.07);
+}
+
+body.dark-mode .tour-tooltip {
+  background: #1e293b;
+  border-color: rgba(255,255,255,0.1);
+  color: #f1f5f9;
+}
+
+/* ── Header ── */
+.tour-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.tour-step-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+body.dark-mode .tour-step-badge { background: #334155; color: #94a3b8; }
+
+.tour-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  display: flex;
+  padding: 2px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.tour-close:hover { color: #475569; background: #f1f5f9; }
+body.dark-mode .tour-close:hover { color: #e2e8f0; background: #334155; }
+
+/* ── Content ── */
+.tour-emoji {
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+  line-height: 1;
+}
+.tour-title {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.4rem;
+  line-height: 1.3;
+}
+body.dark-mode .tour-title { color: #f1f5f9; }
+
+.tour-desc {
+  font-size: 0.84rem;
+  color: #475569;
+  line-height: 1.65;
+  font-weight: 400;
+}
+body.dark-mode .tour-desc { color: #94a3b8; }
+
+/* ── Progress dots ── */
+.tour-dots {
+  display: flex;
+  gap: 5px;
+  margin: 0.875rem 0 0.75rem;
+}
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+  flex-shrink: 0;
+}
+.tour-dot:hover          { background: #94a3b8; }
+.tour-dot--done          { background: #94a3b8; }
+.tour-dot--active        { background: #2563eb; transform: scale(1.3); }
+body.dark-mode .tour-dot         { background: #334155; }
+body.dark-mode .tour-dot--done   { background: #475569; }
+body.dark-mode .tour-dot--active { background: #3b82f6; }
+
+/* ── Buttons ── */
+.tour-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.tour-btn {
+  padding: 0.42rem 0.875rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: background 0.15s, transform 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.tour-btn:active { transform: scale(0.97); }
+
+.tour-btn--back {
+  background: #f1f5f9;
+  color: #475569;
+}
+.tour-btn--back:hover { background: #e2e8f0; color: #1e293b; }
+body.dark-mode .tour-btn--back { background: #334155; color: #94a3b8; }
+
+.tour-btn--skip {
+  background: none;
+  color: #94a3b8;
+  margin-right: auto;
+  padding-left: 0.25rem;
+}
+.tour-btn--skip:hover { color: #475569; }
+body.dark-mode .tour-btn--skip:hover { color: #cbd5e1; }
+
+.tour-btn--next {
+  background: #1e293b;
+  color: #fff;
+  padding: 0.42rem 1rem;
+}
+.tour-btn--next:hover { background: #0f172a; }
+body.dark-mode .tour-btn--next { background: #3b82f6; }
+body.dark-mode .tour-btn--next:hover { background: #2563eb; }
+
+/* ── Replay button (in sidebar footer) ── */
+.tour-replay-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--sb-ink3, #8c8880);
+  font-size: 0.72rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  padding: 0.4rem 0.625rem;
+  border-radius: 7px;
+  transition: background 0.18s, color 0.18s;
+  width: 100%;
+  letter-spacing: 0.02em;
+}
+.tour-replay-btn svg { font-size: 0.95rem; flex-shrink: 0; }
+.tour-replay-btn:hover {
+  background: var(--sb-bg2, #eeecea);
+  color: var(--sb-ink, #1a1916);
+}
+body.dark-mode .tour-replay-btn:hover { background: rgba(255,255,255,0.05); color: #e2e8f0; }
+
+/* ── Mobile: pin tooltip to bottom ── */
+@media (max-width: 540px) {
+  .tour-tooltip {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 1rem !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    width: auto !important;
+    border-radius: 16px;
+  }
+}
