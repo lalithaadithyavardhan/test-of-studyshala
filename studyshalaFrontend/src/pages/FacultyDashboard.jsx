@@ -19,6 +19,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa';
 import { ImSpinner8 } from 'react-icons/im';
 import './FacultyDashboard.css';
+import TourTooltip from '../components/TourTooltip';
 
 // ── Scroll-reveal wrapper ────────────────────────────────────────────────────
 const Reveal = ({ children, delay = 0, direction = 'bottom' }) => {
@@ -114,13 +115,14 @@ const AnnouncementBanner = () => {
 
 // ── Main Component ───────────────────────────────────────────────────────────
 const FacultyDashboard = () => {
-  const { user } = useAuth();
+  const { user, completeTour, resetTour } = useAuth();
 
   const [materials,       setMaterials]       = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [error,           setError]           = useState('');
   const [success,         setSuccess]         = useState('');
   const [pageReady,       setPageReady]       = useState(false);
+  const [showTour,        setShowTour]        = useState(false);
   const [platformStats,   setPlatformStats]   = useState(null);
 
   const [showCreate,      setShowCreate]      = useState(false);
@@ -151,7 +153,13 @@ const FacultyDashboard = () => {
 
   useEffect(() => {
     api.get('/stats').then(res => setPlatformStats(res.data)).catch(() => {});
-    const t = setTimeout(() => setPageReady(true), 60);
+    const t = setTimeout(() => {
+      setPageReady(true);
+      // Start tour only if user hasn't completed it yet
+      if (!user?.tourCompleted) {
+        setTimeout(() => setShowTour(true), 800);
+      }
+    }, 60);
     fetchMaterials();
     return () => clearTimeout(t);
   }, []);
@@ -354,6 +362,57 @@ const FacultyDashboard = () => {
   };
 
   const totalSize = uploadFiles.reduce((s, f) => s + f.size, 0);
+
+
+  const FACULTY_TOUR = [
+    {
+      selector: null,
+      emoji: '👋',
+      title: 'Welcome to StudyShala!',
+      desc: "You're now on your Faculty Dashboard. Let's take a quick tour — it'll take less than a minute.",
+    },
+    {
+      selector: '.fd-create-btn',
+      emoji: '📁',
+      title: 'Create a Material',
+      desc: 'Tap here to create a new subject folder. Give it a name, department, and semester.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.fd-code-box',
+      emoji: '🔑',
+      title: 'Your Access Code',
+      desc: 'Every material gets a unique 8-character code. Share this with your students — they use it to unlock your files.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.fd-share-btn--wa',
+      emoji: '📲',
+      title: 'Share Instantly',
+      desc: 'Send the access code directly via WhatsApp with one tap — no copy-paste needed.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.fd-btn--primary',
+      emoji: '📤',
+      title: 'Upload Files',
+      desc: 'Upload PDFs, slides, documents, images — anything. Files are stored securely on Google Drive.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.sb-nav',
+      emoji: '📚',
+      title: 'Navigation Sidebar',
+      desc: 'Use the sidebar to browse all materials, access admin public courses, or share the app with colleagues.',
+      placement: 'bottom',
+    },
+    {
+      selector: null,
+      emoji: '🎉',
+      title: "You're all set!",
+      desc: "Create your first material and share the code with your class. If you ever want this tour again, tap the Tour button in the sidebar.",
+    },
+  ];
 
   return (
     <div className="app-container">
@@ -764,6 +823,14 @@ const FacultyDashboard = () => {
         )}
       </FdModal>
 
+    </div>
+      {/* ── Guided Tour ── */}
+      {showTour && (
+        <TourTooltip
+          steps={FACULTY_TOUR}
+          onFinish={() => { setShowTour(false); completeTour(); }}
+        />
+      )}
     </div>
   );
 };
