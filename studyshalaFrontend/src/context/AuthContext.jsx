@@ -17,14 +17,38 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize authentication state from localStorage on app load
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token      = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    
+
     if (token && storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsed = JSON.parse(storedUser);
+        setUser(parsed);
+
+        // Silently refresh from DB to get latest tourCompleted and role.
+        // If backend is sleeping (Render cold start), this fails quietly
+        // and the user stays logged in from localStorage.
+        api.get('/auth/user').then(res => {
+          if (res.data?.user) {
+            const fresh = {
+              id:             res.data.user._id,
+              name:           res.data.user.name,
+              email:          res.data.user.email,
+              role:           res.data.user.role,
+              department:     res.data.user.department,
+              profilePicture: res.data.user.profilePicture,
+              tourCompleted:  res.data.user.tourCompleted || false,
+            };
+            setUser(fresh);
+            // Save fresh data back to localStorage so next load is accurate
+            try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
+          }
+        }).catch(() => {
+          // Backend sleeping or network error — keep user from localStorage
+        });
+
       } catch (error) {
-        console.error("Failed to parse stored user:", error);
+        console.error('Failed to parse stored user:', error);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
@@ -57,7 +81,13 @@ export const AuthProvider = ({ children }) => {
     try {
       await api.post('/auth/tour-complete');
     } catch (_) {}
-    setUser(prev => prev ? { ...prev, tourCompleted: true } : prev);
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, tourCompleted: true };
+      // Persist to localStorage so it survives page refresh
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   };
 
   // Called when user clicks "Replay tour" — resets on DB
@@ -65,7 +95,13 @@ export const AuthProvider = ({ children }) => {
     try {
       await api.post('/auth/tour-reset');
     } catch (_) {}
-    setUser(prev => prev ? { ...prev, tourCompleted: false } : prev);
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, tourCompleted: false };
+      // Persist to localStorage
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   };
 
   const logout = async () => {
