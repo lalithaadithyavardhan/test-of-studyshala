@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   MdDashboard,
@@ -112,6 +113,7 @@ const FeedbackModal = ({ onClose }) => {
 const Sidebar = ({ role }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { resetTour } = useAuth();
   const [isCollapsed,   setIsCollapsed]   = useState(false);
   const [isMobileOpen,  setIsMobileOpen]  = useState(false);
   const [mounted,       setMounted]       = useState(false);
