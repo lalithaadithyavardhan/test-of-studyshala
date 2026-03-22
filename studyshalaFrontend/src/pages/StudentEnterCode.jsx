@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import { MdKey, MdLockOpen, MdFolderOpen, MdHistory, MdCampaign, MdClose } from 'react-icons/md';
 import { ImSpinner8 } from 'react-icons/im';
 import './StudentEnterCode.css';
+import TourTooltip from '../components/TourTooltip';
 
 /* ── Announcement Banner ─────────────────────────────────────────────────────
    Fetches announcements for the logged-in student and shows them one at a time.
@@ -57,13 +58,19 @@ const StudentEnterCode = () => {
   const navigate    = useNavigate();
   const inputRef    = useRef(null);
   const [code,          setCode]          = useState('');
+  const [showTour,      setShowTour]      = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState('');
   const [pageReady,     setPageReady]     = useState(false);
   const [platformStats, setPlatformStats] = useState(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setPageReady(true), 60);
+    const t = setTimeout(() => {
+      setPageReady(true);
+      if (!user?.tourCompleted) {
+        setTimeout(() => setShowTour(true), 800);
+      }
+    }, 60);
     api.get('/stats').then(res => setPlatformStats(res.data)).catch(() => {});
     return () => clearTimeout(t);
   }, []);
@@ -92,6 +99,50 @@ const StudentEnterCode = () => {
   const quickLinks = [
     { icon: <MdFolderOpen />, label: 'All Materials',    sub: 'View all your saved materials',  path: '/browse-materials' },
     { icon: <MdHistory />,    label: 'Recently Opened',  sub: 'Materials you accessed before', path: '/student/history'  },
+  ];
+
+
+  const STUDENT_TOUR = [
+    {
+      selector: null,
+      emoji: '👋',
+      title: 'Welcome to StudyShala!',
+      desc: "This is where you access your study materials. Let's take a quick look around.",
+    },
+    {
+      selector: '.ec-input-wrap',
+      emoji: '🔑',
+      title: 'Enter Your Access Code',
+      desc: 'Ask your faculty for the 8-character code. Type it here to unlock their study materials instantly.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.ec-stats-strip',
+      emoji: '📊',
+      title: 'Live Platform Stats',
+      desc: "You're joining thousands of students already using StudyShala.",
+      placement: 'bottom',
+    },
+    {
+      selector: '.ec-quick',
+      emoji: '📂',
+      title: 'Quick Links',
+      desc: 'From here you can browse all your saved materials, see recently opened ones, or view your favourites.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.sb-nav',
+      emoji: '🗂️',
+      title: 'Sidebar Navigation',
+      desc: 'The sidebar keeps everything within reach — your history, favourites, admin courses, and more.',
+      placement: 'bottom',
+    },
+    {
+      selector: null,
+      emoji: '🎉',
+      title: "You're ready!",
+      desc: "Enter the code shared by your faculty to get started. Replay this tour anytime from the sidebar.",
+    },
   ];
 
   return (
@@ -257,6 +308,15 @@ const StudentEnterCode = () => {
 
         </div>
       </div>
+    </div>
+
+      {/* ── Guided Tour ── */}
+      {showTour && (
+        <TourTooltip
+          steps={STUDENT_TOUR}
+          onFinish={() => { setShowTour(false); completeTour(); }}
+        />
+      )}
     </div>
   );
 };
