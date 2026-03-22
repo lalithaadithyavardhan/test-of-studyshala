@@ -53,7 +53,8 @@ const userSchema = new mongoose.Schema({
   recentFiles:    { type: [recentFileSchema], default: [] },   // last 10 viewed files
   starredFiles:   { type: [starredFileSchema], default: [] },  // bookmarked files
   
-  tourCompleted: { type: Boolean, default: false }, // true after first tour finish/skip
+  tourCompleted:       { type: Boolean, default: false }, // Phase 1 tour (empty dashboard)
+  phase2TourCompleted: { type: Boolean, default: false }, // Phase 2 tour (after first material)
   active: { type: Boolean, default: true },
   profilePicture: String,
   lastLogin: Date
