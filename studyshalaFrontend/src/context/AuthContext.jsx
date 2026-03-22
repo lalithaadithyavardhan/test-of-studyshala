@@ -12,53 +12,30 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]       = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize auth state from localStorage on app load.
-  // FIX: We read the token + user from localStorage immediately so the user
-  // is treated as logged in right away — before any backend call completes.
-  // This prevents the Render cold-start problem where the sleeping backend
-  // takes 30-60s to wake up, causing the app to kick the user to /login.
+  // Initialize authentication state from localStorage on app load
   useEffect(() => {
-    const token      = localStorage.getItem('token');
+    const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-
+    
     if (token && storedUser) {
       try {
-        const parsed = JSON.parse(storedUser);
-        // Set user from localStorage immediately — no backend call needed
-        setUser(parsed);
-        // Then silently verify with backend in the background.
-        // If token is truly invalid the backend returns 401 with a clear message
-        // and the axios interceptor will clear it. If backend is just sleeping,
-        // the request will fail silently and the user stays logged in.
-        api.get('/auth/user').then(res => {
-          if (res.data?.user) {
-            // Refresh user data with latest from DB (role may have changed)
-            setUser({
-              id:             res.data.user._id,
-              name:           res.data.user.name,
-              email:          res.data.user.email,
-              role:           res.data.user.role,
-              department:     res.data.user.department,
-              profilePicture: res.data.user.profilePicture,
-            });
-          }
-        }).catch(() => {
-          // Backend sleeping or network error — keep user logged in from localStorage
-          // The axios interceptor handles real 401s (invalid/expired token)
-        });
+        setUser(JSON.parse(storedUser));
       } catch (error) {
-        console.error('Failed to parse stored user:', error);
+        console.error("Failed to parse stored user:", error);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
     }
-
     setLoading(false);
   }, []);
 
+  /**
+   * Updated login function
+   * Matches the parameter order used in AuthCallback: login(userData, token)
+   */
   const login = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
@@ -71,15 +48,37 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
   };
 
+  /**
+   * Logout function
+   * Clears session and notifies the backend if necessary
+   */
+  // Called when user finishes or skips the tour — saves to DB
+  const completeTour = async () => {
+    try {
+      await api.post('/auth/tour-complete');
+    } catch (_) {}
+    setUser(prev => prev ? { ...prev, tourCompleted: true } : prev);
+  };
+
+  // Called when user clicks "Replay tour" — resets on DB
+  const resetTour = async () => {
+    try {
+      await api.post('/auth/tour-reset');
+    } catch (_) {}
+    setUser(prev => prev ? { ...prev, tourCompleted: false } : prev);
+  };
+
   const logout = async () => {
     try {
+      // Optional: Notify backend of logout
       await api.post('/auth/logout');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Keep lastUser + lastRole so quick-return banner shows on next visit
+      // User can clear it manually with "Switch account" button
       setUser(null);
     }
   };
@@ -90,6 +89,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     loading,
     isAuthenticated: !!user,
+    completeTour,
+    resetTour,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
