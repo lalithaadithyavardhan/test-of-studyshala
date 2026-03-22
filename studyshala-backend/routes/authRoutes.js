@@ -41,7 +41,9 @@ router.get('/google/callback', (req, res, next) => {
 
 router.get('/user',            authenticate, authController.getCurrentUser);
 router.post('/logout',         authenticate, authController.logout);
-router.post('/tour-complete',  authenticate, authController.tourComplete);
-router.post('/tour-reset',     authenticate, authController.tourReset);
+router.post('/tour-complete',        authenticate, authController.tourComplete);
+router.post('/tour-reset',           authenticate, authController.tourReset);
+router.post('/phase2-tour-complete', authenticate, authController.phase2TourComplete);
+router.post('/phase2-tour-reset',    authenticate, authController.phase2TourReset);
 
 module.exports = router;
