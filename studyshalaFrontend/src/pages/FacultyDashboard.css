@@ -872,3 +872,91 @@ body.dark-mode .fd-share-btn--done { background: #14532d55 !important; color: #4
   .fd-platform-val { font-size: 0.95rem; }
   .fd-platform-card { padding: 0.875rem; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   PHASE 2 TOUR PROMPT BANNER
+   Appears after first material is created
+   ══════════════════════════════════════════════════════════════ */
+.fd-p2-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  background: var(--fd-card);
+  border: 1.5px solid var(--fd-accent);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(45, 91, 227, 0.10);
+  animation: p2SlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  flex-wrap: wrap;
+}
+@keyframes p2SlideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fd-p2-prompt-left {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  flex: 1;
+  min-width: 0;
+}
+.fd-p2-prompt-emoji {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.fd-p2-prompt-title {
+  font-family: 'Lora', serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--fd-ink);
+  margin-bottom: 0.2rem;
+  transition: color 0.25s;
+}
+.fd-p2-prompt-sub {
+  font-size: 0.78rem;
+  color: var(--fd-ink3);
+  transition: color 0.25s;
+}
+.fd-p2-prompt-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+.fd-p2-prompt-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  font-family: 'Lato', system-ui, sans-serif;
+  transition: background 0.15s, transform 0.15s;
+  white-space: nowrap;
+}
+.fd-p2-prompt-btn:active { transform: scale(0.97); }
+
+.fd-p2-prompt-btn--primary {
+  background: var(--fd-ink);
+  color: var(--fd-card);
+}
+.fd-p2-prompt-btn--primary:hover { background: var(--fd-ink2); }
+
+.fd-p2-prompt-btn--skip {
+  background: var(--fd-bg2);
+  color: var(--fd-ink3);
+  border: 1px solid var(--fd-border);
+}
+.fd-p2-prompt-btn--skip:hover { color: var(--fd-ink); border-color: var(--fd-border2); }
+
+@media (max-width: 480px) {
+  .fd-p2-prompt          { padding: 0.875rem 1rem; }
+  .fd-p2-prompt-emoji    { font-size: 1.4rem; }
+  .fd-p2-prompt-title    { font-size: 0.82rem; }
+  .fd-p2-prompt-sub      { font-size: 0.72rem; }
+  .fd-p2-prompt-actions  { width: 100%; justify-content: flex-end; }
+}
