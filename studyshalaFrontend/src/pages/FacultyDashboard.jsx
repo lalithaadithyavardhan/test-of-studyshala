@@ -12,8 +12,9 @@ import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import {
   MdAdd, MdContentCopy, MdCheck, MdDelete, MdUpload, MdBook,
-  MdFolder, MdCampaign, MdCreateNewFolder,
-  MdFolderOpen, MdClose, MdLink,
+  MdFolder, MdPerson, MdCampaign, MdEdit, MdCreateNewFolder,
+  MdFolderOpen, MdClose, MdKeyboardArrowDown,
+  MdShare, MdWhatsapp, MdLink, MdOpenInNew
 } from 'react-icons/md';
 import { FaWhatsapp } from 'react-icons/fa';
 import { ImSpinner8 } from 'react-icons/im';
@@ -70,6 +71,7 @@ const FdModal = ({ open, onClose, title, children, footer }) => {
   );
 };
 
+
 // ── Announcement Banner ───────────────────────────────────────────────────────
 const AnnouncementBanner = () => {
   const [announcements, setAnnouncements] = React.useState([]);
@@ -111,67 +113,19 @@ const AnnouncementBanner = () => {
   );
 };
 
-// ── Tour steps ────────────────────────────────────────────────────────────────
-const FACULTY_TOUR = [
-  {
-    selector: null,
-    emoji: '👋',
-    title: 'Welcome to StudyShala!',
-    desc: "You're now on your Faculty Dashboard. Let's take a quick tour — it'll take less than a minute.",
-  },
-  {
-    selector: '.fd-create-btn',
-    emoji: '📁',
-    title: 'Create a Material',
-    desc: 'Tap here to create a new subject folder. Give it a name, department, and semester.',
-    placement: 'bottom',
-  },
-  {
-    selector: '.fd-code-box',
-    emoji: '🔑',
-    title: 'Your Access Code',
-    desc: 'Every material gets a unique 8-character code. Share this with your students — they use it to unlock your files.',
-    placement: 'bottom',
-  },
-  {
-    selector: '.fd-share-btn--wa',
-    emoji: '📲',
-    title: 'Share Instantly',
-    desc: 'Send the access code directly via WhatsApp with one tap — no copy-paste needed.',
-    placement: 'bottom',
-  },
-  {
-    selector: '.fd-btn--primary',
-    emoji: '📤',
-    title: 'Upload Files',
-    desc: 'Upload PDFs, slides, documents, images — anything. Files are stored securely on Google Drive.',
-    placement: 'bottom',
-  },
-  {
-    selector: '.sb-nav',
-    emoji: '📚',
-    title: 'Navigation Sidebar',
-    desc: 'Use the sidebar to browse all materials, access admin public courses, or share the app with colleagues.',
-    placement: 'bottom',
-  },
-  {
-    selector: null,
-    emoji: '🎉',
-    title: "You're all set!",
-    desc: "Create your first material and share the code with your class. If you ever want this tour again, tap the Tour button in the sidebar.",
-  },
-];
-
 // ── Main Component ───────────────────────────────────────────────────────────
 const FacultyDashboard = () => {
-  const { user, completeTour } = useAuth();
+  const { user, completeTour, resetTour, completePhase2Tour } = useAuth();
 
   const [materials,       setMaterials]       = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [error,           setError]           = useState('');
   const [success,         setSuccess]         = useState('');
   const [pageReady,       setPageReady]       = useState(false);
-  const [showTour,        setShowTour]        = useState(false);
+  const [showTour,          setShowTour]          = useState(false);
+  const [showPhase2Prompt,  setShowPhase2Prompt]  = useState(false);
+  const [showPhase2Tour,    setShowPhase2Tour]     = useState(false);
+  const [isFirstMaterial,   setIsFirstMaterial]   = useState(false);
   const [platformStats,   setPlatformStats]   = useState(null);
 
   const [showCreate,      setShowCreate]      = useState(false);
@@ -197,9 +151,6 @@ const FacultyDashboard = () => {
   const [msgText,    setMsgText]    = useState('');
   const [savingMsg,  setSavingMsg]  = useState(false);
 
-  // Share
-  const [sharedId,   setSharedId]   = useState(null);
-
   const departments = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT'];
   const semesters   = ['1','2','3','4','5','6','7','8'];
 
@@ -209,12 +160,23 @@ const FacultyDashboard = () => {
       setPageReady(true);
       // Start tour only if user hasn't completed it yet
       if (!user?.tourCompleted) {
+        // Phase 1 tour — works on empty dashboard
         setTimeout(() => setShowTour(true), 800);
       }
     }, 60);
     fetchMaterials();
     return () => clearTimeout(t);
   }, []);
+
+  // After materials load, check if we need to show Phase 2 prompt
+  useEffect(() => {
+    if (!loading && materials.length === 1 && !user?.phase2TourCompleted) {
+      // They just have exactly one material and haven't seen phase 2
+      // Show prompt only once, shortly after load
+      const t = setTimeout(() => setShowPhase2Prompt(true), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [loading, materials.length]);
 
   const fetchMaterials = async () => {
     try {
@@ -234,14 +196,19 @@ const FacultyDashboard = () => {
     e.preventDefault();
     setSubmitting(true); setError('');
     try {
+      const wasEmpty = materials.length === 0; // capture before fetch
       const res = await api.post('/faculty/folders', formData);
       setShowCreate(false);
       setFormData({ department: '', semester: '', subjectName: '', facultyName: '', messageToStudents: '' });
       const code = res.data.folder.accessCode || res.data.folder.departmentCode;
       showSuccess(`Material created! Student code: ${code}`);
-      fetchMaterials();
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to create material');
+      await fetchMaterials();
+      // If this was their very first material, offer Phase 2 tour
+      if (wasEmpty && !user?.phase2TourCompleted) {
+        setIsFirstMaterial(true);
+        setTimeout(() => setShowPhase2Prompt(true), 800);
+      }
+    } catch (err) { showError(err.response?.data?.message || 'Failed to create material');
     } finally { setSubmitting(false); }
   };
 
@@ -270,8 +237,7 @@ const FacultyDashboard = () => {
       setSelectedSfId(newSf._id);
       setNewSfName('');
       showSuccess(`Folder "${newSf.name}" created!`);
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to create folder');
+    } catch (err) { showError(err.response?.data?.message || 'Failed to create folder');
     } finally { setCreatingFolder(false); }
   };
 
@@ -292,15 +258,13 @@ const FacultyDashboard = () => {
           if (evt.total) setUploadProgress(Math.round((evt.loaded * 100) / evt.total));
         }
       });
-      setShowUpload(false);
-      setUploadFiles([]); setSelectedFolder(null); setSelectedSfId(''); setUploadProgress(0);
+      setShowUpload(false); setUploadFiles([]); setSelectedFolder(null); setSelectedSfId(''); setUploadProgress(0);
       const dest = selectedSfId
         ? `into "${selectedFolder.subFolders?.find(sf => sf._id === selectedSfId)?.name || 'folder'}"`
         : 'to root';
       showSuccess(`${uploadFiles.length} file(s) uploaded ${dest}!`);
       fetchMaterials();
-    } catch (err) {
-      showError(err.response?.data?.message || 'Upload failed');
+    } catch (err) { showError(err.response?.data?.message || 'Upload failed');
     } finally { setUploading(false); setUploadProgress(0); }
   };
 
@@ -314,52 +278,98 @@ const FacultyDashboard = () => {
   };
 
   // ── Message ────────────────────────────────────────────────────────────────
-  const openMsg = (material) => {
-    setSelectedFolder(material);
-    setMsgText(material.messageToStudents || '');
-    setShowMsg(true);
-  };
+  const openMsg = (material) => { setSelectedFolder(material); setMsgText(material.messageToStudents || ''); setShowMsg(true); };
   const handleSaveMessage = async () => {
     if (!selectedFolder) return;
     setSavingMsg(true); setError('');
     try {
       await api.patch(`/faculty/folders/${selectedFolder._id}/message`, { messageToStudents: msgText });
       setShowMsg(false); showSuccess('Message updated!'); fetchMaterials();
-    } catch (err) {
-      showError(err.response?.data?.message || 'Failed to save message');
+    } catch (err) { showError(err.response?.data?.message || 'Failed to save message');
     } finally { setSavingMsg(false); }
   };
 
-  // ── Share helpers ──────────────────────────────────────────────────────────
+  // ── Share helpers ─────────────────────────────────────────────────────────
+
   const APP_URL = 'https://studyshala.dev';
 
+  // Share the app itself via WhatsApp
+  const shareApp = () => {
+    const msg =
+      `📚 *StudyShala* — Study material sharing made easy!
+
+` +
+      `Faculty upload materials, students access them with a simple code.
+` +
+      `✓ Free · ✓ No ads · ✓ Google Drive backed
+
+` +
+      `🔗 ${APP_URL}`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank', 'noopener');
+  };
+
+  // Try native share → fallback to WhatsApp
+  const shareAppNative = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'StudyShala — Study Material Platform',
+          text:  'Free study material sharing platform for students and faculty.',
+          url:   APP_URL,
+        });
+        return;
+      } catch (_) {}
+    }
+    shareApp();
+  };
+
+  // Share a specific material via WhatsApp
   const shareMaterial = (material) => {
     const code    = material.accessCode || material.departmentCode || '—';
     const subject = material.subjectName || 'Study Material';
     const faculty = material.facultyName || '';
     const dept    = material.department  || '';
     const sem     = material.semester    ? `Semester ${material.semester}` : '';
+
     const msg =
-      `📚 *${subject}*\n` +
-      (faculty ? `👨‍🏫 Faculty: ${faculty}\n` : '') +
-      (dept    ? `🏫 Department: ${dept}\n`   : '') +
-      (sem     ? `📅 ${sem}\n`                : '') +
-      `\n🔑 *Access Code: \`${code}\`*\n\n` +
-      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.\n\n` +
+      `📚 *${subject}*
+` +
+      (faculty ? `👨‍🏫 Faculty: ${faculty}
+` : '') +
+      (dept    ? `🏫 Department: ${dept}
+`   : '') +
+      (sem     ? `📅 ${sem}
+`                : '') +
+      `
+🔑 *Access Code: \`${code}\`*
+
+` +
+      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.
+
+` +
       `🔗 Login at: ${APP_URL}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank', 'noopener');
   };
 
+  // Copy the material share message to clipboard
+  const [sharedId, setSharedId] = useState(null);
   const copyShareMsg = async (material) => {
     const code    = material.accessCode || material.departmentCode || '—';
     const subject = material.subjectName || 'Study Material';
     const faculty = material.facultyName || '';
     const sem     = material.semester    ? `Semester ${material.semester}` : '';
+
     const msg =
       `📚 ${subject}` +
       (faculty ? ` | ${faculty}` : '') +
       (sem     ? ` | ${sem}`     : '') +
-      `\n🔑 Access Code: ${code}\n🔗 ${APP_URL}`;
+      `
+🔑 Access Code: ${code}
+🔗 ${APP_URL}`;
+
     try {
       await navigator.clipboard.writeText(msg);
       setSharedId(material._id);
@@ -368,14 +378,93 @@ const FacultyDashboard = () => {
   };
 
   const copyCode = (code, id) => {
-    navigator.clipboard.writeText(code);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    navigator.clipboard.writeText(code); setCopiedId(id); setTimeout(() => setCopiedId(null), 2000);
   };
 
   const totalSize = uploadFiles.reduce((s, f) => s + f.size, 0);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+
+  // ── Phase 1: Empty dashboard tour — only shows elements that always exist ──
+  const FACULTY_TOUR_P1 = [
+    {
+      selector: null,
+      emoji: '👋',
+      title: 'Welcome to StudyShala!',
+      desc: "You're on your Faculty Dashboard. Let's take a quick look around — it'll take about 30 seconds.",
+    },
+    {
+      selector: '.fd-create-btn',
+      emoji: '📁',
+      title: 'Start Here — Create a Material',
+      desc: 'Tap this button to create your first subject folder. Give it a name, department, semester, and an optional message to students.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.fd-hero-right',
+      emoji: '📊',
+      title: 'Your Stats',
+      desc: 'Once you create materials, your personal stats appear here — number of materials, files, and platform-wide live metrics.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.sb-nav',
+      emoji: '🗂️',
+      title: 'Sidebar Navigation',
+      desc: 'Browse all materials, view admin courses, and navigate the platform from here.',
+      placement: 'bottom',
+    },
+    {
+      selector: null,
+      emoji: '🚀',
+      title: "One step away!",
+      desc: "Create your first material and we'll walk you through sharing it with students. Tap "Create Material" to get started!",
+    },
+  ];
+
+  // ── Phase 2: Post-first-material tour — runs after first material created ──
+  const FACULTY_TOUR_P2 = [
+    {
+      selector: null,
+      emoji: '🎉',
+      title: 'Your first material is ready!',
+      desc: "Let's take 30 seconds to see exactly what you can do with it.",
+    },
+    {
+      selector: '.fd-code-box',
+      emoji: '🔑',
+      title: 'Your Access Code',
+      desc: 'This unique 8-character code is what you share with students. They enter it in the app to unlock your material instantly.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.fd-share-btn--wa',
+      emoji: '📲',
+      title: 'Share via WhatsApp',
+      desc: 'One tap sends your students a ready-made message with the code, subject name, and login link. No copy-pasting needed.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.fd-btn--primary',
+      emoji: '📤',
+      title: 'Upload Your Files',
+      desc: 'Click Upload to add PDFs, slides, Word docs, images — anything. Files go straight to Google Drive.',
+      placement: 'bottom',
+    },
+    {
+      selector: '.fd-btn--secondary',
+      emoji: '📢',
+      title: 'Message Your Students',
+      desc: "Pin a message to this material — exam reminders, submission deadlines, anything. Students see it every time they access your material.",
+      placement: 'bottom',
+    },
+    {
+      selector: null,
+      emoji: '✅',
+      title: "You know everything!",
+      desc: "You're fully set up. Share your code with students and they can access your material right away. Replay this tour anytime from the sidebar.",
+    },
+  ];
+
   return (
     <div className="app-container">
       <Sidebar role="faculty" />
@@ -407,7 +496,6 @@ const FacultyDashboard = () => {
                   <span className="fd-profile-role">{user?.role}</span>
                 </div>
               </div>
-
               {/* Your stats */}
               <div className="fd-stats-row">
                 <div className="fd-stat">
@@ -416,9 +504,7 @@ const FacultyDashboard = () => {
                 </div>
                 <div className="fd-stat">
                   <div className="fd-stat-val">
-                    {materials.reduce((s, m) =>
-                      s + (m.files?.length || 0) +
-                      (m.subFolders || []).reduce((ss, sf) => ss + (sf.files?.length || 0), 0), 0)}
+                    {materials.reduce((s, m) => s + (m.files?.length || 0) + (m.subFolders || []).reduce((ss, sf) => ss + (sf.files?.length || 0), 0), 0)}
                   </div>
                   <div className="fd-stat-lbl">Total Files</div>
                 </div>
@@ -428,7 +514,7 @@ const FacultyDashboard = () => {
                 </div>
               </div>
 
-              {/* Platform stats */}
+              {/* Platform stats — clearly labelled separate section */}
               {platformStats && (
                 <div className="fd-platform-card">
                   <div className="fd-platform-card-heading">
@@ -458,9 +544,41 @@ const FacultyDashboard = () => {
             </div>
           </div>
 
+          {/* ── Storage Widgets ── */}
           {/* ── Alerts ── */}
           {error   && <div className="fd-alert fd-alert--err fd-enter"><span>⚠</span> {error}</div>}
           {success && <div className="fd-alert fd-alert--ok  fd-enter"><span>✓</span> {success}</div>}
+
+          {/* ── Phase 2 first-material prompt ── */}
+          {showPhase2Prompt && !showPhase2Tour && (
+            <div className="fd-p2-prompt">
+              <div className="fd-p2-prompt-left">
+                <span className="fd-p2-prompt-emoji">🎉</span>
+                <div>
+                  <div className="fd-p2-prompt-title">
+                    {isFirstMaterial ? 'Your first material is live!' : 'Quick tip — explore what you can do'}
+                  </div>
+                  <div className="fd-p2-prompt-sub">
+                    See how to share codes, upload files, and message your students.
+                  </div>
+                </div>
+              </div>
+              <div className="fd-p2-prompt-actions">
+                <button
+                  className="fd-p2-prompt-btn fd-p2-prompt-btn--primary"
+                  onClick={() => { setShowPhase2Prompt(false); setShowPhase2Tour(true); }}
+                >
+                  Show me →
+                </button>
+                <button
+                  className="fd-p2-prompt-btn fd-p2-prompt-btn--skip"
+                  onClick={() => { setShowPhase2Prompt(false); completePhase2Tour(); }}
+                >
+                  Skip
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ── Section header ── */}
           <div className="fd-section-head fd-enter" style={{ animationDelay: '360ms' }}>
@@ -473,7 +591,7 @@ const FacultyDashboard = () => {
             </button>
           </div>
 
-          {/* ── Material cards ── */}
+          {/* ── Content ── */}
           {loading ? (
             <div className="fd-loading">
               <ImSpinner8 className="fd-spinner" />
@@ -499,7 +617,6 @@ const FacultyDashboard = () => {
                 return (
                   <Reveal key={m._id} delay={i * 55}>
                     <div className="fd-card">
-
                       {/* Card top */}
                       <div className="fd-card-top">
                         <div className="fd-card-icon"><MdBook /></div>
@@ -536,7 +653,7 @@ const FacultyDashboard = () => {
                         </div>
                       )}
 
-                      {/* Access code box */}
+                      {/* Access code */}
                       <div className="fd-code-box">
                         <div className="fd-code-label">Student Access Code</div>
                         <div className="fd-code-row">
@@ -550,7 +667,7 @@ const FacultyDashboard = () => {
                           </button>
                         </div>
 
-                        {/* Share row */}
+                        {/* Share material row */}
                         <div className="fd-share-row">
                           <span className="fd-share-label">Share material</span>
                           <div className="fd-share-btns">
@@ -572,7 +689,7 @@ const FacultyDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Card actions */}
+                      {/* Actions */}
                       <div className="fd-card-actions">
                         <button className="fd-btn fd-btn--primary" onClick={() => openUpload(m)}>
                           <MdUpload /> Upload
@@ -657,15 +774,11 @@ const FacultyDashboard = () => {
       {/* ══ Upload Files Modal ══ */}
       <FdModal
         open={showUpload}
-        onClose={() => {
-          if (!uploading) {
-            setShowUpload(false);
-            setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); setUploadProgress(0);
-          }
-        }}
+        onClose={() => { if (!uploading) { setShowUpload(false); setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); setUploadProgress(0); } }}
         title={`Upload Files — ${selectedFolder?.subjectName || ''}`}
         footer={
           <>
+            {/* Progress bar — visible while uploading */}
             {uploading && (
               <div style={{ flex: 1, marginRight: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#0369a1', marginBottom: '0.3rem', fontWeight: 600 }}>
@@ -694,6 +807,7 @@ const FacultyDashboard = () => {
       >
         <p className="fd-modal-hint">Max 50 MB per file · PDF, DOC, PPT, XLS, images, video, ZIP</p>
 
+        {/* Destination */}
         <div className="fd-field">
           <label className="fd-label"><MdFolder style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Upload destination</label>
           <select className="fd-input" value={selectedSfId} onChange={e => setSelectedSfId(e.target.value)}>
@@ -704,6 +818,7 @@ const FacultyDashboard = () => {
           </select>
         </div>
 
+        {/* Create sub-folder */}
         <div className="fd-sf-create">
           <MdCreateNewFolder className="fd-sf-create-icon" />
           <input
@@ -721,6 +836,7 @@ const FacultyDashboard = () => {
           </button>
         </div>
 
+        {/* Drag-drop zone */}
         <div
           className={`fd-dropzone ${isDragging ? 'fd-dropzone--active' : ''}`}
           onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
@@ -737,6 +853,7 @@ const FacultyDashboard = () => {
             accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar,.7z,.mp4,.mp3" />
         </div>
 
+        {/* File list */}
         {uploadFiles.length > 0 && (
           <div className="fd-file-list">
             <div className="fd-file-list-header">
@@ -788,14 +905,22 @@ const FacultyDashboard = () => {
         )}
       </FdModal>
 
-      {/* ── Guided Tour ── */}
+    </div>
+      {/* ── Phase 1 Tour (empty dashboard) ── */}
       {showTour && (
         <TourTooltip
-          steps={FACULTY_TOUR}
+          steps={FACULTY_TOUR_P1}
           onFinish={() => { setShowTour(false); completeTour(); }}
         />
       )}
 
+      {/* ── Phase 2 Tour (after first material) ── */}
+      {showPhase2Tour && (
+        <TourTooltip
+          steps={FACULTY_TOUR_P2}
+          onFinish={() => { setShowPhase2Tour(false); completePhase2Tour(); }}
+        />
+      )}
     </div>
   );
 };
