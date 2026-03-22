@@ -31,13 +31,14 @@ export const AuthProvider = ({ children }) => {
         api.get('/auth/user').then(res => {
           if (res.data?.user) {
             const fresh = {
-              id:             res.data.user._id,
-              name:           res.data.user.name,
-              email:          res.data.user.email,
-              role:           res.data.user.role,
-              department:     res.data.user.department,
-              profilePicture: res.data.user.profilePicture,
-              tourCompleted:  res.data.user.tourCompleted || false,
+              id:                  res.data.user._id,
+              name:                res.data.user.name,
+              email:               res.data.user.email,
+              role:                res.data.user.role,
+              department:          res.data.user.department,
+              profilePicture:      res.data.user.profilePicture,
+              tourCompleted:       res.data.user.tourCompleted       || false,
+              phase2TourCompleted: res.data.user.phase2TourCompleted || false,
             };
             setUser(fresh);
             // Save fresh data back to localStorage so next load is accurate
@@ -90,6 +91,27 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  // Phase 2 tour (after first material created)
+  const completePhase2Tour = async () => {
+    try { await api.post('/auth/phase2-tour-complete'); } catch (_) {}
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, phase2TourCompleted: true };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const resetPhase2Tour = async () => {
+    try { await api.post('/auth/phase2-tour-reset'); } catch (_) {}
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, phase2TourCompleted: false };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
   // Called when user clicks "Replay tour" — resets on DB
   const resetTour = async () => {
     try {
@@ -124,9 +146,11 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated:  !!user,
     completeTour,
     resetTour,
+    completePhase2Tour,
+    resetPhase2Tour,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
