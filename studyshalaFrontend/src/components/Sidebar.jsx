@@ -14,6 +14,7 @@ import api from '../api/axios';
 import owlLogo from '../assets/logo.svg';
 import './Sidebar.css';
 import StorageWidget from './StorageWidget';
+import { TourReplayBtn } from './TourTooltip';
 
 /* ── Feedback Modal ────────────────────────────────────────────────────────── */
 const FeedbackModal = ({ onClose }) => {
@@ -222,6 +223,8 @@ const Sidebar = ({ role }) => {
               </button>
 
               {/* ── Share App button ── */}
+              <TourReplayBtn onClick={resetTour} />
+
               <button className="sb-share-btn" onClick={() => {
                 const msg =
                   `📚 *StudyShala* — Study material sharing made easy!\n\n` +
