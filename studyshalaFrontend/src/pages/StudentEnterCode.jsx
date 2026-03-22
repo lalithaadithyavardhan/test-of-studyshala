@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
@@ -53,10 +54,56 @@ const AnnouncementBanner = () => {
   );
 };
 
+/* ── Tour steps ──────────────────────────────────────────────────────────────*/
+const STUDENT_TOUR = [
+  {
+    selector: null,
+    emoji: '👋',
+    title: 'Welcome to StudyShala!',
+    desc: "This is where you access your study materials. Let's take a quick look around.",
+  },
+  {
+    selector: '.ec-input-wrap',
+    emoji: '🔑',
+    title: 'Enter Your Access Code',
+    desc: 'Ask your faculty for the 8-character code. Type it here to unlock their study materials instantly.',
+    placement: 'bottom',
+  },
+  {
+    selector: '.ec-stats-panel',
+    emoji: '📊',
+    title: 'Live Platform Stats',
+    desc: "You're joining thousands of students already using StudyShala.",
+    placement: 'bottom',
+  },
+  {
+    selector: '.ec-quick',
+    emoji: '📂',
+    title: 'Quick Links',
+    desc: 'From here you can browse all your saved materials, see recently opened ones, or view your favourites.',
+    placement: 'bottom',
+  },
+  {
+    selector: '.sb-nav',
+    emoji: '🗂️',
+    title: 'Sidebar Navigation',
+    desc: 'The sidebar keeps everything within reach — your history, favourites, admin courses, and more.',
+    placement: 'bottom',
+  },
+  {
+    selector: null,
+    emoji: '🎉',
+    title: "You're ready!",
+    desc: "Enter the code shared by your faculty to get started. Replay this tour anytime from the sidebar.",
+  },
+];
+
 /* ── Main Page ───────────────────────────────────────────────────────────────*/
 const StudentEnterCode = () => {
-  const navigate    = useNavigate();
-  const inputRef    = useRef(null);
+  const navigate                        = useNavigate();
+  const { user, completeTour }          = useAuth();
+  const inputRef                        = useRef(null);
+
   const [code,          setCode]          = useState('');
   const [showTour,      setShowTour]      = useState(false);
   const [loading,       setLoading]       = useState(false);
@@ -67,6 +114,7 @@ const StudentEnterCode = () => {
   useEffect(() => {
     const t = setTimeout(() => {
       setPageReady(true);
+      // Start tour only if user hasn't completed it yet
       if (!user?.tourCompleted) {
         setTimeout(() => setShowTour(true), 800);
       }
@@ -97,52 +145,8 @@ const StudentEnterCode = () => {
   };
 
   const quickLinks = [
-    { icon: <MdFolderOpen />, label: 'All Materials',    sub: 'View all your saved materials',  path: '/browse-materials' },
-    { icon: <MdHistory />,    label: 'Recently Opened',  sub: 'Materials you accessed before', path: '/student/history'  },
-  ];
-
-
-  const STUDENT_TOUR = [
-    {
-      selector: null,
-      emoji: '👋',
-      title: 'Welcome to StudyShala!',
-      desc: "This is where you access your study materials. Let's take a quick look around.",
-    },
-    {
-      selector: '.ec-input-wrap',
-      emoji: '🔑',
-      title: 'Enter Your Access Code',
-      desc: 'Ask your faculty for the 8-character code. Type it here to unlock their study materials instantly.',
-      placement: 'bottom',
-    },
-    {
-      selector: '.ec-stats-strip',
-      emoji: '📊',
-      title: 'Live Platform Stats',
-      desc: "You're joining thousands of students already using StudyShala.",
-      placement: 'bottom',
-    },
-    {
-      selector: '.ec-quick',
-      emoji: '📂',
-      title: 'Quick Links',
-      desc: 'From here you can browse all your saved materials, see recently opened ones, or view your favourites.',
-      placement: 'bottom',
-    },
-    {
-      selector: '.sb-nav',
-      emoji: '🗂️',
-      title: 'Sidebar Navigation',
-      desc: 'The sidebar keeps everything within reach — your history, favourites, admin courses, and more.',
-      placement: 'bottom',
-    },
-    {
-      selector: null,
-      emoji: '🎉',
-      title: "You're ready!",
-      desc: "Enter the code shared by your faculty to get started. Replay this tour anytime from the sidebar.",
-    },
+    { icon: <MdFolderOpen />, label: 'All Materials',   sub: 'View all your saved materials',  path: '/browse-materials' },
+    { icon: <MdHistory />,    label: 'Recently Opened', sub: 'Materials you accessed before',  path: '/student/history'  },
   ];
 
   return (
@@ -152,7 +156,7 @@ const StudentEnterCode = () => {
         <Navbar />
         <div className={`ec-page ${pageReady ? 'ec-ready' : ''}`}>
 
-          {/* ── Announcement banner — shows at the very top ── */}
+          {/* ── Announcement banner ── */}
           <AnnouncementBanner />
 
           {/* Hero */}
@@ -170,13 +174,13 @@ const StudentEnterCode = () => {
             </p>
           </div>
 
-          {/* ── Two-column layout on desktop: code left, metrics right ── */}
+          {/* ── Two-column layout: code left, stats right ── */}
           <div className="ec-body-grid">
 
             {/* LEFT — code card + quick links */}
             <div className="ec-body-left">
 
-              {/* Card */}
+              {/* Code card */}
               <div className="ec-card ec-enter" style={{ animationDelay: '320ms' }}>
                 <div className="ec-card-header">
                   <div className="ec-card-icon"><MdKey /></div>
@@ -199,15 +203,15 @@ const StudentEnterCode = () => {
                   >
                     <div className="ec-input-chars" aria-hidden="true">
                       {Array.from({ length: 8 }).map((_, i) => {
-                        const isFilled  = !!code[i];
-                        const isActive  = i === code.length && code.length < 8;
+                        const isFilled = !!code[i];
+                        const isActive = i === code.length && code.length < 8;
                         return (
                           <div
                             key={i}
                             className={[
                               'ec-char-box',
-                              isFilled  ? 'ec-char-box--filled'  : '',
-                              isActive  ? 'ec-char-box--active'  : '',
+                              isFilled ? 'ec-char-box--filled' : '',
+                              isActive  ? 'ec-char-box--active' : '',
                             ].join(' ').trim()}
                           >
                             {isFilled ? code[i] : isActive ? <span className="ec-caret" /> : ''}
@@ -262,7 +266,7 @@ const StudentEnterCode = () => {
               </div>
             </div>
 
-            {/* RIGHT — platform stats panel (desktop) / below (mobile) */}
+            {/* RIGHT — platform stats panel */}
             {platformStats && (
               <div className="ec-stats-panel ec-enter" style={{ animationDelay: '380ms' }}>
                 <div className="ec-stats-panel-heading">
@@ -308,7 +312,6 @@ const StudentEnterCode = () => {
 
         </div>
       </div>
-    </div>
 
       {/* ── Guided Tour ── */}
       {showTour && (
@@ -317,6 +320,7 @@ const StudentEnterCode = () => {
           onFinish={() => { setShowTour(false); completeTour(); }}
         />
       )}
+
     </div>
   );
 };
