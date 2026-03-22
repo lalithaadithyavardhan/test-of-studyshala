@@ -12,9 +12,8 @@ import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
 import {
   MdAdd, MdContentCopy, MdCheck, MdDelete, MdUpload, MdBook,
-  MdFolder, MdPerson, MdCampaign, MdEdit, MdCreateNewFolder,
-  MdFolderOpen, MdClose, MdKeyboardArrowDown,
-  MdShare, MdWhatsapp, MdLink, MdOpenInNew
+  MdFolder, MdCampaign, MdCreateNewFolder,
+  MdFolderOpen, MdClose, MdLink,
 } from 'react-icons/md';
 import { FaWhatsapp } from 'react-icons/fa';
 import { ImSpinner8 } from 'react-icons/im';
@@ -71,7 +70,6 @@ const FdModal = ({ open, onClose, title, children, footer }) => {
   );
 };
 
-
 // ── Announcement Banner ───────────────────────────────────────────────────────
 const AnnouncementBanner = () => {
   const [announcements, setAnnouncements] = React.useState([]);
@@ -113,9 +111,60 @@ const AnnouncementBanner = () => {
   );
 };
 
+// ── Tour steps ────────────────────────────────────────────────────────────────
+const FACULTY_TOUR = [
+  {
+    selector: null,
+    emoji: '👋',
+    title: 'Welcome to StudyShala!',
+    desc: "You're now on your Faculty Dashboard. Let's take a quick tour — it'll take less than a minute.",
+  },
+  {
+    selector: '.fd-create-btn',
+    emoji: '📁',
+    title: 'Create a Material',
+    desc: 'Tap here to create a new subject folder. Give it a name, department, and semester.',
+    placement: 'bottom',
+  },
+  {
+    selector: '.fd-code-box',
+    emoji: '🔑',
+    title: 'Your Access Code',
+    desc: 'Every material gets a unique 8-character code. Share this with your students — they use it to unlock your files.',
+    placement: 'bottom',
+  },
+  {
+    selector: '.fd-share-btn--wa',
+    emoji: '📲',
+    title: 'Share Instantly',
+    desc: 'Send the access code directly via WhatsApp with one tap — no copy-paste needed.',
+    placement: 'bottom',
+  },
+  {
+    selector: '.fd-btn--primary',
+    emoji: '📤',
+    title: 'Upload Files',
+    desc: 'Upload PDFs, slides, documents, images — anything. Files are stored securely on Google Drive.',
+    placement: 'bottom',
+  },
+  {
+    selector: '.sb-nav',
+    emoji: '📚',
+    title: 'Navigation Sidebar',
+    desc: 'Use the sidebar to browse all materials, access admin public courses, or share the app with colleagues.',
+    placement: 'bottom',
+  },
+  {
+    selector: null,
+    emoji: '🎉',
+    title: "You're all set!",
+    desc: "Create your first material and share the code with your class. If you ever want this tour again, tap the Tour button in the sidebar.",
+  },
+];
+
 // ── Main Component ───────────────────────────────────────────────────────────
 const FacultyDashboard = () => {
-  const { user, completeTour, resetTour } = useAuth();
+  const { user, completeTour } = useAuth();
 
   const [materials,       setMaterials]       = useState([]);
   const [loading,         setLoading]         = useState(true);
@@ -147,6 +196,9 @@ const FacultyDashboard = () => {
   // Message edit
   const [msgText,    setMsgText]    = useState('');
   const [savingMsg,  setSavingMsg]  = useState(false);
+
+  // Share
+  const [sharedId,   setSharedId]   = useState(null);
 
   const departments = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT'];
   const semesters   = ['1','2','3','4','5','6','7','8'];
@@ -188,7 +240,8 @@ const FacultyDashboard = () => {
       const code = res.data.folder.accessCode || res.data.folder.departmentCode;
       showSuccess(`Material created! Student code: ${code}`);
       fetchMaterials();
-    } catch (err) { showError(err.response?.data?.message || 'Failed to create material');
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to create material');
     } finally { setSubmitting(false); }
   };
 
@@ -217,7 +270,8 @@ const FacultyDashboard = () => {
       setSelectedSfId(newSf._id);
       setNewSfName('');
       showSuccess(`Folder "${newSf.name}" created!`);
-    } catch (err) { showError(err.response?.data?.message || 'Failed to create folder');
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to create folder');
     } finally { setCreatingFolder(false); }
   };
 
@@ -238,13 +292,15 @@ const FacultyDashboard = () => {
           if (evt.total) setUploadProgress(Math.round((evt.loaded * 100) / evt.total));
         }
       });
-      setShowUpload(false); setUploadFiles([]); setSelectedFolder(null); setSelectedSfId(''); setUploadProgress(0);
+      setShowUpload(false);
+      setUploadFiles([]); setSelectedFolder(null); setSelectedSfId(''); setUploadProgress(0);
       const dest = selectedSfId
         ? `into "${selectedFolder.subFolders?.find(sf => sf._id === selectedSfId)?.name || 'folder'}"`
         : 'to root';
       showSuccess(`${uploadFiles.length} file(s) uploaded ${dest}!`);
       fetchMaterials();
-    } catch (err) { showError(err.response?.data?.message || 'Upload failed');
+    } catch (err) {
+      showError(err.response?.data?.message || 'Upload failed');
     } finally { setUploading(false); setUploadProgress(0); }
   };
 
@@ -258,98 +314,52 @@ const FacultyDashboard = () => {
   };
 
   // ── Message ────────────────────────────────────────────────────────────────
-  const openMsg = (material) => { setSelectedFolder(material); setMsgText(material.messageToStudents || ''); setShowMsg(true); };
+  const openMsg = (material) => {
+    setSelectedFolder(material);
+    setMsgText(material.messageToStudents || '');
+    setShowMsg(true);
+  };
   const handleSaveMessage = async () => {
     if (!selectedFolder) return;
     setSavingMsg(true); setError('');
     try {
       await api.patch(`/faculty/folders/${selectedFolder._id}/message`, { messageToStudents: msgText });
       setShowMsg(false); showSuccess('Message updated!'); fetchMaterials();
-    } catch (err) { showError(err.response?.data?.message || 'Failed to save message');
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to save message');
     } finally { setSavingMsg(false); }
   };
 
-  // ── Share helpers ─────────────────────────────────────────────────────────
-
+  // ── Share helpers ──────────────────────────────────────────────────────────
   const APP_URL = 'https://studyshala.dev';
 
-  // Share the app itself via WhatsApp
-  const shareApp = () => {
-    const msg =
-      `📚 *StudyShala* — Study material sharing made easy!
-
-` +
-      `Faculty upload materials, students access them with a simple code.
-` +
-      `✓ Free · ✓ No ads · ✓ Google Drive backed
-
-` +
-      `🔗 ${APP_URL}`;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank', 'noopener');
-  };
-
-  // Try native share → fallback to WhatsApp
-  const shareAppNative = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'StudyShala — Study Material Platform',
-          text:  'Free study material sharing platform for students and faculty.',
-          url:   APP_URL,
-        });
-        return;
-      } catch (_) {}
-    }
-    shareApp();
-  };
-
-  // Share a specific material via WhatsApp
   const shareMaterial = (material) => {
     const code    = material.accessCode || material.departmentCode || '—';
     const subject = material.subjectName || 'Study Material';
     const faculty = material.facultyName || '';
     const dept    = material.department  || '';
     const sem     = material.semester    ? `Semester ${material.semester}` : '';
-
     const msg =
-      `📚 *${subject}*
-` +
-      (faculty ? `👨‍🏫 Faculty: ${faculty}
-` : '') +
-      (dept    ? `🏫 Department: ${dept}
-`   : '') +
-      (sem     ? `📅 ${sem}
-`                : '') +
-      `
-🔑 *Access Code: \`${code}\`*
-
-` +
-      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.
-
-` +
+      `📚 *${subject}*\n` +
+      (faculty ? `👨‍🏫 Faculty: ${faculty}\n` : '') +
+      (dept    ? `🏫 Department: ${dept}\n`   : '') +
+      (sem     ? `📅 ${sem}\n`                : '') +
+      `\n🔑 *Access Code: \`${code}\`*\n\n` +
+      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.\n\n` +
       `🔗 Login at: ${APP_URL}`;
-
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank', 'noopener');
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
   };
 
-  // Copy the material share message to clipboard
-  const [sharedId, setSharedId] = useState(null);
   const copyShareMsg = async (material) => {
     const code    = material.accessCode || material.departmentCode || '—';
     const subject = material.subjectName || 'Study Material';
     const faculty = material.facultyName || '';
     const sem     = material.semester    ? `Semester ${material.semester}` : '';
-
     const msg =
       `📚 ${subject}` +
       (faculty ? ` | ${faculty}` : '') +
       (sem     ? ` | ${sem}`     : '') +
-      `
-🔑 Access Code: ${code}
-🔗 ${APP_URL}`;
-
+      `\n🔑 Access Code: ${code}\n🔗 ${APP_URL}`;
     try {
       await navigator.clipboard.writeText(msg);
       setSharedId(material._id);
@@ -358,62 +368,14 @@ const FacultyDashboard = () => {
   };
 
   const copyCode = (code, id) => {
-    navigator.clipboard.writeText(code); setCopiedId(id); setTimeout(() => setCopiedId(null), 2000);
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const totalSize = uploadFiles.reduce((s, f) => s + f.size, 0);
 
-
-  const FACULTY_TOUR = [
-    {
-      selector: null,
-      emoji: '👋',
-      title: 'Welcome to StudyShala!',
-      desc: "You're now on your Faculty Dashboard. Let's take a quick tour — it'll take less than a minute.",
-    },
-    {
-      selector: '.fd-create-btn',
-      emoji: '📁',
-      title: 'Create a Material',
-      desc: 'Tap here to create a new subject folder. Give it a name, department, and semester.',
-      placement: 'bottom',
-    },
-    {
-      selector: '.fd-code-box',
-      emoji: '🔑',
-      title: 'Your Access Code',
-      desc: 'Every material gets a unique 8-character code. Share this with your students — they use it to unlock your files.',
-      placement: 'bottom',
-    },
-    {
-      selector: '.fd-share-btn--wa',
-      emoji: '📲',
-      title: 'Share Instantly',
-      desc: 'Send the access code directly via WhatsApp with one tap — no copy-paste needed.',
-      placement: 'bottom',
-    },
-    {
-      selector: '.fd-btn--primary',
-      emoji: '📤',
-      title: 'Upload Files',
-      desc: 'Upload PDFs, slides, documents, images — anything. Files are stored securely on Google Drive.',
-      placement: 'bottom',
-    },
-    {
-      selector: '.sb-nav',
-      emoji: '📚',
-      title: 'Navigation Sidebar',
-      desc: 'Use the sidebar to browse all materials, access admin public courses, or share the app with colleagues.',
-      placement: 'bottom',
-    },
-    {
-      selector: null,
-      emoji: '🎉',
-      title: "You're all set!",
-      desc: "Create your first material and share the code with your class. If you ever want this tour again, tap the Tour button in the sidebar.",
-    },
-  ];
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="app-container">
       <Sidebar role="faculty" />
@@ -445,6 +407,7 @@ const FacultyDashboard = () => {
                   <span className="fd-profile-role">{user?.role}</span>
                 </div>
               </div>
+
               {/* Your stats */}
               <div className="fd-stats-row">
                 <div className="fd-stat">
@@ -453,7 +416,9 @@ const FacultyDashboard = () => {
                 </div>
                 <div className="fd-stat">
                   <div className="fd-stat-val">
-                    {materials.reduce((s, m) => s + (m.files?.length || 0) + (m.subFolders || []).reduce((ss, sf) => ss + (sf.files?.length || 0), 0), 0)}
+                    {materials.reduce((s, m) =>
+                      s + (m.files?.length || 0) +
+                      (m.subFolders || []).reduce((ss, sf) => ss + (sf.files?.length || 0), 0), 0)}
                   </div>
                   <div className="fd-stat-lbl">Total Files</div>
                 </div>
@@ -463,7 +428,7 @@ const FacultyDashboard = () => {
                 </div>
               </div>
 
-              {/* Platform stats — clearly labelled separate section */}
+              {/* Platform stats */}
               {platformStats && (
                 <div className="fd-platform-card">
                   <div className="fd-platform-card-heading">
@@ -493,7 +458,6 @@ const FacultyDashboard = () => {
             </div>
           </div>
 
-          {/* ── Storage Widgets ── */}
           {/* ── Alerts ── */}
           {error   && <div className="fd-alert fd-alert--err fd-enter"><span>⚠</span> {error}</div>}
           {success && <div className="fd-alert fd-alert--ok  fd-enter"><span>✓</span> {success}</div>}
@@ -509,7 +473,7 @@ const FacultyDashboard = () => {
             </button>
           </div>
 
-          {/* ── Content ── */}
+          {/* ── Material cards ── */}
           {loading ? (
             <div className="fd-loading">
               <ImSpinner8 className="fd-spinner" />
@@ -535,6 +499,7 @@ const FacultyDashboard = () => {
                 return (
                   <Reveal key={m._id} delay={i * 55}>
                     <div className="fd-card">
+
                       {/* Card top */}
                       <div className="fd-card-top">
                         <div className="fd-card-icon"><MdBook /></div>
@@ -571,7 +536,7 @@ const FacultyDashboard = () => {
                         </div>
                       )}
 
-                      {/* Access code */}
+                      {/* Access code box */}
                       <div className="fd-code-box">
                         <div className="fd-code-label">Student Access Code</div>
                         <div className="fd-code-row">
@@ -585,7 +550,7 @@ const FacultyDashboard = () => {
                           </button>
                         </div>
 
-                        {/* Share material row */}
+                        {/* Share row */}
                         <div className="fd-share-row">
                           <span className="fd-share-label">Share material</span>
                           <div className="fd-share-btns">
@@ -607,7 +572,7 @@ const FacultyDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Actions */}
+                      {/* Card actions */}
                       <div className="fd-card-actions">
                         <button className="fd-btn fd-btn--primary" onClick={() => openUpload(m)}>
                           <MdUpload /> Upload
@@ -692,11 +657,15 @@ const FacultyDashboard = () => {
       {/* ══ Upload Files Modal ══ */}
       <FdModal
         open={showUpload}
-        onClose={() => { if (!uploading) { setShowUpload(false); setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); setUploadProgress(0); } }}
+        onClose={() => {
+          if (!uploading) {
+            setShowUpload(false);
+            setUploadFiles([]); setSelectedSfId(''); setNewSfName(''); setUploadProgress(0);
+          }
+        }}
         title={`Upload Files — ${selectedFolder?.subjectName || ''}`}
         footer={
           <>
-            {/* Progress bar — visible while uploading */}
             {uploading && (
               <div style={{ flex: 1, marginRight: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#0369a1', marginBottom: '0.3rem', fontWeight: 600 }}>
@@ -725,7 +694,6 @@ const FacultyDashboard = () => {
       >
         <p className="fd-modal-hint">Max 50 MB per file · PDF, DOC, PPT, XLS, images, video, ZIP</p>
 
-        {/* Destination */}
         <div className="fd-field">
           <label className="fd-label"><MdFolder style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Upload destination</label>
           <select className="fd-input" value={selectedSfId} onChange={e => setSelectedSfId(e.target.value)}>
@@ -736,7 +704,6 @@ const FacultyDashboard = () => {
           </select>
         </div>
 
-        {/* Create sub-folder */}
         <div className="fd-sf-create">
           <MdCreateNewFolder className="fd-sf-create-icon" />
           <input
@@ -754,7 +721,6 @@ const FacultyDashboard = () => {
           </button>
         </div>
 
-        {/* Drag-drop zone */}
         <div
           className={`fd-dropzone ${isDragging ? 'fd-dropzone--active' : ''}`}
           onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
@@ -771,7 +737,6 @@ const FacultyDashboard = () => {
             accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.zip,.rar,.7z,.mp4,.mp3" />
         </div>
 
-        {/* File list */}
         {uploadFiles.length > 0 && (
           <div className="fd-file-list">
             <div className="fd-file-list-header">
@@ -823,7 +788,6 @@ const FacultyDashboard = () => {
         )}
       </FdModal>
 
-    </div>
       {/* ── Guided Tour ── */}
       {showTour && (
         <TourTooltip
@@ -831,6 +795,7 @@ const FacultyDashboard = () => {
           onFinish={() => { setShowTour(false); completeTour(); }}
         />
       )}
+
     </div>
   );
 };
