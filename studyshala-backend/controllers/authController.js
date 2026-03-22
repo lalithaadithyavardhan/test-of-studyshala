@@ -27,7 +27,8 @@ const googleCallback = async (req, res) => {   // FIXED: added async
       email:          req.user.email,
       role:           req.user.role,
       department:     req.user.department,
-      profilePicture: req.user.profilePicture
+      profilePicture: req.user.profilePicture,
+      tourCompleted:  req.user.tourCompleted || false,
     };
 
     const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -58,4 +59,26 @@ const logout = (req, res) => {
   });
 };
 
-module.exports = { getCurrentUser, googleCallback, logout };
+// Mark tour as completed for this user — called when user finishes or skips tour
+const tourComplete = async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user._id, { tourCompleted: true });
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error(`tourComplete: ${err.message}`);
+    res.status(500).json({ message: 'Failed to save tour status' });
+  }
+};
+
+// Reset tour for this user — called when user clicks replay
+const tourReset = async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user._id, { tourCompleted: false });
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error(`tourReset: ${err.message}`);
+    res.status(500).json({ message: 'Failed to reset tour' });
+  }
+};
+
+module.exports = { getCurrentUser, googleCallback, logout, tourComplete, tourReset };
