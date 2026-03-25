@@ -103,10 +103,17 @@ app.use((err, req, res, next) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀  Server running at http://localhost:${PORT}`);
   console.log(`❤️   Health check:  http://localhost:${PORT}/health\n`);
 });
+
+// ── Keep-alive fix for Render free tier ──────────────────────────────────────
+// Render's load balancer has a 30s idle timeout. Without these settings,
+// long-running requests (Drive file uploads) get cut mid-transfer.
+// keepAliveTimeout must be > Render's 30s. headersTimeout must be > keepAliveTimeout.
+server.keepAliveTimeout = 65000;   // 65s — above Render's 30s idle timeout
+server.headersTimeout   = 70000;   // 70s — must be > keepAliveTimeout
 
 process.on('unhandledRejection', (err) => logger.error(`Unhandled Rejection: ${err.message}`));
 process.on('uncaughtException',  (err) => {
