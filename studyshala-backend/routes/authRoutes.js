@@ -4,16 +4,28 @@ const passport = require('../config/passport');
 const authController = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
 
-// Google OAuth — prompt=select_account ensures account picker shows every time
 router.get('/google', (req, res, next) => {
   const role = ['faculty', 'admin', 'student'].includes(req.query.role)
     ? req.query.role : 'student';
 
-  passport.authenticate('google', {
+  const loginHint = req.query.hint || null;
+  const promptParam = req.query.prompt || null;
+
+  const authOptions = {
     scope: ['profile', 'email'],
     state: role,
-    prompt: 'select_account'
-  })(req, res, next);
+    accessType: 'offline' // Enables refresh tokens for long-lived sessions
+  };
+
+  if (loginHint) {
+    // Known user — skip picker, go straight to their account
+    authOptions.login_hint = loginHint;
+  } else if (promptParam === 'select_account') {
+    // Force the picker ONLY when the frontend explicitly asks for it (Switch Account feature)
+    authOptions.prompt = 'select_account';
+  }
+
+  passport.authenticate('google', authOptions)(req, res, next);
 });
 
 router.get('/google/callback', (req, res, next) => {
