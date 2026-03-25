@@ -38,20 +38,28 @@ passport.use(
             user.role = chosenRole;
           }
           user.lastLogin = new Date();
+          
+          // NEW: Catch and save the refresh token if Google sends a fresh one
+          if (refreshToken) {
+            user.googleRefreshToken = refreshToken;
+          }
+
           await user.save();
           logger.info(`Login: ${email} as ${user.role}`);
           return done(null, user);
         }
 
-        // New user — assign whatever role they chose
+        // New user — assign whatever role they chose and save the refresh token
         user = new User({
           googleId:          profile.id,
           name:              profile.displayName,
           email:             profile.emails[0].value,
           role:              chosenRole,
           profilePicture:    profile.photos[0]?.value,
+          googleRefreshToken: refreshToken || null, // NEW: Save offline token on creation
           lastLogin:      new Date()
         });
+        
         await user.save();
         logger.info(`New user: ${email} as ${chosenRole}`);
         done(null, user);
@@ -75,4 +83,3 @@ passport.deserializeUser(async (id, done) => {
 });
 
 module.exports = passport;
-
