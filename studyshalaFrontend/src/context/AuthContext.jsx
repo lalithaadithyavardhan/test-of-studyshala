@@ -67,8 +67,9 @@ export const AuthProvider = ({ children }) => {
     // Remember who last logged in so Login page can show quick-return banner
     localStorage.setItem('lastRole', userData.role);
     localStorage.setItem('lastUser', JSON.stringify({
-      name: userData.name,
-      role: userData.role,
+      name:  userData.name,
+      role:  userData.role,
+      email: userData.email,  // stored so Login page can pass as Google login_hint
     }));
     setUser(userData);
   };
