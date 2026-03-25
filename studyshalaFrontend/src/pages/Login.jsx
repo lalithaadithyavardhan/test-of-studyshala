@@ -20,11 +20,6 @@ import teacher1Svg from '../assets/teacher1.svg';
 
 import './Login.css';
 
-/* ══════════════════════════════════════════════════════════════════════════
-   HOOKS
-   ══════════════════════════════════════════════════════════════════════════ */
-
-/* Animated counter */
 const useCounter = (target, duration = 2000, start = false) => {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -42,23 +37,17 @@ const useCounter = (target, duration = 2000, start = false) => {
   return count;
 };
 
-/* Scroll reveal — progressive enhancement only.
-   Elements default to visible. Only add animation class if element
-   starts below the viewport fold (i.e. user actually needs to scroll). */
 const useScrollReveal = (threshold = 0.12) => {
   const ref = useRef(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     if (el.classList.contains('is-visible')) return;
-    // Only animate elements that start off-screen (below fold)
     const rect = el.getBoundingClientRect();
     const inView = rect.top < window.innerHeight && rect.bottom > 0;
     if (!inView) {
-      // Off-screen: opt in to animation
       el.classList.add('clay-anim-ready');
     } else {
-      // Already in view on load — mark visible immediately, no animation
       el.classList.add('is-visible');
       return;
     }
@@ -77,11 +66,6 @@ const useScrollReveal = (threshold = 0.12) => {
   return ref;
 };
 
-/* ══════════════════════════════════════════════════════════════════════════
-   SMALL COMPONENTS
-   ══════════════════════════════════════════════════════════════════════════ */
-
-/* Scroll-reveal wrapper — "page fold" animation per section */
 const Reveal = ({ children, delay = 0, from = 'bottom', className = '' }) => {
   const ref = useScrollReveal();
   return (
@@ -95,7 +79,6 @@ const Reveal = ({ children, delay = 0, from = 'bottom', className = '' }) => {
   );
 };
 
-/* Section wrapper — visible by default, animates only if below fold */
 const SectionReveal = ({ children, className = '' }) => {
   const ref = useRef(null);
   useEffect(() => {
@@ -120,12 +103,9 @@ const SectionReveal = ({ children, className = '' }) => {
   );
 };
 
-/* Feedback card — same visual style as old TestimonialCard */
 const FeedbackCard = ({ message, name, role, delay }) => {
   const ref = useScrollReveal();
-  const roleLabel = role === 'faculty'
-    ? `Faculty`
-    : `Student`;
+  const roleLabel = role === 'faculty' ? `Faculty` : `Student`;
   return (
     <div
       ref={ref}
@@ -141,11 +121,8 @@ const FeedbackCard = ({ message, name, role, delay }) => {
   );
 };
 
-/* Animated stat counter — FIX: no clay-reveal so stats always display regardless of scroll timing */
 const StatItem = ({ value, label }) => {
-  // value === null means still loading
   const isLoading = value === null || value === undefined;
-  // Always start counter as soon as value arrives
   const count = useCounter(isLoading ? 0 : value, 2000, !isLoading);
   return (
     <div className="clay-stat">
@@ -159,7 +136,6 @@ const StatItem = ({ value, label }) => {
     </div>
   );
 };
-
 
 const FeatureItem = ({ icon, text, delay, colorClass }) => {
   const ref = useScrollReveal();
@@ -187,9 +163,6 @@ const HowStep = ({ num, title, desc, delay }) => (
   </Reveal>
 );
 
-/* ══════════════════════════════════════════════════════════════════════════
-   LOGIN CARD
-   ══════════════════════════════════════════════════════════════════════════ */
 const LoginCard = ({ selectedRole, setSelectedRole, onSignIn, loading, error }) => (
   <div className="clay-login-card">
     <div className="clay-login-header">
@@ -254,15 +227,11 @@ const LoginCard = ({ selectedRole, setSelectedRole, onSignIn, loading, error }) 
   </div>
 );
 
-/* ══════════════════════════════════════════════════════════════════════════
-   MAIN PAGE
-   ══════════════════════════════════════════════════════════════════════════ */
 const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
 
-  // Pre-select last used role so returning users don't have to pick again
   const [selectedRole, setSelectedRole] = useState(() => {
     try { return localStorage.getItem('lastRole') || null; } catch { return null; }
   });
@@ -274,9 +243,7 @@ const Login = () => {
   })();
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
-  // null = not yet loaded (shows "—"), object = real data
   const [stats,        setStats]        = useState(null);
-  // real feedback from users — [] until loaded
   const [feedbacks,    setFeedbacks]    = useState([]);
   const [navScrolled,  setNavScrolled]  = useState(false);
   const [menuOpen,     setMenuOpen]     = useState(false);
@@ -297,11 +264,9 @@ const Login = () => {
     let cancelled = false;
 
     const wakeAndFetch = async () => {
-      // Record this visit (fire-and-forget, also wakes the Render backend)
       api.post('/stats/visit').catch(() => {});
 
-      // FIX: Try immediately first, then retry with backoff if backend is cold-starting
-      const DELAYS = [0, 5000, 10000, 15000, 20000, 25000, 30000]; // first attempt is instant
+      const DELAYS = [0, 5000, 10000, 15000, 20000, 25000, 30000]; 
       for (let i = 0; i < DELAYS.length; i++) {
         if (cancelled) return;
         if (DELAYS[i] > 0) {
@@ -312,11 +277,9 @@ const Login = () => {
           const res = await api.get('/stats');
           if (!cancelled && res.data) {
             setStats(res.data);
-            return; // success — stop retrying
+            return; 
           }
-        } catch {
-          // Backend still waking up — keep retrying
-        }
+        } catch {}
       }
     };
 
@@ -324,13 +287,12 @@ const Login = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // Fetch real feedback for the Postcards section
   useEffect(() => {
     api.get('/feedback')
       .then(res => {
         if (res.data?.feedbacks?.length) setFeedbacks(res.data.feedbacks);
       })
-      .catch(() => {}); // silently ignore — section just stays with defaults
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -359,12 +321,34 @@ const Login = () => {
   }
 
   const handleSignIn = (role) => {
-    // Guard: if role is a React event (from direct onClick) treat it as undefined
     const roleToUse = (role && typeof role === 'string') ? role : selectedRole;
     if (!roleToUse) { setError('Please select a role first.'); return; }
     setLoading(true); setError('');
     try { localStorage.setItem('lastRole', roleToUse); } catch {}
-    window.location.href = 'https://test-of-studyshala.onrender.com/api/auth/google?role=' + roleToUse;
+
+    let hint = '';
+    try {
+      const stored = localStorage.getItem('lastUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.email) hint = parsed.email;
+      }
+    } catch {}
+
+    // Uses your environment variable for local vs production
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const url = new URL(`${baseUrl}/auth/google`);
+    
+    url.searchParams.set('role', roleToUse);
+    
+    if (hint) {
+      url.searchParams.set('hint', hint);
+    } else {
+      // Force account picker if "Switch Account" was clicked
+      url.searchParams.set('prompt', 'select_account');
+    }
+    
+    window.location.href = url.toString();
   };
 
   const studentFeatures = [
@@ -386,8 +370,6 @@ const Login = () => {
 
   return (
     <div className={`clay-page ${pageReady ? 'clay-ready' : ''}`}>
-
-      {/* ── Navbar ── */}
       <nav className={`clay-nav ${navScrolled ? 'clay-nav--solid' : ''}`}>
         <div className="clay-nav-inner">
           <div className="clay-brand clay-enter" style={{ animationDelay: '0ms' }}>
@@ -432,17 +414,13 @@ const Login = () => {
         )}
       </nav>
 
-      {/* ══ HERO ══════════════════════════════════════════════════════════ */}
-      {/* Video is FULLY visible — no overlay, no floating SVGs on top */}
       <section className="clay-hero">
         <video className="clay-hero-video" autoPlay muted loop playsInline>
           <source src={heroBgMp4} type="video/mp4" />
         </video>
 
-        {/* Semi-transparent content pane so text stays readable over video */}
         <div className="clay-hero-pane">
           <div className="clay-hero-inner">
-            {/* Left — headline */}
             <div className="clay-hero-left">
               <div className="clay-hero-badge clay-enter" style={{ animationDelay: '80ms' }}>
                 <img src={owlLogo} alt="" style={{ width: "16px", height: "16px", objectFit: "contain", verticalAlign: "middle" }} />
@@ -473,10 +451,7 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Right — login card */}
             <div id="signin" className="clay-hero-right clay-enter" style={{ animationDelay: '300ms' }}>
-
-              {/* Quick return banner — shown when we know who last logged in */}
               {lastUserName && !loading && (
                 <div className="clay-quick-return">
                   <div className="clay-quick-return-label">Welcome back!</div>
@@ -505,7 +480,6 @@ const Login = () => {
                 </div>
               )}
 
-              {/* Full login card — shown when no previous user remembered */}
               {!lastUserName && (
                 <>
                   <LoginCard
@@ -522,13 +496,11 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Scroll indicator */}
         <div className="clay-scroll-indicator clay-enter" style={{ animationDelay: '900ms' }}>
           <div className="clay-scroll-dot" />
         </div>
       </section>
 
-      {/* ══ STATS ═════════════════════════════════════════════════════════ */}
       <SectionReveal>
         <section className="clay-stats-section" id="stats">
           <div className="clay-wrap">
@@ -553,7 +525,6 @@ const Login = () => {
 
       <div className="clay-divider" />
 
-      {/* ══ FEATURES ══════════════════════════════════════════════════════ */}
       <SectionReveal>
         <section className="clay-features-section" id="features">
           <div className="clay-wrap">
@@ -569,7 +540,6 @@ const Login = () => {
                     Students get instant access, faculty get full control.
                   </p>
                 </Reveal>
-                {/* One illustration here — subtle, low opacity */}
                 <Reveal delay={200}>
                   <div className="clay-features-illustration">
                     <img src={student2Svg} alt="" draggable="false" />
@@ -605,7 +575,6 @@ const Login = () => {
 
       <div className="clay-divider" />
 
-      {/* ══ HOW IT WORKS ══════════════════════════════════════════════════ */}
       <SectionReveal>
         <section className="clay-how-section" id="how">
           <div className="clay-wrap">
@@ -650,7 +619,6 @@ const Login = () => {
 
       <div className="clay-divider" />
 
-      {/* ══ TESTIMONIALS ══════════════════════════════════════════════════ */}
       <SectionReveal>
         <section className="clay-testimonials-section" id="postcards">
           <div className="clay-wrap">
@@ -674,8 +642,7 @@ const Login = () => {
                       delay={i * 80}
                     />
                   ))
-                : /* Fallback placeholders shown while no real feedback yet */
-                  [
+                : [
                     { message: 'This saved me so much time before exams!', name: 'A Student', role: 'student' },
                     { message: 'My students accessed all notes within minutes of sharing the code.', name: 'A Faculty', role: 'faculty' },
                     { message: 'No more broken WhatsApp links. This is exactly what we needed.', name: 'A Faculty', role: 'faculty' },
@@ -689,11 +656,8 @@ const Login = () => {
         </section>
       </SectionReveal>
 
-      {/* ══ FOOTER ════════════════════════════════════════════════════════ */}
       <footer className="clay-footer" id="about">
         <div className="clay-wrap clay-footer-inner">
-
-          {/* Brand */}
           <div className="clay-footer-brand">
             <img src={owlLogo} alt="StudyShala" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
             <span>StudyShala</span>
@@ -702,7 +666,6 @@ const Login = () => {
             Empowering education through seamless material sharing.
           </p>
 
-          {/* About — no photo, just text */}
           <div className="clay-footer-about">
             <div className="clay-footer-about-name">Borra Adithya</div>
             <div className="clay-footer-about-meta">Student · Developer</div>
@@ -715,7 +678,6 @@ const Login = () => {
             </blockquote>
           </div>
 
-          {/* Links */}
           <div className="clay-footer-links">
             <a href="https://github.com/lalithaadithyavardhan" target="_blank" rel="noopener noreferrer">
               <FaGithub /> GitHub
