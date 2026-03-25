@@ -11,9 +11,8 @@ const accessHistorySchema = new mongoose.Schema({
   accessedAt: { type: Date, default: Date.now }
 });
 
-// Recently viewed files (capped at 10, newest first, cross-device)
 const recentFileSchema = new mongoose.Schema({
-  fileId:     { type: String, required: true },   // file._id as string
+  fileId:     { type: String, required: true },   
   fileName:   { type: String, required: true },
   mimeType:   { type: String, default: '' },
   materialId: { type: mongoose.Schema.Types.ObjectId, ref: 'Folder', required: true },
@@ -21,7 +20,6 @@ const recentFileSchema = new mongoose.Schema({
   viewedAt:   { type: Date,   default: Date.now }
 });
 
-// Starred/bookmarked individual files (cross-device)
 const starredFileSchema = new mongoose.Schema({
   fileId:     { type: String, required: true },
   fileName:   { type: String, required: true },
@@ -42,19 +40,18 @@ const userSchema = new mongoose.Schema({
   },
   department: String,
   semester: String,
-  departmentCode: String,  // legacy - current active code
+  departmentCode: String,  
 
-  token:               { type: String, default: null },
+  token: { type: String, default: null },
+  googleRefreshToken: { type: String, default: null }, // 👈 Added for 'offline' access support
 
-  
-  // Student-specific fields
   savedMaterials: [savedMaterialSchema],
   accessHistory:  { type: [accessHistorySchema], default: [] },
-  recentFiles:    { type: [recentFileSchema], default: [] },   // last 10 viewed files
-  starredFiles:   { type: [starredFileSchema], default: [] },  // bookmarked files
+  recentFiles:    { type: [recentFileSchema], default: [] },   
+  starredFiles:   { type: [starredFileSchema], default: [] },  
   
-  tourCompleted:       { type: Boolean, default: false }, // Phase 1 tour (empty dashboard)
-  phase2TourCompleted: { type: Boolean, default: false }, // Phase 2 tour (after first material)
+  tourCompleted:       { type: Boolean, default: false }, 
+  phase2TourCompleted: { type: Boolean, default: false }, 
   active: { type: Boolean, default: true },
   profilePicture: String,
   lastLogin: Date
