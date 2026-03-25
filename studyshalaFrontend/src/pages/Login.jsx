@@ -364,7 +364,22 @@ const Login = () => {
     if (!roleToUse) { setError('Please select a role first.'); return; }
     setLoading(true); setError('');
     try { localStorage.setItem('lastRole', roleToUse); } catch {}
-    window.location.href = 'https://test-of-studyshala.onrender.com/api/auth/google?role=' + roleToUse;
+
+    // Pass the previously used email as a login_hint so Google skips the
+    // account picker and signs the user in directly with their known account.
+    let hint = '';
+    try {
+      const stored = localStorage.getItem('lastUser');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.email) hint = parsed.email;
+      }
+    } catch {}
+
+    const url = new URL('https://test-of-studyshala.onrender.com/api/auth/google');
+    url.searchParams.set('role', roleToUse);
+    if (hint) url.searchParams.set('hint', hint);
+    window.location.href = url.toString();
   };
 
   const studentFeatures = [
