@@ -26,8 +26,6 @@ export const AuthProvider = ({ children }) => {
         setUser(parsed);
 
         // Silently refresh from DB to get latest tourCompleted and role.
-        // If backend is sleeping (Render cold start), this fails quietly
-        // and the user stays logged in from localStorage.
         api.get('/auth/user').then(res => {
           if (res.data?.user) {
             const fresh = {
@@ -41,11 +39,16 @@ export const AuthProvider = ({ children }) => {
               phase2TourCompleted: res.data.user.phase2TourCompleted || false,
             };
             setUser(fresh);
-            // Save fresh data back to localStorage so next load is accurate
             try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
           }
-        }).catch(() => {
-          // Backend sleeping or network error — keep user from localStorage
+        }).catch((err) => {
+          // If backend wakes up and says "Unauthorized" (401), the token is dead. Kick them out.
+          if (err.response && err.response.status === 401) {
+             localStorage.removeItem('token');
+             localStorage.removeItem('user');
+             setUser(null);
+          }
+          // Otherwise (network timeout, 500 error), it's a cold start — keep the UI alive from localStorage.
         });
 
       } catch (error) {
@@ -57,41 +60,28 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  /**
-   * Updated login function
-   * Matches the parameter order used in AuthCallback: login(userData, token)
-   */
   const login = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
-    // Remember who last logged in so Login page can show quick-return banner
     localStorage.setItem('lastRole', userData.role);
     localStorage.setItem('lastUser', JSON.stringify({
-      name: userData.name,
-      role: userData.role,
+      name:  userData.name,
+      role:  userData.role,
+      email: userData.email,  
     }));
     setUser(userData);
   };
 
-  /**
-   * Logout function
-   * Clears session and notifies the backend if necessary
-   */
-  // Called when user finishes or skips the tour — saves to DB
   const completeTour = async () => {
-    try {
-      await api.post('/auth/tour-complete');
-    } catch (_) {}
+    try { await api.post('/auth/tour-complete'); } catch (_) {}
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, tourCompleted: true };
-      // Persist to localStorage so it survives page refresh
       try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
 
-  // Phase 2 tour (after first material created)
   const completePhase2Tour = async () => {
     try { await api.post('/auth/phase2-tour-complete'); } catch (_) {}
     setUser(prev => {
@@ -112,15 +102,11 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
-  // Called when user clicks "Replay tour" — resets on DB
   const resetTour = async () => {
-    try {
-      await api.post('/auth/tour-reset');
-    } catch (_) {}
+    try { await api.post('/auth/tour-reset'); } catch (_) {}
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, tourCompleted: false };
-      // Persist to localStorage
       try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
       return updated;
     });
@@ -128,15 +114,12 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Optional: Notify backend of logout
       await api.post('/auth/logout');
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Keep lastUser + lastRole so quick-return banner shows on next visit
-      // User can clear it manually with "Switch account" button
       setUser(null);
     }
   };
