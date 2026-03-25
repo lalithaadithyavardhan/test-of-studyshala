@@ -5,7 +5,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // Give the Render backend time to wake up from sleep
+  // General timeout — 60s covers cold-start wakeup for normal API calls
   timeout: 60000,
 });
 
@@ -16,26 +16,23 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // File uploads need a much longer timeout:
+    // browser→server (multer buffer) + server→Google Drive can take 2-3 minutes
+    // for larger files on Render free tier. Override timeout for multipart requests.
+    if (config.headers['Content-Type'] === 'multipart/form-data') {
+      config.timeout = 5 * 60 * 1000; // 5 minutes for file uploads
+    }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ── Response interceptor ──────────────────────────────────────────────────────
-// FIX: Do NOT clear token on every 401.
-// Render free tier backends sleep after 15 min — a cold-start wakeup can
-// cause temporary failures that look like 401s. Clearing the token here
-// would force the user to log in again every time the backend sleeps.
-//
-// Instead: only clear the token if the backend explicitly says the token
-// is invalid (via a specific error message), not on any network hiccup.
+// Response interceptor — only clear auth on explicit token errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       const msg = error.response?.data?.message || '';
-      // Only log out if backend explicitly says token is bad
-      // NOT on cold-start errors, CORS issues, or network timeouts
       const isRealAuthError =
         msg.toLowerCase().includes('invalid') ||
         msg.toLowerCase().includes('expired') ||
@@ -47,7 +44,6 @@ api.interceptors.response.use(
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
-      // Otherwise: just reject the promise — let the page handle it gracefully
     }
     return Promise.reject(error);
   }
