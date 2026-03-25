@@ -219,6 +219,7 @@ const FacultyDashboard = () => {
   const [uploadFiles,    setUploadFiles]    = useState([]);
   const [uploading,      setUploading]      = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase,    setUploadPhase]    = useState('idle'); // 'idle' | 'sending' | 'drive' | 'done'
   const [isDragging,     setIsDragging]     = useState(false);
   const [selectedSfId,   setSelectedSfId]   = useState('');
   const [newSfName,      setNewSfName]      = useState('');
@@ -314,7 +315,7 @@ const FacultyDashboard = () => {
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!uploadFiles.length || !selectedFolder) return;
-    setUploading(true); setUploadProgress(0);
+    setUploading(true); setUploadProgress(0); setUploadPhase('sending');
     try {
       const form = new FormData();
       uploadFiles.forEach(f => form.append('files', f));
@@ -325,11 +326,16 @@ const FacultyDashboard = () => {
       await api.post(endpoint, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (evt) => {
-          if (evt.total) setUploadProgress(Math.round((evt.loaded * 100) / evt.total));
+          if (evt.total) {
+            const pct = Math.round((evt.loaded * 100) / evt.total);
+            setUploadProgress(pct);
+            // Once browser→server transfer is done, switch to Drive phase
+            if (pct >= 100) setUploadPhase('drive');
+          }
         }
       });
       setShowUpload(false);
-      setUploadFiles([]); setSelectedFolder(null); setSelectedSfId(''); setUploadProgress(0);
+      setUploadFiles([]); setSelectedFolder(null); setSelectedSfId(''); setUploadProgress(0); setUploadPhase('idle');
       const dest = selectedSfId
         ? `into "${selectedFolder.subFolders?.find(sf => sf._id === selectedSfId)?.name || 'folder'}"`
         : 'to root';
@@ -337,7 +343,7 @@ const FacultyDashboard = () => {
       fetchMaterials();
     } catch (err) {
       showError(err.response?.data?.message || 'Upload failed');
-    } finally { setUploading(false); setUploadProgress(0); }
+    } finally { setUploading(false); setUploadProgress(0); setUploadPhase('idle'); }
   };
 
   const handleDelete = async (id) => {
@@ -708,8 +714,12 @@ const FacultyDashboard = () => {
             {uploading && (
               <div style={{ flex: 1, marginRight: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#0369a1', marginBottom: '0.3rem', fontWeight: 600 }}>
-                  <span>⏳ Uploading to Google Drive…</span>
-                  <span>{uploadProgress}%</span>
+                  <span>
+                    {uploadPhase === 'drive'
+                      ? '☁️ Saving to Google Drive…'
+                      : '⏳ Sending files…'}
+                  </span>
+                  <span>{uploadPhase === 'drive' ? '' : `${uploadProgress}%`}</span>
                 </div>
                 <div style={{ height: '7px', background: '#e0f2fe', borderRadius: '99px', overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${uploadProgress}%`, background: 'linear-gradient(90deg, #0891b2, #14b8a6)', borderRadius: '99px', transition: 'width 0.3s ease' }} />
@@ -723,7 +733,9 @@ const FacultyDashboard = () => {
             </button>
             <button className="fd-btn fd-btn--primary" onClick={handleUpload} disabled={uploading || !uploadFiles.length}>
               {uploading
-                ? <><ImSpinner8 className="fd-spin" /> {uploadProgress}%</>
+                ? uploadPhase === 'drive'
+                  ? <><ImSpinner8 className="fd-spin" /> Saving to Drive…</>
+                  : <><ImSpinner8 className="fd-spin" /> {uploadProgress}%</>
                 : <><MdUpload /> Upload {uploadFiles.length} file(s)</>}
             </button>
           </>
