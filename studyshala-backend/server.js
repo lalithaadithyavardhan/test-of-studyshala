@@ -84,6 +84,14 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// ── Keep-alive ping endpoint ──────────────────────────────────────────────────
+// Point UptimeRobot (free) at https://YOUR_BACKEND.onrender.com/ping every 5 min.
+// This prevents Render free tier from spinning down, so users never face a
+// cold-start delay that causes re-login. Lighter than /health (no DB call).
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
 app.use('/api/auth',          authRoutes);
 app.use('/api/faculty',       facultyRoutes);
 app.use('/api/student',       studentRoutes);
