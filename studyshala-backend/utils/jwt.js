@@ -8,8 +8,8 @@ const generateToken = (user) => {
     name: user.name
   };
 
-  // CHANGED: Removed expiresIn — token never expires
-  return jwt.sign(payload, process.env.JWT_SECRET);
+  // 6-month expiry — matches cookie and session lifetime
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '180d' });
 };
 
 const verifyToken = (token) => {
