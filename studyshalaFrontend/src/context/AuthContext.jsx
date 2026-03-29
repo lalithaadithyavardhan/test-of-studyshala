@@ -1,168 +1,79 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api/axios';
+const express  = require('express');
+const router   = express.Router();
+const passport = require('../config/passport');
+const authController = require('../controllers/authController');
+const { authenticate } = require('../middleware/auth');
 
-const AuthContext = createContext(null);
+// Google OAuth — skip account picker if we know who's logging in
+router.get('/google', (req, res, next) => {
+  const role = ['faculty', 'admin', 'student'].includes(req.query.role)
+    ? req.query.role : 'student';
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  const loginHint = req.query.hint || null;
+
+  // 'silent=1' means the frontend wants a fully silent sign-in (no UI at all).
+  // We pass prompt:'none' to Google, which auto-signs the user in without
+  // showing the account picker. If Google can't do it silently (session expired,
+  // multiple accounts, etc.) it returns error=interaction_required, which we
+  // catch in the callback and redirect back to /login for a normal sign-in.
+  const silent = req.query.silent === '1';
+
+  const authOptions = {
+    scope: ['profile', 'email'],
+    state: role,
+  };
+
+  if (loginHint) {
+    // Pre-fill the account so Google knows which account to use
+    authOptions.login_hint = loginHint;
   }
-  return context;
-};
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  if (silent && loginHint) {
+    // Full silent sign-in — no account picker shown at all
+    authOptions.prompt = 'none';
+  }
+  // Without silent: no prompt set — Google auto-signs if one session active,
+  // shows picker only if multiple accounts are logged in the browser.
 
-  // Initialize authentication state from localStorage on app load
-  useEffect(() => {
-    const token      = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+  passport.authenticate('google', authOptions)(req, res, next);
+});
 
-    if (token && storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
+router.get('/google/callback', (req, res, next) => {
+  // Handle Google's error=interaction_required (silent sign-in failed).
+  // This happens when prompt:'none' was used but Google needs user interaction
+  // (e.g. session expired, consent needed, multiple accounts).
+  // Solution: redirect back to login page so user can click the button normally.
+  if (req.query.error === 'interaction_required' || req.query.error === 'consent_required') {
+    return res.redirect(`${process.env.FRONTEND_URL}/login?error=silent_failed`);
+  }
 
-        // Step 1: Trust localStorage immediately — user sees their dashboard
-        // right away without waiting for the backend (which may be sleeping on
-        // Render free tier and take 30–60s to wake up).
-        setUser(parsed);
-        setLoading(false);
+  passport.authenticate('google', (err, user, info) => {
+    if (err)   return next(err);
 
-        // Step 2: Silently refresh from DB in the background to get fresh data
-        // (role, department, tourCompleted, etc). This runs AFTER the UI unblocks.
-        // On failure we keep the localStorage version; the axios interceptor
-        // already handles real invalid-token 401s by clearing localStorage.
-        api.get('/auth/user').then(res => {
-          if (res.data?.user) {
-            const fresh = {
-              id:                  res.data.user._id,
-              name:                res.data.user.name,
-              email:               res.data.user.email,
-              role:                res.data.user.role,
-              department:          res.data.user.department,
-              profilePicture:      res.data.user.profilePicture,
-              tourCompleted:       res.data.user.tourCompleted       || false,
-              phase2TourCompleted: res.data.user.phase2TourCompleted || false,
-            };
-            setUser(fresh);
-            // Save fresh data back to localStorage so next load is accurate
-            try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
-          }
-        }).catch(() => {
-          // Backend sleeping or network error — keep user from localStorage.
-          // Real bad-token errors are handled by the axios interceptor already.
-        });
-
-      } catch (error) {
-        // Corrupted localStorage — clear and show login
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setLoading(false);
-      }
-    } else {
-      setLoading(false);
+    // Blocked admin attempt
+    if (!user && info?.message === 'not_admin') {
+      const redirectBase = req.query.state === 'admin'
+        ? `${process.env.FRONTEND_URL}/admin/login`
+        : `${process.env.FRONTEND_URL}/login`;
+      return res.redirect(`${redirectBase}?error=not_admin`);
     }
-  }, []);
 
-  /**
-   * Updated login function
-   * Matches the parameter order used in AuthCallback: login(userData, token)
-   */
-  const login = (userData, token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    // Remember who last logged in so Login page can show quick-return banner
-    localStorage.setItem('lastRole', userData.role);
-    localStorage.setItem('lastUser', JSON.stringify({
-      name:  userData.name,
-      role:  userData.role,
-      email: userData.email,  // stored so Login page can pass as Google login_hint
-    }));
-    setUser(userData);
-  };
-
-  /**
-   * Logout function
-   * Clears session and notifies the backend if necessary
-   */
-  // Called when user finishes or skips the tour — saves to DB
-  const completeTour = async () => {
-    try {
-      await api.post('/auth/tour-complete');
-    } catch (_) {}
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, tourCompleted: true };
-      // Persist to localStorage so it survives page refresh
-      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  };
-
-  // Phase 2 tour (after first material created)
-  const completePhase2Tour = async () => {
-    try { await api.post('/auth/phase2-tour-complete'); } catch (_) {}
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, phase2TourCompleted: true };
-      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  };
-
-  const resetPhase2Tour = async () => {
-    try { await api.post('/auth/phase2-tour-reset'); } catch (_) {}
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, phase2TourCompleted: false };
-      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  };
-
-  // Called when user clicks "Replay tour" — resets on DB
-  const resetTour = async () => {
-    try {
-      await api.post('/auth/tour-reset');
-    } catch (_) {}
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, tourCompleted: false };
-      // Persist to localStorage
-      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  };
-
-  const logout = async () => {
-    try {
-      // Optional: Notify backend of logout
-      await api.post('/auth/logout');
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // Keep lastUser + lastRole so quick-return banner shows on next visit
-      // User can clear it manually with "Switch account" button
-      setUser(null);
+    if (!user) {
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
     }
-  };
 
-  const value = {
-    user,
-    login,
-    logout,
-    loading,
-    isAuthenticated:  !!user,
-    completeTour,
-    resetTour,
-    completePhase2Tour,
-    resetPhase2Tour,
-  };
+    req.logIn(user, (loginErr) => {
+      if (loginErr) return next(loginErr);
+      authController.googleCallback(req, res);
+    });
+  })(req, res, next);
+});
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+router.get('/user',            authenticate, authController.getCurrentUser);
+router.post('/logout',         authenticate, authController.logout);
+router.post('/tour-complete',        authenticate, authController.tourComplete);
+router.post('/tour-reset',           authenticate, authController.tourReset);
+router.post('/phase2-tour-complete', authenticate, authController.phase2TourComplete);
+router.post('/phase2-tour-reset',    authenticate, authController.phase2TourReset);
+
+module.exports = router;
