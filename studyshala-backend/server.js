@@ -9,6 +9,7 @@ require('dotenv').config();
 const express    = require('express');
 const cors       = require('cors');
 const session    = require('express-session');
+const MongoStore = require('connect-mongo');   // ✅ persistent sessions
 const passport   = require('./config/passport');
 const connectDB  = require('./config/database');
 const logger     = require('./utils/logger');
@@ -50,15 +51,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Session ───────────────────────────────────────────────────────────────────
+// Sessions are stored in MongoDB so they survive Render free-tier restarts and
+// cold starts. Cookie lives for 6 months — users stay logged in permanently.
+const SIX_MONTHS_MS  = 6 * 30 * 24 * 60 * 60 * 1000;   // ~180 days in ms
+const SIX_MONTHS_SEC = 6 * 30 * 24 * 60 * 60;           // ~180 days in seconds
+
 app.use(session({
   secret:            process.env.SESSION_SECRET || 'csms-session-secret',
   resave:            false,
   saveUninitialized: false,
   proxy:             true,
+  // ✅ Store sessions in MongoDB — survives restarts, cold starts, redeploys
+  store: MongoStore.create({
+    mongoUrl:         process.env.MONGO_URI,
+    ttl:              SIX_MONTHS_SEC,   // session lives 6 months in DB
+    autoRemove:       'native',          // let MongoDB TTL index clean up expired sessions
+    touchAfter:       24 * 3600,         // only re-save session once per 24h to reduce DB writes
+  }),
   cookie: {
     secure:   process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge:   24 * 60 * 60 * 1000
+    maxAge:   SIX_MONTHS_MS,            // ✅ 6-month cookie — user stays logged in
   }
 }));
 
@@ -114,6 +127,20 @@ const server = app.listen(PORT, () => {
 // keepAliveTimeout must be > Render's 30s. headersTimeout must be > keepAliveTimeout.
 server.keepAliveTimeout = 65000;   // 65s — above Render's 30s idle timeout
 server.headersTimeout   = 70000;   // 70s — must be > keepAliveTimeout
+
+// ── Keep Render free tier awake ───────────────────────────────────────────────
+// Render spins down free services after 15 min of inactivity.
+// This self-ping fires every 14 minutes to prevent that cold start.
+// Set BACKEND_URL in your Render environment variables.
+if (process.env.NODE_ENV === 'production' && process.env.BACKEND_URL) {
+  const PING_URL = `${process.env.BACKEND_URL}/health`;
+  setInterval(() => {
+    fetch(PING_URL)
+      .then(() => logger.info('Keep-alive ping OK'))
+      .catch((err) => logger.warn(`Keep-alive ping failed: ${err.message}`));
+  }, 14 * 60 * 1000); // every 14 minutes
+  logger.info(`Keep-alive started → ${PING_URL}`);
+}
 
 process.on('unhandledRejection', (err) => logger.error(`Unhandled Rejection: ${err.message}`));
 process.on('uncaughtException',  (err) => {
