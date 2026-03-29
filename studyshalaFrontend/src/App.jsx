@@ -27,7 +27,12 @@ import './styles/global.css';
 
 const Home = () => {
   const { user, loading } = useAuth();
+
+  // IMPORTANT: While AuthContext is reading localStorage, show nothing.
+  // Do NOT redirect to /login yet — user may already be logged in.
+  // This prevents the flicker: loading→null→/login→Google account picker.
   if (loading) return null;
+
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'faculty') return <Navigate to="/faculty/dashboard" replace />;
   if (user.role === 'admin')   return <Navigate to="/admin/dashboard" replace />;
