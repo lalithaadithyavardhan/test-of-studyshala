@@ -1,3 +1,7 @@
+console.log('=== SERVER STARTING v2 ===');
+
+
+  
 // ── Crash handler — MUST be first so ALL errors are visible in logs ──────────
 process.on('uncaughtException', (err) => {
   console.error('💥 UNCAUGHT EXCEPTION:', err.message);
