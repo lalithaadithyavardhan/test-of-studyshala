@@ -5,61 +5,52 @@ const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
 
+// Read user synchronously from localStorage before first render.
+// This means `loading` starts as false and `user` is already set
+// if there is a valid session — no flicker, no redirect to /login.
+const getStoredUser = () => {
+  try {
+    const token = localStorage.getItem('token');
+    const stored = localStorage.getItem('user');
+    if (token && stored) return JSON.parse(stored);
+  } catch {}
+  return null;
+};
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser]       = useState(getStoredUser);   // sync read — no loading flash
+  const [loading, setLoading] = useState(false);           // starts false — already have answer
 
   useEffect(() => {
-    const token      = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const storedUser = getStoredUser();
+    if (!storedUser) return; // not logged in, nothing to refresh
 
-    if (token && storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-
-        // Trust localStorage immediately — user sees dashboard right away
-        // without waiting for the backend (which may be sleeping on Render free tier).
-        setUser(parsed);
-        setLoading(false);
-
-        // Silently refresh from DB in background to get fresh role/department/tour data.
-        // If backend is cold-starting this will take time — that's fine, UI is already unblocked.
-        // Real bad-token 401s are caught by the axios interceptor which clears localStorage.
-        api.get('/auth/user').then(res => {
-          if (res.data?.user) {
-            const fresh = {
-              id:                  res.data.user._id,
-              name:                res.data.user.name,
-              email:               res.data.user.email,
-              role:                res.data.user.role,
-              department:          res.data.user.department,
-              profilePicture:      res.data.user.profilePicture,
-              tourCompleted:       res.data.user.tourCompleted       || false,
-              phase2TourCompleted: res.data.user.phase2TourCompleted || false,
-            };
-            setUser(fresh);
-            try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
-          }
-        }).catch(() => {
-          // Backend sleeping or network error — keep user from localStorage.
-        });
-
-      } catch (error) {
-        // Corrupted localStorage — clear and show login
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setLoading(false);
+    // Background refresh — get latest role/department/tour data from DB.
+    // UI is already unblocked. If backend is cold-starting on Render free tier
+    // this may take 30-60s — that's fine, user is already on their dashboard.
+    api.get('/auth/user').then(res => {
+      if (res.data?.user) {
+        const fresh = {
+          id:                  res.data.user._id,
+          name:                res.data.user.name,
+          email:               res.data.user.email,
+          role:                res.data.user.role,
+          department:          res.data.user.department,
+          profilePicture:      res.data.user.profilePicture,
+          tourCompleted:       res.data.user.tourCompleted       || false,
+          phase2TourCompleted: res.data.user.phase2TourCompleted || false,
+        };
+        setUser(fresh);
+        try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
       }
-    } else {
-      setLoading(false);
-    }
+    }).catch(() => {
+      // Backend sleeping or network error — keep the localStorage version.
+      // Real bad-token 401s are handled by the axios interceptor.
+    });
   }, []);
 
   const login = (userData, token) => {
@@ -74,13 +65,33 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
   };
 
-  const completeTour = async () => {
+  const logout = async () => {
     try {
-      await api.post('/auth/tour-complete');
-    } catch (_) {}
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
+  };
+
+  const completeTour = async () => {
+    try { await api.post('/auth/tour-complete'); } catch (_) {}
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, tourCompleted: true };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const resetTour = async () => {
+    try { await api.post('/auth/tour-reset'); } catch (_) {}
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, tourCompleted: false };
       try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
       return updated;
     });
@@ -104,30 +115,6 @@ export const AuthProvider = ({ children }) => {
       try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
       return updated;
     });
-  };
-
-  const resetTour = async () => {
-    try {
-      await api.post('/auth/tour-reset');
-    } catch (_) {}
-    setUser(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev, tourCompleted: false };
-      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  };
-
-  const logout = async () => {
-    try {
-      await api.post('/auth/logout');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-    }
   };
 
   const value = {
