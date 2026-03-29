@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
         const parsed = JSON.parse(storedUser);
         setUser(parsed);
 
-        // Silently refresh from DB to get latest tourCompleted and role.
+        // Silently refresh from DB to get latest data.
         // If backend is sleeping (Render cold start), this fails quietly
         // and the user stays logged in from localStorage.
         api.get('/auth/user').then(res => {
@@ -41,11 +41,12 @@ export const AuthProvider = ({ children }) => {
               phase2TourCompleted: res.data.user.phase2TourCompleted || false,
             };
             setUser(fresh);
-            // Save fresh data back to localStorage so next load is accurate
+            // Save fresh data back so next load is accurate
             try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
           }
         }).catch(() => {
-          // Backend sleeping or network error — keep user from localStorage
+          // Backend sleeping or network error — keep user from localStorage.
+          // Do NOT log out the user here. They will stay logged in.
         });
 
       } catch (error) {
@@ -58,26 +59,28 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   /**
-   * Updated login function
-   * Matches the parameter order used in AuthCallback: login(userData, token)
+   * login(userData, token)
+   * Called by AuthCallback after a successful Google OAuth redirect.
+   * Saves token + user to localStorage and updates React state.
+   * Also saves lastUser so the Login page can show a quick-return banner
+   * and pass login_hint to Google — so returning users skip the account picker.
    */
   const login = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
-    // Remember who last logged in so Login page can show quick-return banner
+
+    // ✅ lastUser is kept FOREVER (even after logout) so the quick-return
+    // banner always shows and Google login_hint always pre-selects the account.
+    // The user can clear it manually by clicking "Switch account".
     localStorage.setItem('lastRole', userData.role);
     localStorage.setItem('lastUser', JSON.stringify({
       name:  userData.name,
       role:  userData.role,
-      email: userData.email,  // stored so Login page can pass as Google login_hint
+      email: userData.email,
     }));
     setUser(userData);
   };
 
-  /**
-   * Logout function
-   * Clears session and notifies the backend if necessary
-   */
   // Called when user finishes or skips the tour — saves to DB
   const completeTour = async () => {
     try {
@@ -86,7 +89,6 @@ export const AuthProvider = ({ children }) => {
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, tourCompleted: true };
-      // Persist to localStorage so it survives page refresh
       try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
       return updated;
     });
@@ -121,23 +123,30 @@ export const AuthProvider = ({ children }) => {
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, tourCompleted: false };
-      // Persist to localStorage
       try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
       return updated;
     });
   };
 
+  /**
+   * logout()
+   * Clears the active session token but intentionally KEEPS lastUser in
+   * localStorage. This means:
+   *   - The quick-return banner still shows on the Login page after logout
+   *   - Google login_hint still pre-selects the correct account
+   *   - The user never has to pick an account from a list again
+   * To fully switch accounts, the user clicks "Switch account" on Login page.
+   */
   const logout = async () => {
     try {
-      // Optional: Notify backend of logout
       await api.post('/auth/logout');
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error('Logout error:', error);
     } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      // Keep lastUser + lastRole so quick-return banner shows on next visit
-      // User can clear it manually with "Switch account" button
+      // ✅ DO NOT remove lastUser or lastRole here — keep them so the
+      // returning-user experience works perfectly on next visit.
       setUser(null);
     }
   };
