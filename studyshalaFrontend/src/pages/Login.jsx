@@ -262,6 +262,32 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
 
+  // ── Instant redirect for already-logged-in users ──────────────────────────
+  // Read token + user directly from localStorage synchronously, before any
+  // render. This prevents the login page (and Google account picker) from
+  // flashing even for a split second when a logged-in user opens a new tab.
+  // The AuthContext useEffect does the same thing but asynchronously — this
+  // catches the case where the redirect fires before AuthContext has set state.
+  const [redirectingExistingUser] = useState(() => {
+    try {
+      const token = localStorage.getItem('token');
+      const stored = localStorage.getItem('user');
+      if (token && stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.role) return parsed.role;
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    if (redirectingExistingUser) {
+      if (redirectingExistingUser === 'faculty') navigate('/faculty/dashboard', { replace: true });
+      else if (redirectingExistingUser === 'admin') navigate('/admin/dashboard', { replace: true });
+      else navigate('/student/enter-code', { replace: true });
+    }
+  }, [redirectingExistingUser, navigate]);
+
   // Pre-select last used role so returning users don't have to pick again
   const [selectedRole, setSelectedRole] = useState(() => {
     try { return localStorage.getItem('lastRole') || null; } catch { return null; }
@@ -352,7 +378,9 @@ const Login = () => {
     }
   }, [searchParams]);
 
-  if (authLoading) {
+  // If we detected an existing session from localStorage, show a blank screen
+  // while the redirect fires. Don't render the login page at all.
+  if (redirectingExistingUser || authLoading) {
     return (
       <div className="clay-auth-loading">
         <div className="clay-auth-loading-inner">
