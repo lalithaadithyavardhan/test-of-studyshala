@@ -4,17 +4,11 @@ import { useAuth } from '../context/AuthContext';
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-      </div>
-    );
-  }
+  // While AuthContext is reading localStorage, show nothing.
+  // Never redirect to /login during loading — user may already be logged in.
+  if (loading) return null;
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
