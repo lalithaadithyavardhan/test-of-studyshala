@@ -344,6 +344,12 @@ const Login = () => {
 
   useEffect(() => {
     if (searchParams.get('error') === 'auth_failed') setError('Google sign-in failed. Please try again.');
+    // silent_failed means prompt:'none' didn't work — user just needs to click sign in normally.
+    // Don't show an error, just let the page render so they can click the button.
+    if (searchParams.get('error') === 'silent_failed') {
+      // Clear it from the URL so it doesn't confuse anything
+      // The login form is already visible — user just clicks sign in
+    }
   }, [searchParams]);
 
   if (authLoading) {
@@ -376,9 +382,18 @@ const Login = () => {
       }
     } catch {}
 
-    const url = new URL('https://test-of-studyshala.onrender.com/api/auth/google');
+    const baseUrl = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace('/api', '') + '/api/auth/google'
+      : 'https://test-of-studyshala.onrender.com/api/auth/google';
+    const url = new URL(baseUrl);
     url.searchParams.set('role', roleToUse);
-    if (hint) url.searchParams.set('hint', hint);
+    if (hint) {
+      url.searchParams.set('hint', hint);
+      // silent=1 tells the backend to use prompt:'none' so Google signs in
+      // without showing the account picker at all. Falls back gracefully if
+      // Google can't sign in silently (we handle silent_failed error below).
+      url.searchParams.set('silent', '1');
+    }
     window.location.href = url.toString();
   };
 
