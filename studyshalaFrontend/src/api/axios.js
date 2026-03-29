@@ -27,23 +27,35 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor — only clear auth on explicit token errors
+// Response interceptor — only clear auth on CONFIRMED token errors, never on
+// network failures or backend cold-start errors. This prevents users from being
+// logged out when Render free tier is waking up.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Only act on 401 responses that actually came back from the server
+    // (i.e. error.response exists). A timeout or network error has no response.
     if (error.response?.status === 401) {
-      const msg = error.response?.data?.message || '';
-      const isRealAuthError =
-        msg.toLowerCase().includes('invalid') ||
-        msg.toLowerCase().includes('expired') ||
-        msg.toLowerCase().includes('no token') ||
-        msg.toLowerCase().includes('not found');
+      const msg = (error.response?.data?.message || '').toLowerCase();
 
-      if (isRealAuthError) {
+      // These messages are sent by our own auth middleware only when the
+      // token is genuinely bad — never during a cold-start timeout.
+      const isRealTokenError =
+        msg.includes('invalid or expired token') ||
+        msg.includes('invalid token') ||
+        msg.includes('expired') ||
+        msg.includes('user not found');
+
+      // NOTE: Do NOT include 'no token' here — that fires on requests that race
+      // before the token is attached, not on actual bad tokens.
+
+      if (isRealTokenError) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+      // For any other 401 (e.g. cold-start hiccup), do nothing —
+      // the user stays logged in from localStorage.
     }
     return Promise.reject(error);
   }
