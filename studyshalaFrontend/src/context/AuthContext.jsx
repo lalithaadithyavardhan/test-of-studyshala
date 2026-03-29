@@ -1,79 +1,146 @@
-const express  = require('express');
-const router   = express.Router();
-const passport = require('../config/passport');
-const authController = require('../controllers/authController');
-const { authenticate } = require('../middleware/auth');
+import { createContext, useContext, useState, useEffect } from 'react';
+import api from '../api/axios';
 
-// Google OAuth — skip account picker if we know who's logging in
-router.get('/google', (req, res, next) => {
-  const role = ['faculty', 'admin', 'student'].includes(req.query.role)
-    ? req.query.role : 'student';
+const AuthContext = createContext(null);
 
-  const loginHint = req.query.hint || null;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
-  // 'silent=1' means the frontend wants a fully silent sign-in (no UI at all).
-  // We pass prompt:'none' to Google, which auto-signs the user in without
-  // showing the account picker. If Google can't do it silently (session expired,
-  // multiple accounts, etc.) it returns error=interaction_required, which we
-  // catch in the callback and redirect back to /login for a normal sign-in.
-  const silent = req.query.silent === '1';
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const authOptions = {
-    scope: ['profile', 'email'],
-    state: role,
+  useEffect(() => {
+    const token      = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+
+    if (token && storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+
+        // Trust localStorage immediately — user sees dashboard right away
+        // without waiting for the backend (which may be sleeping on Render free tier).
+        setUser(parsed);
+        setLoading(false);
+
+        // Silently refresh from DB in background to get fresh role/department/tour data.
+        // If backend is cold-starting this will take time — that's fine, UI is already unblocked.
+        // Real bad-token 401s are caught by the axios interceptor which clears localStorage.
+        api.get('/auth/user').then(res => {
+          if (res.data?.user) {
+            const fresh = {
+              id:                  res.data.user._id,
+              name:                res.data.user.name,
+              email:               res.data.user.email,
+              role:                res.data.user.role,
+              department:          res.data.user.department,
+              profilePicture:      res.data.user.profilePicture,
+              tourCompleted:       res.data.user.tourCompleted       || false,
+              phase2TourCompleted: res.data.user.phase2TourCompleted || false,
+            };
+            setUser(fresh);
+            try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
+          }
+        }).catch(() => {
+          // Backend sleeping or network error — keep user from localStorage.
+        });
+
+      } catch (error) {
+        // Corrupted localStorage — clear and show login
+        console.error('Failed to parse stored user:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const login = (userData, token) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('lastRole', userData.role);
+    localStorage.setItem('lastUser', JSON.stringify({
+      name:  userData.name,
+      role:  userData.role,
+      email: userData.email,
+    }));
+    setUser(userData);
   };
 
-  if (loginHint) {
-    // Pre-fill the account so Google knows which account to use
-    authOptions.login_hint = loginHint;
-  }
-
-  if (silent && loginHint) {
-    // Full silent sign-in — no account picker shown at all
-    authOptions.prompt = 'none';
-  }
-  // Without silent: no prompt set — Google auto-signs if one session active,
-  // shows picker only if multiple accounts are logged in the browser.
-
-  passport.authenticate('google', authOptions)(req, res, next);
-});
-
-router.get('/google/callback', (req, res, next) => {
-  // Handle Google's error=interaction_required (silent sign-in failed).
-  // This happens when prompt:'none' was used but Google needs user interaction
-  // (e.g. session expired, consent needed, multiple accounts).
-  // Solution: redirect back to login page so user can click the button normally.
-  if (req.query.error === 'interaction_required' || req.query.error === 'consent_required') {
-    return res.redirect(`${process.env.FRONTEND_URL}/login?error=silent_failed`);
-  }
-
-  passport.authenticate('google', (err, user, info) => {
-    if (err)   return next(err);
-
-    // Blocked admin attempt
-    if (!user && info?.message === 'not_admin') {
-      const redirectBase = req.query.state === 'admin'
-        ? `${process.env.FRONTEND_URL}/admin/login`
-        : `${process.env.FRONTEND_URL}/login`;
-      return res.redirect(`${redirectBase}?error=not_admin`);
-    }
-
-    if (!user) {
-      return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
-    }
-
-    req.logIn(user, (loginErr) => {
-      if (loginErr) return next(loginErr);
-      authController.googleCallback(req, res);
+  const completeTour = async () => {
+    try {
+      await api.post('/auth/tour-complete');
+    } catch (_) {}
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, tourCompleted: true };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-  })(req, res, next);
-});
+  };
 
-router.get('/user',            authenticate, authController.getCurrentUser);
-router.post('/logout',         authenticate, authController.logout);
-router.post('/tour-complete',        authenticate, authController.tourComplete);
-router.post('/tour-reset',           authenticate, authController.tourReset);
-router.post('/phase2-tour-complete', authenticate, authController.phase2TourComplete);
-router.post('/phase2-tour-reset',    authenticate, authController.phase2TourReset);
+  const completePhase2Tour = async () => {
+    try { await api.post('/auth/phase2-tour-complete'); } catch (_) {}
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, phase2TourCompleted: true };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
 
-module.exports = router;
+  const resetPhase2Tour = async () => {
+    try { await api.post('/auth/phase2-tour-reset'); } catch (_) {}
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, phase2TourCompleted: false };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const resetTour = async () => {
+    try {
+      await api.post('/auth/tour-reset');
+    } catch (_) {}
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, tourCompleted: false };
+      try { localStorage.setItem('user', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
+  };
+
+  const value = {
+    user,
+    login,
+    logout,
+    loading,
+    isAuthenticated:  !!user,
+    completeTour,
+    resetTour,
+    completePhase2Tour,
+    resetPhase2Tour,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
