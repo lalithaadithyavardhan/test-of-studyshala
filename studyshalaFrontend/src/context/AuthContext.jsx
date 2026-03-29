@@ -23,11 +23,17 @@ export const AuthProvider = ({ children }) => {
     if (token && storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        setUser(parsed);
 
-        // Silently refresh from DB to get latest tourCompleted and role.
-        // If backend is sleeping (Render cold start), this fails quietly
-        // and the user stays logged in from localStorage.
+        // Step 1: Trust localStorage immediately — user sees their dashboard
+        // right away without waiting for the backend (which may be sleeping on
+        // Render free tier and take 30–60s to wake up).
+        setUser(parsed);
+        setLoading(false);
+
+        // Step 2: Silently refresh from DB in the background to get fresh data
+        // (role, department, tourCompleted, etc). This runs AFTER the UI unblocks.
+        // On failure we keep the localStorage version; the axios interceptor
+        // already handles real invalid-token 401s by clearing localStorage.
         api.get('/auth/user').then(res => {
           if (res.data?.user) {
             const fresh = {
@@ -45,16 +51,20 @@ export const AuthProvider = ({ children }) => {
             try { localStorage.setItem('user', JSON.stringify(fresh)); } catch {}
           }
         }).catch(() => {
-          // Backend sleeping or network error — keep user from localStorage
+          // Backend sleeping or network error — keep user from localStorage.
+          // Real bad-token errors are handled by the axios interceptor already.
         });
 
       } catch (error) {
+        // Corrupted localStorage — clear and show login
         console.error('Failed to parse stored user:', error);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        setLoading(false);
       }
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   /**
