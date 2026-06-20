@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "StudyShala",
+    "slug": "studyshala-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.studyshala.app"
+    },
+    "extra": {
+      "apiUrl": "https://test-of-studyshala.onrender.com",
+      "googleWebClientId": "1051792797895-c6cmvt6gm8f565tu81l14tafdhae123r.apps.googleusercontent.com",
+      "eas": {
+        "projectId": "619c965c-9af6-4aad-9133-c246eeac0eca"
+      }
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin"
+    ]
+  }
+}
