@@ -17,7 +17,7 @@
 // -----------------------------------------------------------------------
 // This is your Render deployment, e.g. "https://studyshala-backend.onrender.com"
 // Do NOT include a trailing slash.
-export const API_BASE_URL = 'https://YOUR_BACKEND.onrender.com';
+export const API_BASE_URL = 'https://test-of-studyshala.onrender.com';
 
 // Derived: all API routes are mounted under /api in server.js
 export const API_URL = `${API_BASE_URL}/api`;

@@ -4,52 +4,52 @@ const passport = require('../config/passport');
 const authController = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
 
-
 // For mobile login
 const mobileAuthController = require('../controllers/mobileAuthController');
 router.post('/google/mobile', mobileAuthController.googleMobileLogin);
-
-
 
 // Google OAuth — skip account picker if we know who's logging in
 router.get('/google', (req, res, next) => {
   const role = ['faculty', 'admin', 'student'].includes(req.query.role)
     ? req.query.role : 'student';
+    
+  // Check if request is coming from mobile
+  const platform = req.query.platform === 'mobile' ? 'mobile' : 'web';
 
-  // login_hint: if the frontend passes the user's email, Google skips the
-  // account picker and signs them in directly. No prompt needed.
-  // If no hint, omit prompt so Google uses its own smart default
-  // (signs in automatically if only one account, shows picker if multiple).
   const loginHint = req.query.hint || null;
 
   const authOptions = {
     scope: ['profile', 'email'],
-    state: role,
+    // Pass both role and platform in the state string, separated by a pipe
+    state: `${role}|${platform}`,
   };
 
   if (loginHint) {
-    // Known user — skip picker, go straight to their account
     authOptions.login_hint = loginHint;
   }
-  // No prompt: 'select_account' — never force the picker
 
   passport.authenticate('google', authOptions)(req, res, next);
 });
 
 router.get('/google/callback', (req, res, next) => {
   passport.authenticate('google', (err, user, info) => {
-    if (err)   return next(err);
+    if (err) return next(err);
+
+    const state = req.query.state || '';
+    const isMobile = state.includes('mobile');
+    const isAdmin = state.includes('admin');
 
     // Blocked admin attempt
     if (!user && info?.message === 'not_admin') {
-      const redirectBase = req.query.state === 'admin'
+      const redirectBase = isAdmin
         ? `${process.env.FRONTEND_URL}/admin/login`
         : `${process.env.FRONTEND_URL}/login`;
       return res.redirect(`${redirectBase}?error=not_admin`);
     }
 
     if (!user) {
-      return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+      const failBase = isMobile ? 'studyshala://auth-callback' : process.env.FRONTEND_URL;
+      return res.redirect(`${failBase}/login?error=auth_failed`);
     }
 
     req.logIn(user, (loginErr) => {

@@ -14,7 +14,7 @@ const getCurrentUser = async (req, res) => {
 };
 
 // Google OAuth callback
-const googleCallback = async (req, res) => {   // FIXED: added async
+const googleCallback = async (req, res) => {
   try {
     const token = generateToken(req.user);
 
@@ -32,13 +32,24 @@ const googleCallback = async (req, res) => {   // FIXED: added async
       phase2TourCompleted: req.user.phase2TourCompleted || false,
     };
 
-    const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const redirectUrl = `${frontendURL}/auth-callback?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+    // Check if the state indicates this was a mobile login
+    const state = req.query.state || '';
+    const isMobile = state.includes('mobile');
+
+    // Decide where to redirect based on the platform
+    const baseRedirectUrl = isMobile 
+      ? 'studyshala://auth-callback' 
+      : (process.env.FRONTEND_URL || 'http://localhost:3000');
+
+    const redirectUrl = `${baseRedirectUrl}?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
 
     res.redirect(redirectUrl);
   } catch (error) {
     logger.error(`Google callback error: ${error.message}`);
-    const fallbackURL = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const state = req.query.state || '';
+    const fallbackURL = state.includes('mobile') 
+      ? 'studyshala://auth-callback' 
+      : (process.env.FRONTEND_URL || 'http://localhost:3000');
     res.redirect(`${fallbackURL}/login?error=auth_failed`);
   }
 };
@@ -60,7 +71,7 @@ const logout = (req, res) => {
   });
 };
 
-// Mark tour as completed for this user — called when user finishes or skips tour
+// Mark tour as completed for this user
 const tourComplete = async (req, res) => {
   try {
     await User.findByIdAndUpdate(req.user._id, { tourCompleted: true });
@@ -71,7 +82,7 @@ const tourComplete = async (req, res) => {
   }
 };
 
-// Reset tour for this user — called when user clicks replay
+// Reset tour for this user
 const tourReset = async (req, res) => {
   try {
     await User.findByIdAndUpdate(req.user._id, { tourCompleted: false });
