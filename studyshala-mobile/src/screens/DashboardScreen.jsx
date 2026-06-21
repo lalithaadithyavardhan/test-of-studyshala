@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { getRecentFiles } from '../api/studentApi';
 import FileListItem from '../components/FileListItem';
 import { openFile } from '../utils/fileActions';
+import RoleSwitchButton from '../components/RoleSwitchButton';
 
 const QUICK_ACTIONS = [
   { key: 'EnterCode', label: 'Enter Code', icon: 'key', color: '#4F46E5' },
@@ -75,6 +76,8 @@ export default function DashboardScreen({ navigation }) {
             <Ionicons name="log-out-outline" size={22} color="#EF4444" />
           </TouchableOpacity>
         </View>
+
+        <RoleSwitchButton targetRole="faculty" style={{ marginBottom: 18 }} />
 
         <View style={styles.quickGrid}>
           {QUICK_ACTIONS.map((action) => (

@@ -7,11 +7,15 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "studyshala",
     "splash": {
       "backgroundColor": "#F4F6FB"
     },
     "assetBundlePatterns": ["**/*"],
+    "plugins": [
+      [
+        "@react-native-google-signin/google-signin"
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.studyshala.mobile"

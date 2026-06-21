@@ -1,57 +1,109 @@
 /**
  * components/MaterialCard.jsx
  * =============================
- * Renders a material/folder summary exactly as returned by
- * getSavedMaterials() and getAccessHistory() in your real
- * studentController.js:
- *   { _id, subjectName, department, semester, facultyName, accessCode,
- *     fileCount, messageToStudents, subFolderCount, savedAt|accessedAt,
- *     createdAt, isSaved? }
+ * Shared card used by SavedMaterialsScreen, HistoryScreen (student side)
+ * and FacultyDashboardScreen / FacultyMaterialsScreen (faculty side).
+ * `role` toggles which action buttons show.
  */
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function MaterialCard({ material, onPress, onRemove, removeLabel }) {
+export default function MaterialCard({
+  material,
+  onPress,
+  onRemove,
+  role = 'student', // 'student' | 'faculty'
+  onUpload,
+  onMessage,
+  onDelete,
+  onShare,
+}) {
+  const [copied, setCopied] = useState(false);
+  const code = material.accessCode || material.departmentCode;
+  const hasMsg = !!material.messageToStudents?.trim();
+  const sfCount = material.subFolderCount ?? material.subFolders?.length ?? 0;
+  const rootFiles = material.files?.length ?? 0;
+  const totalFiles =
+    material.fileCount ??
+    rootFiles + (material.subFolders || []).reduce((s, sf) => s + (sf.files?.length || 0), 0);
+
+  const copyCode = () => {
+    if (!code) return;
+    Clipboard.setString(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onPress(material)} activeOpacity={0.8}>
-      <View style={styles.headerRow}>
-        <View style={styles.subjectBadge}>
-          <Ionicons name="folder" size={16} color="#4F46E5" />
+    <View style={styles.card}>
+      <TouchableOpacity onPress={() => onPress?.(material)} activeOpacity={0.7}>
+        <View style={styles.headerRow}>
+          <View style={styles.iconBox}>
+            <Ionicons name="book" size={18} color="#4F46E5" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title} numberOfLines={1}>{material.subjectName}</Text>
+            <Text style={styles.meta} numberOfLines={1}>
+              {material.facultyName} · {material.department} · Sem {material.semester}
+            </Text>
+          </View>
+          {hasMsg && (
+            <View style={styles.msgBadge}>
+              <Ionicons name="megaphone" size={11} color="#92400E" />
+            </View>
+          )}
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.subject} numberOfLines={1}>
-            {material.subjectName}
+
+        <Text style={styles.filesLine}>
+          {totalFiles} file{totalFiles !== 1 ? 's' : ''}
+          {sfCount > 0 ? ` · ${sfCount} folder${sfCount !== 1 ? 's' : ''}` : ''}
+        </Text>
+
+        {hasMsg && (
+          <Text style={styles.msgPreview} numberOfLines={2}>
+            💬 {material.messageToStudents}
           </Text>
-          <Text style={styles.subMeta} numberOfLines={1}>
-            {material.department} · Sem {material.semester}
-          </Text>
-        </View>
-        {onRemove && (
-          <TouchableOpacity
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            onPress={() => onRemove(material)}
-          >
-            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+        )}
+
+        {!!code && (
+          <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.7}>
+            <Text style={styles.code}>{code}</Text>
+            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={15} color={copied ? '#10B981' : '#9CA3AF'} />
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
 
-      <View style={styles.footerRow}>
-        <Text style={styles.faculty} numberOfLines={1}>
-          👤 {material.facultyName}
-        </Text>
-        <Text style={styles.fileCount}>
-          {material.fileCount} file{material.fileCount === 1 ? '' : 's'}
-        </Text>
+      {/* ── Actions ── */}
+      <View style={styles.actionsRow}>
+        {role === 'student' && onRemove && (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => onRemove(material)}>
+            <Ionicons name="trash-outline" size={15} color="#EF4444" />
+            <Text style={[styles.actionText, { color: '#EF4444' }]}>Remove</Text>
+          </TouchableOpacity>
+        )}
+        {role === 'faculty' && (
+          <>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onUpload?.(material)}>
+              <Ionicons name="cloud-upload-outline" size={15} color="#4F46E5" />
+              <Text style={[styles.actionText, { color: '#4F46E5' }]}>Upload</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onMessage?.(material)}>
+              <Ionicons name="megaphone-outline" size={15} color="#0891B2" />
+              <Text style={[styles.actionText, { color: '#0891B2' }]}>Message</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onShare?.(material)}>
+              <Ionicons name="share-social-outline" size={15} color="#16A34A" />
+              <Text style={[styles.actionText, { color: '#16A34A' }]}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete?.(material)}>
+              <Ionicons name="trash-outline" size={15} color="#EF4444" />
+              <Text style={[styles.actionText, { color: '#EF4444' }]}>Delete</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
-
-      {!!material.messageToStudents && (
-        <Text style={styles.message} numberOfLines={2}>
-          💬 {material.messageToStudents}
-        </Text>
-      )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -60,44 +112,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  subjectBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  iconBox: {
+    width: 36, height: 36, borderRadius: 10,
     backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
+    alignItems: 'center', justifyContent: 'center', marginRight: 10,
   },
-  subject: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
-  subMeta: { fontSize: 12, color: '#9CA3AF', marginTop: 1 },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  title: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  meta: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
+  msgBadge: {
+    backgroundColor: '#FEF3C7', borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 4,
   },
-  faculty: { fontSize: 12, color: '#6B7280', flex: 1 },
-  fileCount: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#4F46E5',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    overflow: 'hidden',
+  filesLine: { fontSize: 12, color: '#6B7280', marginBottom: 6 },
+  msgPreview: {
+    fontSize: 12, color: '#4338CA', backgroundColor: '#EEF2FF',
+    borderRadius: 8, padding: 8, marginBottom: 8,
   },
-  message: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 8,
-    fontStyle: 'italic',
+  codeRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB', borderRadius: 8,
+    paddingVertical: 8, paddingHorizontal: 10,
   },
+  code: { fontFamily: 'monospace', fontSize: 13, fontWeight: '700', color: '#374151', letterSpacing: 1 },
+  actionsRow: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    marginTop: 10, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    gap: 14,
+  },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  actionText: { fontSize: 12, fontWeight: '600' },
 });
