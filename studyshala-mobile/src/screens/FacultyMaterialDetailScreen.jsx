@@ -1,49 +1,33 @@
 /**
- * screens/FacultyMaterialDetailScreen.jsx
- * ==========================================
- * Combines studyshalaFrontend's FileManager (browse files/sub-folders),
- * the "Message to Students" modal, and the WhatsApp share flow from
- * FacultyDashboard.jsx — all in one screen since mobile favors push
- * navigation over stacked modals.
+ * screens/FacultyMaterialDetailScreen.jsx — StudyShala Dark Theme
+ * Dark base #0f0f0f · Accent #e87c3a
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  SafeAreaView,
-  Alert,
-  Modal,
-  TextInput,
-  Linking,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  ActivityIndicator, Alert, Modal, TextInput, Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import FileListItem from '../components/FileListItem';
 import {
-  getFolderDetails,
-  deleteFile,
-  deleteSubFolderFile,
-  deleteSubFolder,
-  updateMessage,
-  getFacultyDownloadUrl,
+  getFolderDetails, deleteFile, deleteSubFolderFile, deleteSubFolder,
+  updateMessage, getFacultyDownloadUrl,
 } from '../api/facultyApi';
+import { C, R, T } from '../components/theme';
 
 const APP_URL = 'https://studyshala.dev';
 
 export default function FacultyMaterialDetailScreen({ route, navigation }) {
   const { material: initialMaterial, openMessage, openShare } = route.params;
-  const [material, setMaterial] = useState(initialMaterial);
-  const [files, setFiles] = useState(initialMaterial.files || []);
-  const [subFolders, setSubFolders] = useState(initialMaterial.subFolders || []);
+  const [material,     setMaterial]     = useState(initialMaterial);
+  const [files,        setFiles]        = useState(initialMaterial.files || []);
+  const [subFolders,   setSubFolders]   = useState(initialMaterial.subFolders || []);
   const [activeFolder, setActiveFolder] = useState(null);
-  const [loading, setLoading] = useState(true);
-
+  const [loading,      setLoading]      = useState(true);
   const [msgModalOpen, setMsgModalOpen] = useState(!!openMessage);
-  const [msgText, setMsgText] = useState(initialMaterial.messageToStudents || '');
-  const [savingMsg, setSavingMsg] = useState(false);
+  const [msgText,      setMsgText]      = useState(initialMaterial.messageToStudents || '');
+  const [savingMsg,    setSavingMsg]    = useState(false);
 
   const loadDetails = useCallback(async () => {
     try {
@@ -53,45 +37,24 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
       setSubFolders(data.folder.subFolders || []);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to load material.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [initialMaterial._id]);
 
-  useEffect(() => {
-    loadDetails();
-  }, [loadDetails]);
-
+  useEffect(() => { loadDetails(); }, [loadDetails]);
   useEffect(() => {
     if (openShare) {
       const t = setTimeout(() => handleShareWhatsApp(), 200);
       return () => clearTimeout(t);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openShare]);
 
   const currentFiles = activeFolder ? activeFolder.files : files;
 
   const handleFilePress = (file) => {
     Alert.alert(file.name, 'What would you like to do?', [
-      {
-        text: 'Open',
-        onPress: () => {
-          if (file.previewUrl) Linking.openURL(file.previewUrl);
-        },
-      },
-      {
-        text: 'Download',
-        onPress: () => {
-          const url = file.downloadUrl || getFacultyDownloadUrl(material._id, file._id);
-          Linking.openURL(url);
-        },
-      },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => handleDeleteFile(file),
-      },
+      { text: 'Open', onPress: () => { if (file.previewUrl) Linking.openURL(file.previewUrl); } },
+      { text: 'Download', onPress: () => { Linking.openURL(file.downloadUrl || getFacultyDownloadUrl(material._id, file._id)); } },
+      { text: 'Delete', style: 'destructive', onPress: () => handleDeleteFile(file) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -100,23 +63,17 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
     Alert.alert('Delete file?', file.name, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
-        style: 'destructive',
+        text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
             if (activeFolder) {
               await deleteSubFolderFile(material._id, activeFolder._id, file._id);
-              setActiveFolder((prev) => ({
-                ...prev,
-                files: prev.files.filter((f) => f._id !== file._id),
-              }));
+              setActiveFolder((prev) => ({ ...prev, files: prev.files.filter((f) => f._id !== file._id) }));
             } else {
               await deleteFile(material._id, file._id);
               setFiles((prev) => prev.filter((f) => f._id !== file._id));
             }
-          } catch (e) {
-            Alert.alert('Error', e.response?.data?.message || 'Failed to delete file.');
-          }
+          } catch (e) { Alert.alert('Error', e.response?.data?.message || 'Failed to delete.'); }
         },
       },
     ]);
@@ -126,15 +83,12 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
     Alert.alert('Delete folder?', `"${sf.name}" and all its files will be removed.`, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete',
-        style: 'destructive',
+        text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
             await deleteSubFolder(material._id, sf._id);
             setSubFolders((prev) => prev.filter((s) => s._id !== sf._id));
-          } catch (e) {
-            Alert.alert('Error', e.response?.data?.message || 'Failed to delete folder.');
-          }
+          } catch (e) { Alert.alert('Error', e.response?.data?.message || 'Failed to delete folder.'); }
         },
       },
     ]);
@@ -148,34 +102,31 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
       setMsgModalOpen(false);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to save message.');
-    } finally {
-      setSavingMsg(false);
-    }
+    } finally { setSavingMsg(false); }
   };
 
   const handleShareWhatsApp = () => {
-    const code = material.accessCode || material.departmentCode || '—';
+    const code    = material.accessCode || material.departmentCode || '—';
     const subject = material.subjectName || 'Study Material';
     const faculty = material.facultyName || '';
-    const dept = material.department || '';
-    const sem = material.semester ? `Semester ${material.semester}` : '';
+    const dept    = material.department || '';
+    const sem     = material.semester ? `Semester ${material.semester}` : '';
     const msg =
       `📚 *${subject}*\n` +
       (faculty ? `👨‍🏫 Faculty: ${faculty}\n` : '') +
-      (dept ? `🏫 Department: ${dept}\n` : '') +
-      (sem ? `📅 ${sem}\n` : '') +
+      (dept    ? `🏫 Department: ${dept}\n`    : '') +
+      (sem     ? `📅 ${sem}\n`                 : '') +
       `\n🔑 *Access Code: \`${code}\`*\n\n` +
-      `Open StudyShala, go to *Enter Code* and enter the above code to access the material.\n\n` +
-      `🔗 Login at: ${APP_URL}`;
-    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(msg)}`).catch(() => {
-      Alert.alert('Error', 'WhatsApp is not installed.');
-    });
+      `Open StudyShala → Enter Code and type the above code.\n\n🔗 ${APP_URL}`;
+    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(msg)}`).catch(() =>
+      Alert.alert('Error', 'WhatsApp is not installed.')
+    );
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0891B2" />
+      <SafeAreaView style={s.center} edges={['top']}>
+        <ActivityIndicator size="large" color={C.accent} />
       </SafeAreaView>
     );
   }
@@ -183,186 +134,285 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
   const code = material.accessCode || material.departmentCode;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={s.container} edges={['top']}>
+
+      {/* ── Header ── */}
+      <View style={s.header}>
         <TouchableOpacity
-          onPress={() => (activeFolder ? setActiveFolder(null) : navigation.goBack())}
-          style={styles.backBtn}
+          style={s.backBtn}
+          onPress={() => activeFolder ? setActiveFolder(null) : navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={22} color="#1F2937" />
+          <Ionicons name="arrow-back" size={20} color={C.textSecondary} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={s.title} numberOfLines={1}>
             {activeFolder ? activeFolder.name : material.subjectName}
           </Text>
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {material.department} · Sem {material.semester}
-          </Text>
+          <Text style={s.subtitle}>{material.department} · Sem {material.semester}</Text>
         </View>
       </View>
 
       {!activeFolder && (
         <>
+          {/* ── Access code card ── */}
           {!!code && (
-            <View style={styles.codeBox}>
-              <Text style={styles.codeLabel}>Access Code</Text>
-              <Text style={styles.codeValue}>{code}</Text>
+            <View style={s.codeCard}>
+              <View>
+                <Text style={s.codeLabel}>Student Access Code</Text>
+                <Text style={s.codeValue}>{code}</Text>
+              </View>
+              <View style={s.codeIconBox}>
+                <Ionicons name="key" size={22} color={C.accent} />
+              </View>
             </View>
           )}
 
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionChip} onPress={() => navigation.navigate('UploadFiles', { material })}>
-              <Ionicons name="cloud-upload-outline" size={16} color="#0891B2" />
-              <Text style={styles.actionChipText}>Upload</Text>
+          {/* ── Action chips ── */}
+          <View style={s.actionRow}>
+            <TouchableOpacity
+              style={s.actionChip}
+              onPress={() => navigation.navigate('UploadFiles', { material })}
+            >
+              <Ionicons name="cloud-upload-outline" size={16} color={C.accent} />
+              <Text style={[s.actionChipText, { color: C.accent }]}>Upload</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionChip} onPress={() => setMsgModalOpen(true)}>
-              <Ionicons name="megaphone-outline" size={16} color="#92400E" />
-              <Text style={[styles.actionChipText, { color: '#92400E' }]}>Message</Text>
+            <TouchableOpacity
+              style={s.actionChip}
+              onPress={() => setMsgModalOpen(true)}
+            >
+              <Ionicons name="megaphone-outline" size={16} color={C.warning} />
+              <Text style={[s.actionChipText, { color: C.warning }]}>Announce</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionChip} onPress={handleShareWhatsApp}>
-              <Ionicons name="logo-whatsapp" size={16} color="#16A34A" />
-              <Text style={[styles.actionChipText, { color: '#16A34A' }]}>Share</Text>
+            <TouchableOpacity
+              style={s.actionChip}
+              onPress={handleShareWhatsApp}
+            >
+              <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+              <Text style={[s.actionChipText, { color: '#25D366' }]}>Share</Text>
             </TouchableOpacity>
           </View>
 
-          {!!material.messageToStudents?.trim() && (
-            <View style={styles.messageBox}>
-              <Text style={styles.messageText}>💬 {material.messageToStudents}</Text>
+          {/* ── Announcement preview ── */}
+          {!!material.messageToStudents && (
+            <View style={s.announcementBox}>
+              <Ionicons name="megaphone-outline" size={15} color={C.accent} />
+              <Text style={s.announcementText} numberOfLines={2}>
+                {material.messageToStudents}
+              </Text>
             </View>
           )}
         </>
       )}
 
+      {/* ── File/folder list ── */}
       <FlatList
         data={[
           ...(!activeFolder ? subFolders.map((sf) => ({ ...sf, __isFolder: true })) : []),
           ...currentFiles,
         ]}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={s.listContent}
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }) =>
           item.__isFolder ? (
-            <View style={styles.folderRow}>
+            <View style={s.folderCard}>
               <TouchableOpacity
-                style={styles.folderRowMain}
+                style={s.folderCardMain}
                 onPress={() => setActiveFolder(item)}
-                activeOpacity={0.7}
+                activeOpacity={0.8}
               >
-                <View style={styles.folderIconBox}>
-                  <Ionicons name="folder" size={20} color="#F59E0B" />
+                <View style={s.folderIconBox}>
+                  <Ionicons name="folder" size={22} color={C.warning} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.folderName}>{item.name}</Text>
-                  <Text style={styles.folderMeta}>{item.fileCount} files</Text>
+                  <Text style={s.folderName}>{item.name}</Text>
+                  <Text style={s.folderMeta}>{item.fileCount ?? item.files?.length ?? 0} files</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                <Ionicons name="chevron-forward" size={17} color={C.textMuted} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handleDeleteSubFolder(item)}
-                style={styles.folderDeleteBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={s.folderDeleteBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="trash-outline" size={17} color="#EF4444" />
+                <Ionicons name="trash-outline" size={17} color={C.danger} />
               </TouchableOpacity>
             </View>
           ) : (
-            <FileListItem file={item} onPress={handleFilePress} showStar={false} onDeletePress={handleDeleteFile} />
+            <FileListItem
+              file={item}
+              onPress={handleFilePress}
+              showStar={false}
+              onDeletePress={handleDeleteFile}
+              dark
+            />
           )
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>No files in this folder yet.</Text>}
+        ListEmptyComponent={
+          <View style={s.emptyBox}>
+            <Text style={s.emptyEmoji}>📂</Text>
+            <Text style={s.emptyTitle}>No files yet</Text>
+            <Text style={s.emptyDesc}>Upload files to share them with your students.</Text>
+          </View>
+        }
       />
 
-      {/* ── Message modal ── */}
+      {/* ── Announce Modal ── */}
       <Modal visible={msgModalOpen} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Message to Students</Text>
-              <TouchableOpacity onPress={() => setMsgModalOpen(false)}>
-                <Ionicons name="close" size={22} color="#1F2937" />
+        <View style={s.modalOverlay}>
+          <SafeAreaView style={s.modalCard} edges={['bottom']}>
+            <View style={s.modalHandle} />
+            <View style={s.modalHeader}>
+              <View>
+                <Text style={s.modalTitle}>Announce to Students</Text>
+                <Text style={s.modalHint}>Shown every time students open this material</Text>
+              </View>
+              <TouchableOpacity style={s.modalCloseBtn} onPress={() => setMsgModalOpen(false)}>
+                <Ionicons name="close" size={18} color={C.textSecondary} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalHint}>Shown to students whenever they access this material.</Text>
             <TextInput
-              style={styles.modalTextarea}
+              style={s.modalTextarea}
               value={msgText}
               onChangeText={setMsgText}
-              placeholder="e.g., Unit 2 exam next week. Assignment deadline Sunday midnight."
-              placeholderTextColor="#9CA3AF"
+              placeholder="e.g. Unit 2 exam next week. Assignment due Sunday midnight."
+              placeholderTextColor={C.textMuted}
               multiline
               numberOfLines={5}
               maxLength={2000}
             />
-            <Text style={styles.charCount}>{msgText.length}/2000</Text>
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setMsgModalOpen(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+            <Text style={s.charCount}>{msgText.length}/2000</Text>
+            <View style={s.modalFooter}>
+              <TouchableOpacity style={s.modalCancelBtn} onPress={() => setMsgModalOpen(false)}>
+                <Text style={s.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSaveMessage} disabled={savingMsg}>
-                {savingMsg ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.modalSaveText}>Save</Text>}
+              <TouchableOpacity style={s.modalSaveBtn} onPress={handleSaveMessage} disabled={savingMsg}>
+                {savingMsg
+                  ? <ActivityIndicator color={C.white} size="small" />
+                  : <Text style={s.modalSaveText}>Save Message</Text>
+                }
               </TouchableOpacity>
             </View>
-          </View>
+          </SafeAreaView>
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F6FB' },
-  centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F6FB' },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
+  center:    { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff',
+    paddingHorizontal: 16, paddingVertical: 13,
+    backgroundColor: C.surface,
+    borderBottomWidth: 1, borderBottomColor: C.border, gap: 8,
   },
-  backBtn: { padding: 6, marginRight: 4 },
-  title: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
-  subtitle: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
-  codeBox: {
-    backgroundColor: '#fff', marginHorizontal: 14, marginTop: 12,
-    borderRadius: 12, padding: 12, alignItems: 'center',
+  backBtn: {
+    width: 36, height: 36, borderRadius: R.sm,
+    backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  codeLabel: { fontSize: 11, color: '#9CA3AF', marginBottom: 4 },
-  codeValue: { fontFamily: 'monospace', fontSize: 18, fontWeight: '800', color: '#0891B2', letterSpacing: 2 },
-  actionRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, marginTop: 12 },
+  title:    { fontSize: T.base + 2, fontWeight: '700', color: C.textPrimary },
+  subtitle: { fontSize: T.xs, color: C.textSecondary, marginTop: 2 },
+
+  // Code card
+  codeCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.accentBg, marginHorizontal: 16, marginTop: 14,
+    borderRadius: R.md, padding: 16,
+    borderWidth: 1, borderColor: C.accent + '40',
+  },
+  codeLabel: { fontSize: T.xs, fontWeight: '700', color: C.accent, marginBottom: 4, letterSpacing: 0.5 },
+  codeValue: {
+    fontSize: T.xxl, fontWeight: '800', color: C.textPrimary, letterSpacing: 4,
+    fontFamily: 'monospace',
+  },
+  codeIconBox: {
+    width: 44, height: 44, borderRadius: R.md,
+    backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.border,
+  },
+
+  // Action row
+  actionRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 12, marginBottom: 4 },
   actionChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#fff', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, borderRadius: R.sm, paddingVertical: 10,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
   },
-  actionChipText: { fontSize: 12, fontWeight: '700', color: '#0891B2' },
-  messageBox: {
-    backgroundColor: '#EEF2FF', marginHorizontal: 14, marginTop: 12,
-    borderRadius: 10, padding: 10,
-  },
-  messageText: { fontSize: 13, color: '#4338CA' },
-  listContent: { padding: 14 },
-  folderRow: {
+  actionChipText: { fontSize: T.sm, fontWeight: '700' },
+
+  // Announcement
+  announcementBox: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 12, marginBottom: 8,
+    backgroundColor: C.accentBg, marginHorizontal: 16, marginTop: 10,
+    borderRadius: R.sm, padding: 12, gap: 8,
+    borderWidth: 1, borderColor: C.accent + '30',
   },
-  folderRowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 14 },
+  announcementText: { flex: 1, fontSize: T.base, color: C.accent, lineHeight: 18 },
+
+  listContent: { padding: 16, paddingBottom: 32 },
+
+  folderCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.surface, borderRadius: R.md,
+    marginBottom: 10, borderWidth: 1, borderColor: C.border,
+  },
+  folderCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 14 },
   folderIconBox: {
-    width: 40, height: 40, borderRadius: 10, backgroundColor: '#FFFBEB',
-    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+    width: 44, height: 44, borderRadius: R.md,
+    backgroundColor: C.elevated, alignItems: 'center', justifyContent: 'center',
+    marginRight: 12, borderWidth: 1, borderColor: C.border,
   },
-  folderName: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
-  folderMeta: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  folderName: { fontSize: T.base, fontWeight: '700', color: C.textPrimary },
+  folderMeta: { fontSize: T.xs, color: C.textMuted, marginTop: 2 },
   folderDeleteBtn: { paddingHorizontal: 14 },
-  emptyText: { textAlign: 'center', color: '#9CA3AF', marginTop: 40 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
-  modalHint: { fontSize: 12, color: '#9CA3AF', marginBottom: 12 },
-  modalTextarea: {
-    borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12,
-    padding: 12, fontSize: 14, color: '#1F2937', minHeight: 110, textAlignVertical: 'top',
+
+  emptyBox:   { alignItems: 'center', paddingTop: 50 },
+  emptyEmoji: { fontSize: 44, marginBottom: 12 },
+  emptyTitle: { fontSize: T.base + 2, fontWeight: '700', color: C.textPrimary, marginBottom: 4 },
+  emptyDesc:  { fontSize: T.base, color: C.textMuted, textAlign: 'center', paddingHorizontal: 40 },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' },
+  modalCard: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingTop: 0,
+    borderTopWidth: 1, borderColor: C.border,
   },
-  charCount: { fontSize: 11, color: '#9CA3AF', textAlign: 'right', marginTop: 4, marginBottom: 14 },
+  modalHandle: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: C.border, alignSelf: 'center', marginTop: 10, marginBottom: 18,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-start', marginBottom: 14,
+  },
+  modalTitle: { fontSize: T.base + 3, fontWeight: '800', color: C.textPrimary },
+  modalHint:  { fontSize: T.xs, color: C.textMuted, marginTop: 2 },
+  modalCloseBtn: {
+    width: 32, height: 32, borderRadius: R.xs,
+    backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalTextarea: {
+    borderWidth: 1.5, borderColor: C.border, borderRadius: R.md,
+    padding: 14, fontSize: T.base, color: C.textPrimary,
+    backgroundColor: C.bg,
+    minHeight: 120, textAlignVertical: 'top',
+  },
+  charCount: { fontSize: T.xs, color: C.textMuted, textAlign: 'right', marginTop: 4, marginBottom: 16 },
   modalFooter: { flexDirection: 'row', gap: 10 },
-  modalCancelBtn: { flex: 1, paddingVertical: 13, alignItems: 'center', borderRadius: 12, backgroundColor: '#F3F4F6' },
-  modalCancelText: { fontSize: 14, fontWeight: '700', color: '#374151' },
-  modalSaveBtn: { flex: 1, paddingVertical: 13, alignItems: 'center', borderRadius: 12, backgroundColor: '#0891B2' },
-  modalSaveText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  modalCancelBtn: {
+    flex: 1, paddingVertical: 14, alignItems: 'center',
+    borderRadius: R.md, backgroundColor: C.elevated,
+    borderWidth: 1, borderColor: C.border,
+  },
+  modalCancelText: { fontSize: T.md, fontWeight: '700', color: C.textSecondary },
+  modalSaveBtn: { flex: 2, paddingVertical: 14, alignItems: 'center', borderRadius: R.md, backgroundColor: C.accent },
+  modalSaveText: { fontSize: T.md, fontWeight: '700', color: C.white },
 });

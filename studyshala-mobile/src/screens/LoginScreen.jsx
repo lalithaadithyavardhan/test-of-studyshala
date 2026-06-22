@@ -1,33 +1,20 @@
 /**
- * screens/LoginScreen.jsx
- * ========================
- * Mirrors studyshalaFrontend's Login.jsx role-selection UX, adapted to
- * native Google Sign-In (no browser redirect needed on mobile — see
- * README for why). Calls POST /api/auth/google/mobile, which IS wired
- * into the real backend (mobileAuthController.js / authRoutes.js).
- *
- * Role is picked once, then remembered (SecureStore 'lastRole') so it's
- * pre-selected — never forced — on every later visit, same as the
- * website's localStorage 'lastRole' behavior.
+ * screens/LoginScreen.jsx — StudyShala Dark Theme
+ * Dark base #0f0f0f · Accent #e87c3a · Matches HTML reference.
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  SafeAreaView,
-  Alert,
-  Platform,
+  View, Text, StyleSheet, TouchableOpacity,
+  ActivityIndicator, Alert, Platform, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  GoogleSignin,
-  statusCodes,
+  GoogleSignin, statusCodes,
 } from '@react-native-google-signin/google-signin';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL, GOOGLE_WEB_CLIENT_ID } from '../config/config';
+import { C, R, T } from '../components/theme';
 
 const ROLES = [
   {
@@ -53,8 +40,6 @@ export default function LoginScreen() {
 
   useEffect(() => {
     GoogleSignin.configure({
-      // ⚠️ Replace with your real Web Client ID from Google Cloud Console
-      // (same one used as GOOGLE_CLIENT_ID on the backend).
       webClientId: GOOGLE_WEB_CLIENT_ID,
       offlineAccess: false,
     });
@@ -66,217 +51,274 @@ export default function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     if (isPlaceholderUrl) {
-      Alert.alert(
-        'Backend URL not set',
-        'Open src/config/config.js and set API_BASE_URL to your real Render backend URL.'
-      );
+      Alert.alert('Backend URL not set', 'Open src/config/config.js and set API_BASE_URL.');
       return;
     }
     if (!selectedRole) {
       Alert.alert('Pick a role', 'Please select Student or Faculty first.');
       return;
     }
-
     setLoading(true);
     try {
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo?.data?.idToken ?? userInfo?.idToken;
-
-      if (!idToken) {
-        Alert.alert('Sign-in failed', 'No ID token received from Google. Please try again.');
-        return;
-      }
-
+      if (!idToken) { Alert.alert('Sign-in failed', 'No ID token from Google.'); return; }
       const response = await fetch(`${API_BASE_URL}/api/auth/google/mobile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken, role: selectedRole }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert(
-          'Sign-in failed',
-          data.message || `Server error (${response.status}). Please try again.`
-        );
-        return;
-      }
-
+      if (!response.ok) { Alert.alert('Sign-in failed', data.message || `Error ${response.status}`); return; }
       await login(data.user, data.token);
     } catch (error) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // User pressed back — no alert needed
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        Alert.alert('Please wait', 'Sign-in is already in progress.');
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert(
-          'Google Play Services required',
-          'Please update Google Play Services and try again.'
-        );
-      } else {
-        Alert.alert('Sign-in error', error.message || 'Something went wrong. Please try again.');
-      }
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) { /* silent */ }
+      else if (error.code === statusCodes.IN_PROGRESS) Alert.alert('Please wait', 'Sign-in already in progress.');
+      else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) Alert.alert('Update required', 'Please update Google Play Services.');
+      else Alert.alert('Sign-in error', error.message || 'Something went wrong.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoEmoji}>📚</Text>
-        </View>
-        <Text style={styles.title}>StudyShala</Text>
-        <Text style={styles.subtitle}>
-          Empowering education through seamless material sharing
-        </Text>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
 
+        {/* ── Brand ── */}
+        <View style={s.brand}>
+          <View style={s.logoWrap}>
+            <View style={s.logoBg}>
+              <Text style={s.logoText}>S</Text>
+            </View>
+            {/* accent dot */}
+            <View style={s.logoDot} />
+          </View>
+          <Text style={s.appName}>StudyShala</Text>
+          <Text style={s.appTagline}>Your college study companion</Text>
+        </View>
+
+        {/* ── Warning ── */}
         {isPlaceholderUrl && (
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              ⚠️ Backend URL not configured. Edit{' '}
-              <Text style={styles.warningCode}>src/config/config.js</Text>
+          <View style={s.warning}>
+            <Ionicons name="warning-outline" size={16} color={C.warning} />
+            <Text style={s.warningText}>
+              Backend URL not set.{' '}
+              <Text style={s.warningCode}>Edit config/config.js</Text>
             </Text>
           </View>
         )}
 
-        {/* ── Role selection ── */}
-        <View style={styles.roleRow}>
+        {/* ── Role label ── */}
+        <Text style={s.sectionLabel}>I am a…</Text>
+
+        {/* ── Role cards ── */}
+        <View style={s.roleRow}>
           {ROLES.map((r) => {
             const active = selectedRole === r.key;
             return (
               <TouchableOpacity
                 key={r.key}
-                style={[styles.roleCard, active && styles.roleCardActive]}
+                style={[s.roleCard, active && s.roleCardActive]}
                 onPress={() => setSelectedRole(r.key)}
-                activeOpacity={0.85}
+                activeOpacity={0.8}
               >
-                <Ionicons
-                  name={r.icon}
-                  size={26}
-                  color={active ? '#4F46E5' : '#9CA3AF'}
-                  style={{ marginBottom: 6 }}
-                />
-                <Text style={[styles.roleLabel, active && styles.roleLabelActive]}>
-                  {r.label}
-                </Text>
-                <Text style={styles.roleDesc}>{r.desc}</Text>
+                {/* tick */}
                 {active && (
-                  <View style={styles.roleTick}>
-                    <Ionicons name="checkmark-circle" size={18} color="#4F46E5" />
+                  <View style={s.tick}>
+                    <Ionicons name="checkmark" size={11} color={C.bg} />
                   </View>
                 )}
+                <View style={[s.roleIconBox, active && s.roleIconBoxActive]}>
+                  <Ionicons
+                    name={r.icon}
+                    size={28}
+                    color={active ? C.accent : C.textSecondary}
+                  />
+                </View>
+                <Text style={[s.roleLabel, active && s.roleLabelActive]}>{r.label}</Text>
+                <Text style={s.roleDesc}>{r.desc}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
+        {/* ── Google button ── */}
         <TouchableOpacity
-          style={[
-            styles.googleButton,
-            (loading || !selectedRole) && styles.googleButtonDisabled,
-          ]}
+          style={[s.googleBtn, (!selectedRole || loading) && s.googleBtnDisabled]}
           onPress={handleGoogleLogin}
           disabled={loading || !selectedRole}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           {loading ? (
-            <ActivityIndicator color="#374151" />
+            <ActivityIndicator color={C.accent} />
           ) : (
             <>
-              <View style={styles.googleIconBox}>
-                <Text style={styles.googleG}>G</Text>
+              <View style={s.googleIconBox}>
+                <Text style={s.googleG}>G</Text>
               </View>
-              <Text style={styles.googleButtonText}>
+              <Text style={s.googleBtnText}>
                 {selectedRole
                   ? `Continue as ${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}`
                   : 'Select a role to continue'}
               </Text>
+              {!!selectedRole && (
+                <Ionicons name="arrow-forward" size={17} color={C.textSecondary} />
+              )}
             </>
           )}
         </TouchableOpacity>
 
-        <Text style={styles.footnote}>
+        <Text style={s.footnote}>
           {selectedRole === 'faculty'
-            ? '🔒 Verified by your institution'
-            : 'Sign in with your college Google account to access your study materials.'}
+            ? '🔒 Verified by your institution\'s Google account'
+            : '✨ Sign in with your college Google account'}
         </Text>
-      </View>
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F6FB' },
-  content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
-  logoCircle: {
-    width: 84, height: 84, borderRadius: 42,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 18,
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 36,
   },
-  logoEmoji: { fontSize: 40 },
-  title: { fontSize: 30, fontWeight: '800', color: '#1F2937', marginBottom: 6 },
-  subtitle: {
-    fontSize: 15, color: '#6B7280', textAlign: 'center',
-    marginBottom: 28, lineHeight: 21,
+
+  // Brand
+  brand: { alignItems: 'center', marginBottom: 40 },
+  logoWrap: { position: 'relative', marginBottom: 18 },
+  logoBg: {
+    width: 80,
+    height: 80,
+    borderRadius: 22,
+    backgroundColor: C.surface,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  warningBox: {
-    backgroundColor: '#FEF3C7', borderRadius: 10,
-    padding: 12, marginBottom: 20, width: '100%',
+  logoText: { fontSize: 36, fontWeight: '800', color: C.accent },
+  logoDot: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: C.accent,
+    borderWidth: 2,
+    borderColor: C.bg,
   },
-  warningText: { color: '#92400E', fontSize: 13, lineHeight: 18 },
-  warningCode: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontWeight: '700',
+  appName: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: C.textPrimary,
+    letterSpacing: -0.5,
+    marginBottom: 6,
   },
-  roleRow: {
+  appTagline: { fontSize: T.base, color: C.textSecondary },
+
+  // Warning
+  warning: {
     flexDirection: 'row',
-    width: '100%',
-    gap: 12,
-    marginBottom: 22,
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    padding: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: C.warning + '60',
   },
+  warningText: { flex: 1, color: C.warning, fontSize: T.sm, lineHeight: 18 },
+  warningCode: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700' },
+
+  // Section label
+  sectionLabel: {
+    fontSize: T.xs,
+    fontWeight: '700',
+    color: C.textMuted,
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+
+  // Role cards
+  roleRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
   roleCard: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: C.surface,
+    borderRadius: R.lg,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    paddingVertical: 16,
-    paddingHorizontal: 10,
+    borderColor: C.border,
+    paddingVertical: 22,
+    paddingHorizontal: 12,
     alignItems: 'center',
     position: 'relative',
   },
   roleCardActive: {
-    borderColor: '#4F46E5',
-    backgroundColor: '#EEF2FF',
+    borderColor: C.accent,
+    backgroundColor: C.accentBg,
   },
-  roleLabel: { fontSize: 14, fontWeight: '700', color: '#374151' },
-  roleLabelActive: { color: '#4F46E5' },
-  roleDesc: {
-    fontSize: 11, color: '#9CA3AF', textAlign: 'center', marginTop: 3, lineHeight: 14,
+  tick: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  roleTick: { position: 'absolute', top: 8, right: 8 },
-  googleButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF', borderRadius: 12,
-    paddingVertical: 14, paddingHorizontal: 24, width: '100%',
-    borderWidth: 1, borderColor: '#E5E7EB',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  roleIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: R.md,
+    backgroundColor: C.elevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  googleButtonDisabled: { opacity: 0.6 },
+  roleIconBoxActive: { backgroundColor: C.surface },
+  roleLabel: { fontSize: T.md, fontWeight: '700', color: C.textSecondary, marginBottom: 4 },
+  roleLabelActive: { color: C.accent },
+  roleDesc: { fontSize: T.xs, color: C.textMuted, textAlign: 'center', lineHeight: 16 },
+
+  // Google button
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    gap: 10,
+    marginBottom: 16,
+  },
+  googleBtnDisabled: { opacity: 0.45 },
   googleIconBox: {
-    width: 22, height: 22, borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#4285F4',
-    alignItems: 'center', justifyContent: 'center', marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  googleG: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  googleButtonText: { fontSize: 16, fontWeight: '600', color: '#374151' },
-  footnote: {
-    marginTop: 22, fontSize: 12, color: '#9CA3AF',
-    textAlign: 'center', paddingHorizontal: 12,
-  },
+  googleG: { color: C.white, fontWeight: '800', fontSize: T.sm },
+  googleBtnText: { flex: 1, fontSize: T.base, fontWeight: '600', color: C.textPrimary },
+
+  footnote: { textAlign: 'center', fontSize: T.sm, color: C.textMuted, lineHeight: 18 },
 });

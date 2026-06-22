@@ -1,30 +1,24 @@
 /**
- * screens/FacultyMaterialsScreen.jsx
- * =====================================
- * Mirrors studyshalaFrontend's FacultyMaterials.jsx — searchable list of
- * all materials this faculty member owns.
+ * screens/FacultyMaterialsScreen.jsx — StudyShala Dark Theme
+ * Dark base #0f0f0f · Accent #e87c3a
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  ActivityIndicator,
-  SafeAreaView,
-  Alert,
-  RefreshControl,
+  View, Text, StyleSheet, FlatList, TextInput,
+  ActivityIndicator, Alert, RefreshControl, TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MaterialCard from '../components/MaterialCard';
 import { getFolders, deleteFolder } from '../api/facultyApi';
+import { C, R, T } from '../components/theme';
 
 export default function FacultyMaterialsScreen({ navigation }) {
-  const [materials, setMaterials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
+  const [materials, setMaterials]       = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [search, setSearch]             = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -36,34 +30,25 @@ export default function FacultyMaterialsScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await load();
-      setLoading(false);
-    })();
+    (async () => { setLoading(true); await load(); setLoading(false); })();
   }, [load]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   const handleDelete = (material) => {
     Alert.alert(
       'Delete material?',
-      `"${material.subjectName}" and all its files will be removed. Students will lose access.`,
+      `"${material.subjectName}" and all its files will be permanently removed.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: 'Delete', style: 'destructive',
           onPress: async () => {
             try {
               await deleteFolder(material._id);
               setMaterials((prev) => prev.filter((m) => m._id !== material._id));
             } catch (e) {
-              Alert.alert('Error', e.response?.data?.message || 'Failed to delete material.');
+              Alert.alert('Error', e.response?.data?.message || 'Failed to delete.');
             }
           },
         },
@@ -83,42 +68,59 @@ export default function FacultyMaterialsScreen({ navigation }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0891B2" />
+      <SafeAreaView style={s.centerContainer} edges={['top']}>
+        <ActivityIndicator size="large" color={C.accent} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Materials</Text>
+    <SafeAreaView style={s.container} edges={['top']}>
+
+      {/* ── Header ── */}
+      <View style={s.header}>
+        <View>
+          <Text style={s.title}>My Materials</Text>
+          <Text style={s.subtitle}>
+            {materials.length} subject{materials.length === 1 ? '' : 's'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={s.addBtn}
+          onPress={() => navigation.navigate('CreateMaterial')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={22} color={C.accent} />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color="#9CA3AF" style={{ marginRight: 8 }} />
+      {/* ── Search ── */}
+      <View style={[s.searchWrap, searchFocused && s.searchWrapFocused]}>
+        <Ionicons name="search" size={18} color={searchFocused ? C.accent : C.textSecondary} />
         <TextInput
-          style={styles.searchInput}
+          style={s.searchInput}
           placeholder="Search by subject, department…"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={C.textMuted}
           value={search}
           onChangeText={setSearch}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
         />
         {!!search && (
-          <Ionicons
-            name="close-circle"
-            size={18}
-            color="#9CA3AF"
-            onPress={() => setSearch('')}
-          />
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color={C.textSecondary} />
+          </TouchableOpacity>
         )}
       </View>
 
       <FlatList
         data={filtered}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={s.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />
+        }
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <MaterialCard
             material={item}
@@ -128,16 +130,19 @@ export default function FacultyMaterialsScreen({ navigation }) {
             onMessage={(mat) => navigation.navigate('FacultyMaterialDetail', { material: mat, openMessage: true })}
             onShare={(mat) => navigation.navigate('FacultyMaterialDetail', { material: mat, openShare: true })}
             onDelete={handleDelete}
+            dark
           />
         )}
         ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Ionicons name="folder-outline" size={32} color="#D1D5DB" />
-            <Text style={styles.emptyText}>
+          <View style={s.emptyCard}>
+            <Text style={s.emptyEmoji}>{search ? '🔍' : '📁'}</Text>
+            <Text style={s.emptyTitle}>
               {search ? 'No results found' : 'No materials yet'}
             </Text>
-            <Text style={styles.emptySubtext}>
-              {search ? `No materials match "${search}"` : 'Create materials from the Dashboard to see them here'}
+            <Text style={s.emptyDesc}>
+              {search
+                ? `Nothing matched "${search}". Try a different keyword.`
+                : 'Create your first material from the Dashboard.'}
             </Text>
           </View>
         }
@@ -146,20 +151,75 @@ export default function FacultyMaterialsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F6FB' },
-  centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F6FB' },
-  header: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 8 },
-  title: { fontSize: 22, fontWeight: '800', color: '#1F2937' },
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 12,
-    marginHorizontal: 18, paddingHorizontal: 12, paddingVertical: 10,
-    marginBottom: 10,
+const s = StyleSheet.create({
+  container:       { flex: 1, backgroundColor: C.bg },
+  centerContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+
+  // ── Header ──────────────────────────────────────
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#1F2937' },
-  listContent: { padding: 18, paddingTop: 6 },
-  emptyBox: { alignItems: 'center', marginTop: 60, paddingHorizontal: 30 },
-  emptyText: { fontSize: 14, fontWeight: '600', color: '#6B7280', marginTop: 10 },
-  emptySubtext: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 4 },
+  title:    { fontSize: T.lg, fontWeight: '700', color: C.textPrimary },
+  subtitle: { fontSize: T.xs, color: C.textSecondary, marginTop: 2 },
+  addBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: R.sm,
+    backgroundColor: C.accentBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.accent + '40',
+  },
+
+  // ── Search ──────────────────────────────────────
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    marginHorizontal: 18,
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: 10,
+  },
+  searchWrapFocused: {
+    borderColor: C.accent + '80',
+    backgroundColor: C.elevated,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: T.base,
+    color: C.textPrimary,
+  },
+
+  listContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 40,
+    flexGrow: 1,
+  },
+
+  emptyCard: {
+    backgroundColor: C.surface,
+    borderRadius: R.xl,
+    paddingVertical: 36,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    marginTop: 8,
+  },
+  emptyEmoji: { fontSize: 44, marginBottom: 12 },
+  emptyTitle: { fontSize: T.md, fontWeight: '700', color: C.textPrimary, marginBottom: 6 },
+  emptyDesc:  {
+    fontSize: T.base, color: C.textMuted,
+    textAlign: 'center', paddingHorizontal: 28, lineHeight: 20,
+  },
 });

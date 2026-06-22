@@ -1,44 +1,37 @@
 /**
- * screens/CreateMaterialScreen.jsx
- * ===================================
- * Mirrors the "Create Material" modal in studyshalaFrontend's
- * FacultyDashboard.jsx. Fields and validation match createFolder() in
- * facultyController.js exactly: department, semester, subjectName,
- * facultyName (all required), messageToStudents (optional, max 2000).
+ * screens/CreateMaterialScreen.jsx — StudyShala Dark Theme
+ * Dark base #0f0f0f · Accent #e87c3a
  */
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  SafeAreaView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ScrollView, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { createFolder } from '../api/facultyApi';
 import { DEPARTMENTS, SEMESTERS } from '../config/config';
+import { C, R, T } from '../components/theme';
 
+// ── Chip picker ────────────────────────────────────────────────────────────
 function ChipPicker({ label, options, value, onChange, prefix = '' }) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label} <Text style={styles.required}>*</Text></Text>
-      <View style={styles.chipRow}>
+    <View style={s.field}>
+      <Text style={s.label}>
+        {label} <Text style={s.required}>*</Text>
+      </Text>
+      <View style={s.chipRow}>
         {options.map((opt) => {
           const active = value === opt;
           return (
             <TouchableOpacity
               key={opt}
-              style={[styles.chip, active && styles.chipActive]}
+              style={[s.chip, active && s.chipActive]}
               onPress={() => onChange(opt)}
             >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+              <Text style={[s.chipText, active && s.chipTextActive]}>
                 {prefix}{opt}
               </Text>
             </TouchableOpacity>
@@ -63,109 +56,126 @@ export default function CreateMaterialScreen({ navigation }) {
   const set = (key) => (val) => setFormData((p) => ({ ...p, [key]: val }));
 
   const isValid =
-    formData.department && formData.semester && formData.subjectName.trim() && formData.facultyName.trim();
+    formData.department && formData.semester &&
+    formData.subjectName.trim() && formData.facultyName.trim();
+
+  const steps = [
+    { filled: !!formData.facultyName.trim() },
+    { filled: !!formData.department },
+    { filled: !!formData.semester },
+    { filled: !!formData.subjectName.trim() },
+  ];
+  const completedSteps = steps.filter((s) => s.filled).length;
 
   const handleSubmit = async () => {
-    if (!isValid) {
-      Alert.alert('Missing fields', 'Department, semester, subject name, and faculty name are required.');
-      return;
-    }
+    if (!isValid) { Alert.alert('Missing fields', 'Please fill in all required fields.'); return; }
     setSubmitting(true);
     try {
       const { data } = await createFolder(formData);
       const code = data.folder.accessCode || data.folder.departmentCode;
-      Alert.alert('Material created!', `Student access code: ${code}`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
+      Alert.alert('Material created! 🎉', `Student access code: ${code}`, [
+        { text: 'Done', onPress: () => navigation.goBack() },
       ]);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to create material.');
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
-          <Ionicons name="close" size={24} color="#1F2937" />
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+
+      {/* ── Header ── */}
+      <View style={s.header}>
+        <TouchableOpacity style={s.closeBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={20} color={C.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Material</Text>
-        <View style={{ width: 32 }} />
+        <Text style={s.headerTitle}>Create Material</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      {/* ── Progress bar ── */}
+      <View style={s.progressSection}>
+        <View style={s.progressBg}>
+          <View style={[s.progressFill, { width: `${(completedSteps / steps.length) * 100}%` }]} />
+        </View>
+        <Text style={s.progressText}>{completedSteps} of {steps.length} fields filled</Text>
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.field}>
-            <Text style={styles.label}>Faculty Name <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              value={formData.facultyName}
-              onChangeText={set('facultyName')}
-              placeholder="e.g., Dr. John Smith"
-              placeholderTextColor="#9CA3AF"
-            />
+        <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
+
+          {/* Faculty Name */}
+          <View style={s.field}>
+            <Text style={s.label}>Faculty Name <Text style={s.required}>*</Text></Text>
+            <View style={s.inputWrap}>
+              <Ionicons name="person-outline" size={17} color={C.textSecondary} />
+              <TextInput
+                style={s.input}
+                value={formData.facultyName}
+                onChangeText={set('facultyName')}
+                placeholder="e.g. Dr. John Smith"
+                placeholderTextColor={C.textMuted}
+              />
+            </View>
           </View>
 
-          <ChipPicker
-            label="Department"
-            options={DEPARTMENTS}
-            value={formData.department}
-            onChange={set('department')}
-          />
+          <ChipPicker label="Department" options={DEPARTMENTS} value={formData.department} onChange={set('department')} />
+          <ChipPicker label="Semester"   options={SEMESTERS}   value={formData.semester}   onChange={set('semester')} prefix="Sem " />
 
-          <ChipPicker
-            label="Semester"
-            options={SEMESTERS}
-            value={formData.semester}
-            onChange={set('semester')}
-            prefix="Sem "
-          />
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Subject Name <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              style={styles.input}
-              value={formData.subjectName}
-              onChangeText={set('subjectName')}
-              placeholder="e.g., Data Structures & Algorithms"
-              placeholderTextColor="#9CA3AF"
-            />
+          {/* Subject Name */}
+          <View style={s.field}>
+            <Text style={s.label}>Subject Name <Text style={s.required}>*</Text></Text>
+            <View style={s.inputWrap}>
+              <Ionicons name="book-outline" size={17} color={C.textSecondary} />
+              <TextInput
+                style={s.input}
+                value={formData.subjectName}
+                onChangeText={set('subjectName')}
+                placeholder="e.g. Data Structures & Algorithms"
+                placeholderTextColor={C.textMuted}
+              />
+            </View>
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              <Ionicons name="megaphone-outline" size={13} /> Message to Students{' '}
-              <Text style={styles.optional}>(optional)</Text>
+          {/* Message to Students */}
+          <View style={s.field}>
+            <Text style={s.label}>
+              Message to Students{' '}
+              <Text style={s.optional}>(optional)</Text>
             </Text>
             <TextInput
-              style={[styles.input, styles.textarea]}
+              style={s.textarea}
               value={formData.messageToStudents}
               onChangeText={set('messageToStudents')}
-              placeholder="e.g., Unit 1 exam on Friday. Submit assignments by Sunday."
-              placeholderTextColor="#9CA3AF"
+              placeholder="e.g. Unit 1 exam on Friday. Submit assignments by Sunday."
+              placeholderTextColor={C.textMuted}
               multiline
               numberOfLines={3}
               maxLength={2000}
             />
-            <Text style={styles.charCount}>{formData.messageToStudents.length}/2000</Text>
+            <Text style={s.charCount}>{formData.messageToStudents.length}/2000</Text>
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={styles.footer}>
+      {/* ── Footer ── */}
+      <View style={s.footer}>
         <TouchableOpacity
-          style={[styles.submitBtn, (!isValid || submitting) && styles.submitBtnDisabled]}
+          style={[s.submitBtn, (!isValid || submitting) && s.submitBtnDisabled]}
           onPress={handleSubmit}
           disabled={!isValid || submitting}
         >
           {submitting ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={C.white} />
           ) : (
-            <Text style={styles.submitBtnText}>Create Material</Text>
+            <>
+              <Ionicons name="checkmark-circle-outline" size={20} color={C.white} />
+              <Text style={s.submitBtnText}>Create Material</Text>
+            </>
           )}
         </TouchableOpacity>
       </View>
@@ -173,43 +183,69 @@ export default function CreateMaterialScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F6FB' },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 16, paddingVertical: 13,
+    backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  closeBtn: { padding: 4 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
-  scrollContent: { padding: 18, paddingBottom: 40 },
-  field: { marginBottom: 18 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  required: { color: '#EF4444' },
-  optional: { color: '#9CA3AF', fontWeight: '400' },
-  input: {
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E7EB',
-    borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14,
-    fontSize: 15, color: '#1F2937',
+  closeBtn: {
+    width: 36, height: 36, borderRadius: R.sm,
+    backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  textarea: { minHeight: 80, textAlignVertical: 'top' },
-  charCount: { fontSize: 11, color: '#9CA3AF', textAlign: 'right', marginTop: 4 },
+  headerTitle: { fontSize: T.base + 3, fontWeight: '800', color: C.textPrimary },
+
+  progressSection: {
+    paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10,
+    backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border,
+  },
+  progressBg: {
+    height: 5, backgroundColor: C.elevated, borderRadius: R.pill, overflow: 'hidden', marginBottom: 6,
+  },
+  progressFill: { height: '100%', backgroundColor: C.accent, borderRadius: R.pill },
+  progressText: { fontSize: T.xs, color: C.textMuted, fontWeight: '600' },
+
+  scrollContent: { padding: 18, paddingBottom: 20 },
+
+  field:    { marginBottom: 22 },
+  label:    { fontSize: T.base, fontWeight: '700', color: C.textPrimary, marginBottom: 10 },
+  required: { color: C.danger },
+  optional: { color: C.textMuted, fontWeight: '400' },
+
+  inputWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border,
+    borderRadius: R.md, paddingHorizontal: 14, paddingVertical: 13,
+  },
+  input: { flex: 1, fontSize: T.md, color: C.textPrimary },
+
+  textarea: {
+    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border,
+    borderRadius: R.md, padding: 14, fontSize: T.md, color: C.textPrimary,
+    minHeight: 90, textAlignVertical: 'top',
+  },
+  charCount: { fontSize: T.xs, color: C.textMuted, textAlign: 'right', marginTop: 4 },
+
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E5E7EB',
-    borderRadius: 10, paddingVertical: 9, paddingHorizontal: 14,
+    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border,
+    borderRadius: R.pill, paddingVertical: 8, paddingHorizontal: 14,
   },
-  chipActive: { backgroundColor: '#0891B2', borderColor: '#0891B2' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-  chipTextActive: { color: '#fff' },
+  chipActive: { backgroundColor: C.accentBg, borderColor: C.accent },
+  chipText:   { fontSize: T.base, fontWeight: '600', color: C.textSecondary },
+  chipTextActive: { color: C.accent },
+
   footer: {
-    padding: 16, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    padding: 16, backgroundColor: C.surface,
+    borderTopWidth: 1, borderTopColor: C.border,
   },
   submitBtn: {
-    backgroundColor: '#0891B2', borderRadius: 12,
-    paddingVertical: 15, alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: C.accent, borderRadius: R.md, paddingVertical: 16,
   },
-  submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  submitBtnDisabled: { opacity: 0.45 },
+  submitBtnText: { color: C.white, fontSize: T.base + 2, fontWeight: '700' },
 });

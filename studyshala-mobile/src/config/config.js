@@ -5,7 +5,7 @@
  * Everything else is derived automatically.
  */
 
-export const API_BASE_URL = 'https://YOUR_BACKEND.onrender.com';
+export const API_BASE_URL = 'https://test-of-studyshala.onrender.com';
 
 export const API_URL = `${API_BASE_URL}/api`;
 
