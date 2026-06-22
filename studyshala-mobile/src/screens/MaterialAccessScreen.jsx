@@ -78,12 +78,12 @@ export default function MaterialAccessScreen({ route, navigation }) {
   };
 
   const handleFilePress = (file) => {
-    Alert.alert(file.name, 'What would you like to do?', [
-      { text: 'Preview',  onPress: () => openFile(file, material) },
-      { text: 'Download', onPress: () => downloadFile(file) },
-      { text: 'Cancel',   style: 'cancel' },
-    ]);
-  };
+  Alert.alert(file.name, 'What would you like to do?', [
+    { text: 'Preview',  onPress: () => openFile(file, material, navigation) },
+    { text: 'Download', onPress: () => downloadFile(file) },
+    { text: 'Cancel',   style: 'cancel' },
+  ]);
+};
 
   if (loading) {
     return (

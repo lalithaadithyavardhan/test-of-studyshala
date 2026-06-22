@@ -33,6 +33,10 @@ import CreateMaterialScreen from '../screens/CreateMaterialScreen';
 import FacultyMaterialDetailScreen from '../screens/FacultyMaterialDetailScreen';
 import UploadFilesScreen from '../screens/UploadFilesScreen';
 
+
+import FileViewerScreen from '../screens/FileViewerScreen';
+
+
 const RootStack = createNativeStackNavigator();
 const StudentTab = createBottomTabNavigator();
 const StudentStack = createNativeStackNavigator();
@@ -72,6 +76,7 @@ function StudentRoot() {
   return (
     <StudentStack.Navigator screenOptions={{ headerShown: false }}>
       <StudentStack.Screen name="StudentTabs" component={StudentTabs} />
+      <StudentStack.Screen name="FileViewer" component={FileViewerScreen} />
       <StudentStack.Screen
         name="MaterialAccess"
         component={MaterialAccessScreen}
@@ -111,6 +116,7 @@ function FacultyRoot() {
       <FacultyStack.Screen name="CreateMaterial" component={CreateMaterialScreen} options={{ presentation: 'modal' }} />
       <FacultyStack.Screen name="FacultyMaterialDetail" component={FacultyMaterialDetailScreen} />
       <FacultyStack.Screen name="UploadFiles" component={UploadFilesScreen} options={{ presentation: 'modal' }} />
+      <FacultyStack.Screen name="FileViewer" component={FileViewerScreen} />
     </FacultyStack.Navigator>
   );
 }

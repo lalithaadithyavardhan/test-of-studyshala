@@ -5,20 +5,19 @@
  * gives student/faculty files real Drive preview/download URLs — see
  * buildDriveUrls() in studentController.js / facultyController.js).
  *
- * - openFile(): opens file.previewUrl in the device browser/Drive app, and
- *   (for student files) tracks it as a "recent file" via the backend so it
- *   shows up cross-device on DashboardScreen.
+ * - openFile(): opens file.previewUrl inside the app via FileViewerScreen
+ *   (no redirect to Google Drive or external browser), and tracks it as a
+ *   "recent file" via the backend so it shows up cross-device on DashboardScreen.
  * - downloadFile(): downloads file.downloadUrl into the app's document
  *   directory, then opens the native share sheet so the user can save it
  *   to Files / Drive / wherever.
  */
-import * as Linking from 'expo-linking';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 import { trackRecentFile } from '../api/studentApi';
 
-export const openFile = async (file, material) => {
+export const openFile = async (file, material, navigation) => {
   if (!file?.previewUrl) {
     Alert.alert('Unavailable', 'This file has no preview link. Try downloading instead.');
     return;
@@ -37,11 +36,15 @@ export const openFile = async (file, material) => {
     }).catch(() => {});
   }
 
-  try {
-    await Linking.openURL(file.previewUrl);
-  } catch (e) {
-    Alert.alert('Error', 'Could not open this file.');
+  // Open inside the app via FileViewerScreen instead of leaving to Google Drive
+  if (navigation) {
+    const parentNav = navigation.getParent() || navigation;
+    parentNav.navigate('FileViewer', { file, material });
+    return;
   }
+
+  // Fallback — should not normally be reached
+  Alert.alert('Error', 'Could not open this file.');
 };
 
 export const downloadFile = async (file) => {

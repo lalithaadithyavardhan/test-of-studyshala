@@ -1,21 +1,18 @@
 /**
- * components/RoleSwitchButton.jsx
- * ==================================
- * Lets a logged-in user flip between Student and Faculty views without
- * a visible login screen. Calls AuthContext.switchRole(), which silently
- * re-authenticates the cached Google session against the OTHER role
- * (see AuthContext.jsx for why — backend stores one role per account).
+ * components/RoleSwitchButton.jsx — StudyShala Dark Theme
+ * Dark base #0f0f0f · Accent #e87c3a
  */
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { C, R, T } from './theme';
 
 export default function RoleSwitchButton({ targetRole, style }) {
   const { switchRole, switchingRole } = useAuth();
 
   const label = targetRole === 'faculty' ? 'Switch to Faculty' : 'Switch to Student';
-  const icon = targetRole === 'faculty' ? 'easel-outline' : 'school-outline';
+  const icon  = targetRole === 'faculty' ? 'easel-outline' : 'school-outline';
 
   const handlePress = () => {
     Alert.alert(
@@ -38,33 +35,35 @@ export default function RoleSwitchButton({ targetRole, style }) {
 
   return (
     <TouchableOpacity
-      style={[styles.btn, style]}
+      style={[s.btn, style]}
       onPress={handlePress}
       disabled={switchingRole}
-      activeOpacity={0.75}
+      activeOpacity={0.8}
     >
       {switchingRole ? (
-        <ActivityIndicator size="small" color="#4F46E5" />
+        <ActivityIndicator size="small" color={C.accent} />
       ) : (
         <>
-          <Ionicons name={icon} size={16} color="#4F46E5" />
-          <Text style={styles.text}>{label}</Text>
+          <Ionicons name={icon} size={16} color={C.accent} />
+          <Text style={s.text}>{label}</Text>
         </>
       )}
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#EEF2FF',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    gap: 7,
+    backgroundColor: C.accentBg,
+    borderRadius: R.sm,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: C.accent + '40',
   },
-  text: { fontSize: 12, fontWeight: '700', color: '#4F46E5' },
+  text: { fontSize: T.sm, fontWeight: '700', color: C.accent },
 });

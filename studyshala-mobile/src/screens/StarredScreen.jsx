@@ -12,9 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import FileListItem from '../components/FileListItem';
 import { getStarredFiles, unstarFile } from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
+import { useNavigation } from '@react-navigation/native';
 import { C, R, T } from '../components/theme';
 
 export default function StarredScreen() {
+  const navigation = useNavigation();
   const [starredFiles, setStarredFiles] = useState([]);
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
@@ -46,7 +48,8 @@ export default function StarredScreen() {
   const handleOpen = (file) => {
     openFile(
       { _id: file.fileId, name: file.fileName, mimeType: file.mimeType, previewUrl: file.previewUrl, downloadUrl: file.downloadUrl },
-      { _id: file.materialId, subjectName: file.subjectName }
+      { _id: file.materialId, subjectName: file.subjectName },
+      navigation,
     );
   };
 

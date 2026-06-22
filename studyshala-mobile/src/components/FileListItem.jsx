@@ -1,34 +1,32 @@
 /**
- * components/FileListItem.jsx
- * =============================
- * Shared row used by Dashboard (recent files), MaterialAccess, Starred,
- * and Faculty file browsing. Mirrors the file-icon-by-mimeType pattern
- * from the website's StudentDashboard.jsx / StudentStarred.jsx.
+ * components/FileListItem.jsx — StudyShala Dark Theme
+ * Dark base #0f0f0f · Accent #e87c3a
  */
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { C, R, T } from './theme';
 
 const getFileIconName = (mimeType = '') => {
-  if (mimeType.includes('pdf')) return 'document-text';
+  if (mimeType.includes('pdf'))                                    return 'document-text';
   if (mimeType.includes('word') || mimeType.includes('document')) return 'document';
-  if (mimeType.includes('sheet') || mimeType.includes('excel')) return 'grid';
+  if (mimeType.includes('sheet') || mimeType.includes('excel'))   return 'grid';
   if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'easel';
-  if (mimeType.includes('image')) return 'image';
-  if (mimeType.includes('video')) return 'videocam';
-  if (mimeType.includes('audio')) return 'musical-notes';
+  if (mimeType.includes('image'))  return 'image';
+  if (mimeType.includes('video'))  return 'videocam';
+  if (mimeType.includes('audio'))  return 'musical-notes';
   if (mimeType.includes('zip') || mimeType.includes('rar')) return 'archive';
   return 'document-attach';
 };
 
 const getFileIconColor = (mimeType = '') => {
-  if (mimeType.includes('pdf')) return '#EF4444';
-  if (mimeType.includes('word') || mimeType.includes('document')) return '#2563EB';
-  if (mimeType.includes('sheet') || mimeType.includes('excel')) return '#16A34A';
-  if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return '#EA580C';
-  if (mimeType.includes('image')) return '#8B5CF6';
-  if (mimeType.includes('video')) return '#DB2777';
-  return '#6B7280';
+  if (mimeType.includes('pdf'))                                    return '#EF4444';
+  if (mimeType.includes('word') || mimeType.includes('document')) return '#3B82F6';
+  if (mimeType.includes('sheet') || mimeType.includes('excel'))   return '#22C55E';
+  if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return C.accent;
+  if (mimeType.includes('image')) return '#A78BFA';
+  if (mimeType.includes('video')) return '#EC4899';
+  return C.textSecondary;
 };
 
 export const formatFileSize = (bytes) => {
@@ -47,65 +45,81 @@ export default function FileListItem({
   showStar = true,
   onDeletePress,
 }) {
+  const iconColor = getFileIconColor(file.mimeType);
+
   return (
     <TouchableOpacity
-      style={styles.row}
+      style={s.row}
       onPress={() => onPress?.(file)}
       activeOpacity={0.7}
     >
-      <View style={[styles.iconBox, { backgroundColor: `${getFileIconColor(file.mimeType)}1A` }]}>
-        <Ionicons name={getFileIconName(file.mimeType)} size={20} color={getFileIconColor(file.mimeType)} />
+      {/* ── File type icon ── */}
+      <View style={[s.iconBox, { backgroundColor: iconColor + '1A' }]}>
+        <Ionicons name={getFileIconName(file.mimeType)} size={20} color={iconColor} />
       </View>
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{file.name}</Text>
+
+      {/* ── Name + meta ── */}
+      <View style={s.info}>
+        <Text style={s.name} numberOfLines={1}>{file.name}</Text>
         {!!file.size && (
-          <Text style={styles.meta}>
+          <Text style={s.meta}>
             {formatFileSize(file.size)}
             {file.uploadedAt ? ` · ${new Date(file.uploadedAt).toLocaleDateString()}` : ''}
           </Text>
         )}
       </View>
+
+      {/* ── Star ── */}
       {showStar && (
         <TouchableOpacity
           onPress={() => onStarPress?.(file)}
-          style={styles.iconBtn}
+          style={s.iconBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons
             name={isStarred ? 'star' : 'star-outline'}
             size={20}
-            color={isStarred ? '#F59E0B' : '#D1D5DB'}
+            color={isStarred ? C.accent : C.textMuted}
           />
         </TouchableOpacity>
       )}
+
+      {/* ── Delete ── */}
       {onDeletePress && (
         <TouchableOpacity
           onPress={() => onDeletePress(file)}
-          style={styles.iconBtn}
+          style={s.iconBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="trash-outline" size={19} color="#EF4444" />
+          <Ionicons name="trash-outline" size={19} color={C.danger} />
         </TouchableOpacity>
       )}
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: C.surface,
+    borderRadius: R.md,
     padding: 12,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   iconBox: {
-    width: 40, height: 40, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+    width: 40,
+    height: 40,
+    borderRadius: R.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    flexShrink: 0,
   },
-  info: { flex: 1 },
-  name: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
-  meta: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
+  info:   { flex: 1 },
+  name:   { fontSize: T.base, fontWeight: '600', color: C.textPrimary },
+  meta:   { fontSize: T.xs, color: C.textMuted, marginTop: 2 },
   iconBtn: { padding: 6, marginLeft: 4 },
 });

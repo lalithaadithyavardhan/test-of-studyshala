@@ -1,28 +1,26 @@
 /**
- * components/MaterialCard.jsx
- * =============================
- * Shared card used by SavedMaterialsScreen, HistoryScreen (student side)
- * and FacultyDashboardScreen / FacultyMaterialsScreen (faculty side).
- * `role` toggles which action buttons show.
+ * components/MaterialCard.jsx — StudyShala Dark Theme
+ * Dark base #0f0f0f · Accent #e87c3a
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { C, R, T } from './theme';
 
 export default function MaterialCard({
   material,
   onPress,
   onRemove,
-  role = 'student', // 'student' | 'faculty'
+  role = 'student',
   onUpload,
   onMessage,
   onDelete,
   onShare,
 }) {
   const [copied, setCopied] = useState(false);
-  const code = material.accessCode || material.departmentCode;
-  const hasMsg = !!material.messageToStudents?.trim();
-  const sfCount = material.subFolderCount ?? material.subFolders?.length ?? 0;
+  const code      = material.accessCode || material.departmentCode;
+  const hasMsg    = !!material.messageToStudents?.trim();
+  const sfCount   = material.subFolderCount ?? material.subFolders?.length ?? 0;
   const rootFiles = material.files?.length ?? 0;
   const totalFiles =
     material.fileCount ??
@@ -36,69 +34,78 @@ export default function MaterialCard({
   };
 
   return (
-    <View style={styles.card}>
+    <View style={s.card}>
       <TouchableOpacity onPress={() => onPress?.(material)} activeOpacity={0.7}>
-        <View style={styles.headerRow}>
-          <View style={styles.iconBox}>
-            <Ionicons name="book" size={18} color="#4F46E5" />
+
+        {/* ── Header row ── */}
+        <View style={s.headerRow}>
+          <View style={s.iconBox}>
+            <Ionicons name="book" size={18} color={C.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title} numberOfLines={1}>{material.subjectName}</Text>
-            <Text style={styles.meta} numberOfLines={1}>
+            <Text style={s.title} numberOfLines={1}>{material.subjectName}</Text>
+            <Text style={s.meta} numberOfLines={1}>
               {material.facultyName} · {material.department} · Sem {material.semester}
             </Text>
           </View>
           {hasMsg && (
-            <View style={styles.msgBadge}>
-              <Ionicons name="megaphone" size={11} color="#92400E" />
+            <View style={s.msgBadge}>
+              <Ionicons name="megaphone" size={11} color={C.accent} />
             </View>
           )}
         </View>
 
-        <Text style={styles.filesLine}>
+        {/* ── Files / folders count ── */}
+        <Text style={s.filesLine}>
           {totalFiles} file{totalFiles !== 1 ? 's' : ''}
           {sfCount > 0 ? ` · ${sfCount} folder${sfCount !== 1 ? 's' : ''}` : ''}
         </Text>
 
+        {/* ── Message preview ── */}
         {hasMsg && (
-          <Text style={styles.msgPreview} numberOfLines={2}>
+          <Text style={s.msgPreview} numberOfLines={2}>
             💬 {material.messageToStudents}
           </Text>
         )}
 
+        {/* ── Access code row ── */}
         {!!code && (
-          <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.7}>
-            <Text style={styles.code}>{code}</Text>
-            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={15} color={copied ? '#10B981' : '#9CA3AF'} />
+          <TouchableOpacity style={s.codeRow} onPress={copyCode} activeOpacity={0.7}>
+            <Text style={s.code}>{code}</Text>
+            <Ionicons
+              name={copied ? 'checkmark' : 'copy-outline'}
+              size={15}
+              color={copied ? C.success : C.textSecondary}
+            />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
 
       {/* ── Actions ── */}
-      <View style={styles.actionsRow}>
+      <View style={s.actionsRow}>
         {role === 'student' && onRemove && (
-          <TouchableOpacity style={styles.actionBtn} onPress={() => onRemove(material)}>
-            <Ionicons name="trash-outline" size={15} color="#EF4444" />
-            <Text style={[styles.actionText, { color: '#EF4444' }]}>Remove</Text>
+          <TouchableOpacity style={s.actionBtn} onPress={() => onRemove(material)}>
+            <Ionicons name="trash-outline" size={15} color={C.danger} />
+            <Text style={[s.actionText, { color: C.danger }]}>Remove</Text>
           </TouchableOpacity>
         )}
         {role === 'faculty' && (
           <>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onUpload?.(material)}>
-              <Ionicons name="cloud-upload-outline" size={15} color="#4F46E5" />
-              <Text style={[styles.actionText, { color: '#4F46E5' }]}>Upload</Text>
+            <TouchableOpacity style={s.actionBtn} onPress={() => onUpload?.(material)}>
+              <Ionicons name="cloud-upload-outline" size={15} color={C.accent} />
+              <Text style={[s.actionText, { color: C.accent }]}>Upload</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onMessage?.(material)}>
-              <Ionicons name="megaphone-outline" size={15} color="#0891B2" />
-              <Text style={[styles.actionText, { color: '#0891B2' }]}>Message</Text>
+            <TouchableOpacity style={s.actionBtn} onPress={() => onMessage?.(material)}>
+              <Ionicons name="megaphone-outline" size={15} color={C.textSecondary} />
+              <Text style={[s.actionText, { color: C.textSecondary }]}>Message</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onShare?.(material)}>
-              <Ionicons name="share-social-outline" size={15} color="#16A34A" />
-              <Text style={[styles.actionText, { color: '#16A34A' }]}>Share</Text>
+            <TouchableOpacity style={s.actionBtn} onPress={() => onShare?.(material)}>
+              <Ionicons name="share-social-outline" size={15} color={C.textSecondary} />
+              <Text style={[s.actionText, { color: C.textSecondary }]}>Share</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete?.(material)}>
-              <Ionicons name="trash-outline" size={15} color="#EF4444" />
-              <Text style={[styles.actionText, { color: '#EF4444' }]}>Delete</Text>
+            <TouchableOpacity style={s.actionBtn} onPress={() => onDelete?.(material)}>
+              <Ionicons name="trash-outline" size={15} color={C.danger} />
+              <Text style={[s.actionText, { color: C.danger }]}>Delete</Text>
             </TouchableOpacity>
           </>
         )}
@@ -107,42 +114,73 @@ export default function MaterialCard({
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: C.surface,
+    borderRadius: R.md,
     padding: 14,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   iconBox: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center', justifyContent: 'center', marginRight: 10,
+    width: 36,
+    height: 36,
+    borderRadius: R.xs,
+    backgroundColor: C.accentBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
-  title: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
-  meta: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
+  title:    { fontSize: T.md, fontWeight: '700', color: C.textPrimary },
+  meta:     { fontSize: T.xs, color: C.textSecondary, marginTop: 2 },
   msgBadge: {
-    backgroundColor: '#FEF3C7', borderRadius: 8,
-    paddingHorizontal: 6, paddingVertical: 4,
+    backgroundColor: C.accentBg,
+    borderRadius: R.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: C.accent + '40',
   },
-  filesLine: { fontSize: 12, color: '#6B7280', marginBottom: 6 },
+  filesLine: { fontSize: T.sm, color: C.textMuted, marginBottom: 6 },
   msgPreview: {
-    fontSize: 12, color: '#4338CA', backgroundColor: '#EEF2FF',
-    borderRadius: 8, padding: 8, marginBottom: 8,
+    fontSize: T.sm,
+    color: C.textSecondary,
+    backgroundColor: C.elevated,
+    borderRadius: R.xs,
+    padding: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   codeRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#F9FAFB', borderRadius: 8,
-    paddingVertical: 8, paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: C.elevated,
+    borderRadius: R.xs,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: C.border,
   },
-  code: { fontFamily: 'monospace', fontSize: 13, fontWeight: '700', color: '#374151', letterSpacing: 1 },
+  code: {
+    fontFamily: 'monospace',
+    fontSize: T.base,
+    fontWeight: '700',
+    color: C.textPrimary,
+    letterSpacing: 1.5,
+  },
   actionsRow: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    marginTop: 10, paddingTop: 10,
-    borderTopWidth: 1, borderTopColor: '#F3F4F6',
-    gap: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    gap: 16,
   },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  actionText: { fontSize: 12, fontWeight: '600' },
+  actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionText: { fontSize: T.sm, fontWeight: '600' },
 });
