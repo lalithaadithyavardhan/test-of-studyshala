@@ -12,9 +12,8 @@
     },
     "assetBundlePatterns": ["**/*"],
     "plugins": [
-      [
-        "@react-native-google-signin/google-signin"
-      ]
+      "expo-dev-client",
+      ["@react-native-google-signin/google-signin"]
     ],
     "ios": {
       "supportsTablet": true,
