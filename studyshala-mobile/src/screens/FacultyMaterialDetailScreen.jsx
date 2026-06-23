@@ -51,9 +51,21 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
   const currentFiles = activeFolder ? activeFolder.files : files;
 
   const handleFilePress = (file) => {
-    Alert.alert(file.name, 'What would you like to do?', [
-      { text: 'Open', onPress: () => { if (file.previewUrl) Linking.openURL(file.previewUrl); } },
-      { text: 'Download', onPress: () => { Linking.openURL(file.downloadUrl || getFacultyDownloadUrl(material._id, file._id)); } },
+    // Navigate to in-app FileViewer — never use Linking.openURL for files
+    // as it hands control to Google Drive / browser instead of staying in the app.
+    // Long-pressing shows the Download / Delete options instead.
+    navigation.navigate('FileViewer', { file, material });
+  };
+
+  const handleFileLongPress = (file) => {
+    Alert.alert(file.name, 'File options', [
+      {
+        text: 'Download',
+        onPress: () => {
+          const url = file.downloadUrl || getFacultyDownloadUrl(material._id, file._id);
+          if (url) Linking.openURL(url);
+        },
+      },
       { text: 'Delete', style: 'destructive', onPress: () => handleDeleteFile(file) },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -142,7 +154,7 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
           style={s.backBtn}
           onPress={() => activeFolder ? setActiveFolder(null) : navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={20} color={C.textSecondary} />
+          <Ionicons name="arrow-back" size={20} color={C.textSec} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.title} numberOfLines={1}>
@@ -180,8 +192,8 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
               style={s.actionChip}
               onPress={() => setMsgModalOpen(true)}
             >
-              <Ionicons name="megaphone-outline" size={16} color={C.warning} />
-              <Text style={[s.actionChipText, { color: C.warning }]}>Announce</Text>
+              <Ionicons name="megaphone-outline" size={16} color={"#f59e0b"} />
+              <Text style={[s.actionChipText, { color: "#f59e0b" }]}>Announce</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={s.actionChip}
@@ -222,7 +234,7 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
                 activeOpacity={0.8}
               >
                 <View style={s.folderIconBox}>
-                  <Ionicons name="folder" size={22} color={C.warning} />
+                  <Ionicons name="folder" size={22} color={"#f59e0b"} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.folderName}>{item.name}</Text>
@@ -235,13 +247,14 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
                 style={s.folderDeleteBtn}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="trash-outline" size={17} color={C.danger} />
+                <Ionicons name="trash-outline" size={17} color={C.error} />
               </TouchableOpacity>
             </View>
           ) : (
             <FileListItem
               file={item}
               onPress={handleFilePress}
+              onLongPress={handleFileLongPress}
               showStar={false}
               onDeletePress={handleDeleteFile}
               dark
@@ -268,7 +281,7 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
                 <Text style={s.modalHint}>Shown every time students open this material</Text>
               </View>
               <TouchableOpacity style={s.modalCloseBtn} onPress={() => setMsgModalOpen(false)}>
-                <Ionicons name="close" size={18} color={C.textSecondary} />
+                <Ionicons name="close" size={18} color={C.textSec} />
               </TouchableOpacity>
             </View>
             <TextInput
@@ -316,7 +329,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   title:    { fontSize: T.base + 2, fontWeight: '700', color: C.textPrimary },
-  subtitle: { fontSize: T.xs, color: C.textSecondary, marginTop: 2 },
+  subtitle: { fontSize: T.xs, color: C.textSec, marginTop: 2 },
 
   // Code card
   codeCard: {
@@ -327,7 +340,7 @@ const s = StyleSheet.create({
   },
   codeLabel: { fontSize: T.xs, fontWeight: '700', color: C.accent, marginBottom: 4, letterSpacing: 0.5 },
   codeValue: {
-    fontSize: T.xxl, fontWeight: '800', color: C.textPrimary, letterSpacing: 4,
+    fontSize: 20, fontWeight: '800', color: C.textPrimary, letterSpacing: 4,
     fontFamily: 'monospace',
   },
   codeIconBox: {
@@ -377,7 +390,7 @@ const s = StyleSheet.create({
   emptyDesc:  { fontSize: T.base, color: C.textMuted, textAlign: 'center', paddingHorizontal: 40 },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: C.surface,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
@@ -412,7 +425,7 @@ const s = StyleSheet.create({
     borderRadius: R.md, backgroundColor: C.elevated,
     borderWidth: 1, borderColor: C.border,
   },
-  modalCancelText: { fontSize: T.md, fontWeight: '700', color: C.textSecondary },
+  modalCancelText: { fontSize: T.md, fontWeight: '700', color: C.textSec },
   modalSaveBtn: { flex: 2, paddingVertical: 14, alignItems: 'center', borderRadius: R.md, backgroundColor: C.accent },
   modalSaveText: { fontSize: T.md, fontWeight: '700', color: C.white },
 });

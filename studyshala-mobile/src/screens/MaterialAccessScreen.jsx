@@ -14,17 +14,21 @@ import FileListItem from '../components/FileListItem';
 import {
   getMaterialFiles, saveMaterial, starFile, unstarFile, getStarredFiles,
 } from '../api/studentApi';
-import { openFile, downloadFile } from '../utils/fileActions';
+import { downloadFile } from '../utils/fileActions';
 import { C, R, T } from '../components/theme';
 
 export default function MaterialAccessScreen({ route, navigation }) {
   const { material: initialMaterial } = route.params;
   const [material,    setMaterial]    = useState(initialMaterial);
-  const [files,       setFiles]       = useState(initialMaterial.files || []);
-  const [subFolders,  setSubFolders]  = useState(initialMaterial.subFolders || []);
+  // initialMaterial.files may be a NUMBER (count) from the dashboard — treat as not loaded
+  const initialFiles = Array.isArray(initialMaterial.files) ? initialMaterial.files : [];
+  const initialSubs  = Array.isArray(initialMaterial.subFolders) ? initialMaterial.subFolders : [];
+  const [files,       setFiles]       = useState(initialFiles);
+  const [subFolders,  setSubFolders]  = useState(initialSubs);
   const [activeFolder,setActiveFolder]= useState(null);
-  const [loading,     setLoading]     = useState(!initialMaterial.files);
-  const [starredIds,  setStarredIds]  = useState(new Set());
+  // Always load from API — initialMaterial.files is often just a count number
+  const [loading,     setLoading]     = useState(true);
+  const [starredIds,  setStarredIds]  = useState([]);
   const [saving,      setSaving]      = useState(false);
 
   const loadFiles = useCallback(async () => {
@@ -42,27 +46,29 @@ export default function MaterialAccessScreen({ route, navigation }) {
   const loadStarred = useCallback(async () => {
     try {
       const { data } = await getStarredFiles();
-      setStarredIds(new Set((data.starredFiles || []).map((s) => s.fileId)));
+      setStarredIds((data.starredFiles || []).map((s) => s.fileId));
     } catch (e) { /* non-critical */ }
   }, []);
 
   useEffect(() => {
-    if (!initialMaterial.files) loadFiles();
+    loadFiles();
     loadStarred();
   }, []);
 
-  const currentFiles = activeFolder ? activeFolder.files : files;
+  // Always ensure currentFiles is a plain array — activeFolder.files may be
+  // undefined or a count number coming from the API, which crashes Hermes spread
+  const currentFiles = Array.isArray(activeFolder?.files) ? activeFolder.files : files;
 
   const handleStarToggle = async (file) => {
-    const isStarred = starredIds.has(file._id);
+    const isStarred = starredIds.includes(file._id);
     try {
       if (isStarred) {
         await unstarFile(file._id);
-        setStarredIds((prev) => { const n = new Set(prev); n.delete(file._id); return n; });
+        setStarredIds((prev) => prev.filter((id) => id !== file._id));
       } else {
         await starFile({ fileId: file._id, fileName: file.name, mimeType: file.mimeType,
           materialId: material._id, subjectName: material.subjectName });
-        setStarredIds((prev) => new Set(prev).add(file._id));
+        setStarredIds((prev) => [...prev, file._id]);
       }
     } catch (e) { Alert.alert('Error', 'Failed to update star.'); }
   };
@@ -78,12 +84,16 @@ export default function MaterialAccessScreen({ route, navigation }) {
   };
 
   const handleFilePress = (file) => {
-  Alert.alert(file.name, 'What would you like to do?', [
-    { text: 'Preview',  onPress: () => openFile(file, material, navigation) },
-    { text: 'Download', onPress: () => downloadFile(file) },
-    { text: 'Cancel',   style: 'cancel' },
-  ]);
-};
+    // Navigate directly to in-app FileViewer — no OS hand-off
+    navigation.navigate('FileViewer', { file, material });
+  };
+
+  const handleFileLongPress = (file) => {
+    Alert.alert(file.name, 'File options', [
+      { text: 'Download', onPress: () => downloadFile(file) },
+      { text: 'Cancel',   style: 'cancel' },
+    ]);
+  };
 
   if (loading) {
     return (
@@ -105,7 +115,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
           style={s.backBtn}
           onPress={() => activeFolder ? setActiveFolder(null) : navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={20} color={C.textSecondary} />
+          <Ionicons name="arrow-back" size={20} color={C.textSec} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.title} numberOfLines={1}>
@@ -134,8 +144,8 @@ export default function MaterialAccessScreen({ route, navigation }) {
           </View>
           {subFolders.length > 0 && (
             <View style={[s.statPill, { backgroundColor: C.elevated }]}>
-              <Ionicons name="folder-outline" size={13} color={C.textSecondary} />
-              <Text style={[s.statText, { color: C.textSecondary }]}>
+              <Ionicons name="folder-outline" size={13} color={C.textSec} />
+              <Text style={[s.statText, { color: C.textSec }]}>
                 {subFolders.length} folders
               </Text>
             </View>
@@ -154,8 +164,8 @@ export default function MaterialAccessScreen({ route, navigation }) {
       {/* ── File + folder list ── */}
       <FlatList
         data={[
-          ...(!activeFolder ? subFolders.map((sf) => ({ ...sf, __isFolder: true })) : []),
-          ...currentFiles,
+          ...(!activeFolder ? (Array.isArray(subFolders) ? subFolders : []).map((sf) => ({ ...sf, __isFolder: true })) : []),
+          ...(Array.isArray(currentFiles) ? currentFiles : []),
         ]}
         keyExtractor={(item) => item._id}
         contentContainerStyle={s.listContent}
@@ -164,11 +174,18 @@ export default function MaterialAccessScreen({ route, navigation }) {
           item.__isFolder ? (
             <TouchableOpacity
               style={s.folderCard}
-              onPress={() => setActiveFolder(item)}
+              onPress={() => {
+                // subfolder.files may be a count number — ensure it's an array
+                const safeFolder = {
+                  ...item,
+                  files: Array.isArray(item.files) ? item.files : [],
+                };
+                setActiveFolder(safeFolder);
+              }}
               activeOpacity={0.8}
             >
               <View style={s.folderIconBox}>
-                <Ionicons name="folder" size={22} color={C.warning} />
+                <Ionicons name="folder" size={22} color={"#f59e0b"} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.folderName}>{item.name}</Text>
@@ -180,8 +197,9 @@ export default function MaterialAccessScreen({ route, navigation }) {
             <FileListItem
               file={item}
               onPress={handleFilePress}
+              onLongPress={handleFileLongPress}
               onStarPress={handleStarToggle}
-              isStarred={starredIds.has(item._id)}
+              isStarred={starredIds.includes(item._id)}
               dark
             />
           )
@@ -201,7 +219,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
-  loadingText: { marginTop: 12, color: C.textSecondary, fontSize: T.base },
+  loadingText: { marginTop: 12, color: C.textSec, fontSize: T.base },
 
   header: {
     flexDirection: 'row', alignItems: 'center',
@@ -215,7 +233,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   title:    { fontSize: T.base + 2, fontWeight: '700', color: C.textPrimary },
-  subtitle: { fontSize: T.xs, color: C.textSecondary, marginTop: 2 },
+  subtitle: { fontSize: T.xs, color: C.textSec, marginTop: 2 },
   saveBtn: {
     width: 36, height: 36, borderRadius: R.sm,
     backgroundColor: C.accentBg, borderWidth: 1, borderColor: C.accent + '40',
@@ -230,7 +248,7 @@ const s = StyleSheet.create({
   },
   statPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: C.accentBg, borderRadius: R.pill,
+    backgroundColor: C.accentBg, borderRadius: R.full,
     paddingHorizontal: 10, paddingVertical: 5,
   },
   statText: { fontSize: T.sm, fontWeight: '600', color: C.accent },

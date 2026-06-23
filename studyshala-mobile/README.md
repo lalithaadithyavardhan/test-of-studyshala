@@ -130,3 +130,7 @@ Per your request, this build covers **student-only** features. Faculty
 `AdminCoursesView`) screens are not included — say the word and I'll build
 those next using the same approach (pulling exact routes from
 `facultyController.js` / `adminController.js` in your Drive).
+
+
+
+npx expo start --dev-client

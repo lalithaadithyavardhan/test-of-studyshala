@@ -1,45 +1,89 @@
 /**
- * screens/FacultyDashboard.jsx — StudyShala Enhanced Faculty Dashboard
- * 
- * Fully redesigned with enhanced HTML design system:
- * - Notch/status bar
- * - Avatar with gradient ring (purple for faculty) + online status
- * - Hero stat card (students this week) with gradient + sparkline
- * - Stat cards with icon overlays
- * - Weekly activity bar chart
- * - Create new material banner (dashed border)
- * - Material cards with access code box (monospace, copy/whatsapp)
- * - Action buttons (Upload, Announce, Delete)
- * - Collapsible "How it works" guide
- * - Trust pills
- * - FAB (Floating Action Button)
- * - Sidebar drawer
- * 
- * Dark base #0a0a0f · Accent #e87c3a · Faculty #a78bfa
+ * screens/FacultyDashboard.jsx — StudyShala Faculty Dashboard
+ *
+ * Color system from HTML mockup (Claude warm theme):
+ *   Background  #13120f  warm dark (not cold black)
+ *   Surface     #1e1c19  warm card surface
+ *   Border      #2e2c28  normal border
+ *   BorderSub   #2a2724  subtle divider
+ *   Accent      #DE7356  Claude Peach / terra-cotta (primary)
+ *   Secondary   #B1ADA1  Cloudy warm stone (secondary / faculty role)
+ *   TextPrimary #e8e4de  warm white
+ *   TextSec     #b1ada1  warm gray
+ *   TextMuted   #6b6760  readable dim
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Alert, Clipboard, Share, Platform,
+  RefreshControl, Alert, Share, Platform,
   Dimensions, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { getFolders, deleteFolder } from '../api/facultyApi';
-import MaterialCard from '../components/MaterialCard';
-import RoleSwitchButton from '../components/RoleSwitchButton';
 import SidebarDrawer from '../components/SidebarDrawer';
-import { C, R, T, SHADOW, SHADOW_SM, SHADOW_LG } from '../components/theme';
+
+// Support both new @react-native-clipboard/clipboard and deprecated RN core Clipboard
+// Must come after all import statements
+let Clipboard;
+try {
+  Clipboard = require('@react-native-clipboard/clipboard').default;
+} catch {
+  Clipboard = require('react-native').Clipboard;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THEME — warm dark palette from HTML mockup
+// ─────────────────────────────────────────────────────────────────────────────
+const C = {
+  // Backgrounds
+  bg:          '#13120f',
+  surface:     '#1e1c19',
+  surface2:    '#252320',
+  elevated:    '#2a2724',
+
+  // Borders
+  border:      '#2e2c28',
+  borderSub:   '#2a2724',
+
+  // Accent — Claude Peach / terra-cotta
+  accent:      '#DE7356',
+  accentBg:    'rgba(222,115,86,0.09)',
+  accentBorder:'rgba(222,115,86,0.25)',
+
+  // Secondary — Cloudy warm stone (faculty identity color)
+  secondary:   '#B1ADA1',
+  secondaryBg: 'rgba(177,173,161,0.09)',
+  secondaryBdr:'rgba(177,173,161,0.25)',
+
+  // Text
+  textPrimary: '#e8e4de',
+  textSec:     '#b1ada1',
+  textMuted:   '#6b6760',
+
+  // Utility
+  white:    '#ffffff',
+  success:  '#4ade80',
+  error:    '#f87171',
+  whatsapp: '#25D366',
+};
+
+const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 16, xxl: 14, full: 999 };
+const T = { xs: 10, sm: 12, base: 13, md: 14, lg: 16, xl: 18, '2xl': 20 };
+
+const SHADOW_LG = {
+  shadowColor: '#000', shadowOffset: { width: 0, height: 5 },
+  shadowOpacity: 0.25, shadowRadius: 10, elevation: 8,
+};
 
 const { width } = Dimensions.get('window');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA
 // ─────────────────────────────────────────────────────────────────────────────
-
-const TRUST_PILLS = ['No ads', 'Free forever', 'Google Drive backed', 'Instant access'];
+const TRUST_PILLS = ['No ads', 'Free forever', 'Drive backed', 'Instant access'];
 
 const WEEKLY_DATA = [
   { day: 'Mon', value: 30 },
@@ -51,111 +95,56 @@ const WEEKLY_DATA = [
   { day: 'Sun', value: 20 },
 ];
 
-// Mock data — replace with real API
 const MOCK_MATERIALS = [
-  {
-    _id: '1',
-    subjectName: 'Data Structures & Algorithms',
-    semester: 'Semester 4',
-    code: 'A3F9K2BX',
-    files: 14,
-    sections: 3,
-    views: 89,
-    colorIdx: 0,
-  },
-  {
-    _id: '2',
-    subjectName: 'Database Management Systems',
-    semester: 'Semester 4',
-    code: 'DB7XK1QP',
-    files: 8,
-    sections: 2,
-    views: 67,
-    colorIdx: 1,
-  },
-  {
-    _id: '3',
-    subjectName: 'Computer Networks',
-    semester: 'Semester 4',
-    code: 'CN9ZRK3W',
-    files: 6,
-    sections: 2,
-    views: 42,
-    colorIdx: 2,
-  },
+  { _id: '1', subjectName: 'Data Structures & Algorithms', semester: 'Semester 4', code: 'A3F9K2BX', files: 14, sections: 3, views: 89,  colorIdx: 0 },
+  { _id: '2', subjectName: 'Database Management Systems',  semester: 'Semester 4', code: 'DB7XK1QP', files: 8,  sections: 2, views: 67,  colorIdx: 1 },
+  { _id: '3', subjectName: 'Computer Networks',            semester: 'Semester 4', code: 'CN9ZRK3W', files: 6,  sections: 2, views: 42,  colorIdx: 0 },
 ];
 
-const SUBJECT_ICONS = ['book-outline', 'database-outline', 'wifi-outline', 'cpu-outline'];
+const SUBJECT_ICONS = ['book-outline', 'server-outline', 'wifi-outline', 'cpu-outline'];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CUSTOM HOOKS
+// HOOKS
 // ─────────────────────────────────────────────────────────────────────────────
-
-const useInViewAnimation = (threshold = 0.1) => {
-  const ref = useRef(null);
-  const animated = useRef(new Animated.Value(0)).current;
-
+const useEntryAnim = (delay = 0) => {
+  const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          Animated.timing(animated, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
-          observer.unobserve(el);
-        }
-      },
-      { threshold, rootMargin: '0px 0px -20px 0px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+    const t = setTimeout(() => {
+      Animated.timing(anim, { toValue: 1, duration: 380, useNativeDriver: true }).start();
+    }, delay);
+    return () => clearTimeout(t);
   }, []);
-
-  return { ref, animated };
+  return anim;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SMALL COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
-
 const Section = ({ children, delay = 0, style }) => {
-  const { ref, animated } = useInViewAnimation();
+  const anim = useEntryAnim(delay);
   return (
-    <Animated.View
-      ref={ref}
-      style={[
-        { opacity: animated, transform: [{ translateY: animated.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] },
-        style,
-      ]}
-    >
+    <Animated.View style={[{
+      opacity: anim,
+      transform: [{ translateY: anim.interpolate({ inputRange: [0,1], outputRange: [10,0] }) }],
+    }, style]}>
       {children}
     </Animated.View>
   );
 };
 
-const SectionLabel = ({ children }) => (
-  <Text style={styles.sectionLabel}>{children}</Text>
-);
-
-const Divider = ({ style }) => (
-  <View style={[styles.divider, style]} />
-);
+const SectionLabel = ({ children }) => <Text style={styles.sectionLabel}>{children}</Text>;
 
 const TrustPill = ({ children }) => (
   <View style={styles.trustPill}>
-    <Ionicons name="checkmark-circle" size={11} color={C.success} />
+    <Ionicons name="checkmark-circle" size={11} color={C.accent} />
     <Text style={styles.trustPillText}>{children}</Text>
   </View>
 );
 
-/** Weekly bar chart */
-const WeeklyChart = ({ data = WEEKLY_DATA }) => {
-  const maxVal = Math.max(...data.map((d) => d.value));
-  const today = new Date().getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+/** Weekly activity bar chart */
+const WeeklyChart = () => {
+  const maxVal = Math.max(...WEEKLY_DATA.map(d => d.value));
+  const today  = new Date().getDay(); // 0=Sun
 
   return (
     <View style={styles.chartCard}>
@@ -164,29 +153,20 @@ const WeeklyChart = ({ data = WEEKLY_DATA }) => {
         <Text style={styles.chartPeriod}>Last 7 days</Text>
       </View>
       <View style={styles.chartBars}>
-        {data.map((item, i) => {
-          const barHeight = (item.value / maxVal) * 40;
-          // Map JS day (0=Sun) to our Mon-start array
-          const dayIndex = (i + 1) % 7; // Mon=1 in WEEKLY_DATA
-          const isToday = dayIndex === today;
-
+        {WEEKLY_DATA.map((item, i) => {
+          const barH    = (item.value / maxVal) * 40;
+          const dayIdx  = (i + 1) % 7;
+          const isToday = dayIdx === today;
           return (
             <View key={item.day} style={styles.chartBarWrap}>
-              <View style={[styles.chartBarContainer, { height: 40 }]}>
-                <View
-                  style={[
-                    styles.chartBar,
-                    {
-                      height: barHeight,
-                      backgroundColor: isToday ? C.accent : C.accentBg,
-                      borderColor: isToday ? C.accent : 'rgba(232,124,58,0.2)',
-                    },
-                  ]}
-                />
+              <View style={{ height: 40, justifyContent: 'flex-end', width: '100%' }}>
+                <View style={[styles.chartBar, {
+                  height: barH,
+                  backgroundColor: isToday ? C.accent : C.accentBg,
+                  borderColor:     isToday ? C.accent : C.accentBorder,
+                }]} />
               </View>
-              <Text style={[styles.chartBarLabel, isToday && { color: C.accent }]}>
-                {item.day}
-              </Text>
+              <Text style={[styles.chartBarLabel, isToday && { color: C.accent }]}>{item.day}</Text>
             </View>
           );
         })}
@@ -195,20 +175,22 @@ const WeeklyChart = ({ data = WEEKLY_DATA }) => {
   );
 };
 
-/** Access code box with copy & whatsapp */
+/** Access code box with Copy + WhatsApp */
 const AccessCodeBox = ({ code }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    Clipboard.setString(code);
+    try {
+      Clipboard.setString(code);
+    } catch {}
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setTimeout(() => setCopied(false), 1800);
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Access my study materials on StudyShala!\n\nSubject Code: ${code}\n\nDownload the app and enter this code to access all materials.`,
+        message: `Access my study materials on StudyShala!\n\nSubject Code: ${code}\n\nEnter this code in the app to unlock all materials.`,
         title: 'StudyShala Access Code',
       });
     } catch {}
@@ -221,14 +203,12 @@ const AccessCodeBox = ({ code }) => {
         <Text style={styles.codeValue}>{code}</Text>
         <View style={styles.codeActions}>
           <TouchableOpacity style={styles.codeBtn} onPress={handleCopy} activeOpacity={0.8}>
-            <Ionicons name={copied ? 'checkmark' : 'copy'} size={12} color={copied ? C.success : C.textSecondary} />
-            <Text style={[styles.codeBtnText, copied && { color: C.success }]}>
-              {copied ? 'Copied!' : 'Copy'}
-            </Text>
+            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={11} color={copied ? C.success : C.textSec} />
+            <Text style={[styles.codeBtnText, copied && { color: C.success }]}>{copied ? 'Copied!' : 'Copy'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.codeBtn, styles.codeBtnWhatsapp]} onPress={handleShare} activeOpacity={0.8}>
-            <Ionicons name="logo-whatsapp" size={12} color="#25D366" />
-            <Text style={[styles.codeBtnText, { color: '#25D366' }]}>Share</Text>
+          <TouchableOpacity style={[styles.codeBtn, styles.codeBtnWa]} onPress={handleShare} activeOpacity={0.8}>
+            <Ionicons name="logo-whatsapp" size={11} color={C.whatsapp} />
+            <Text style={[styles.codeBtnText, { color: C.whatsapp }]}>Share</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -239,46 +219,41 @@ const AccessCodeBox = ({ code }) => {
 /** Collapsible How It Works */
 const HowItWorks = () => {
   const [open, setOpen] = useState(false);
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const rotAnim = useRef(new Animated.Value(0)).current;
 
   const steps = [
     { num: '1', title: 'Create a material', desc: 'Add subject name, department, and semester' },
-    { num: '2', title: 'Upload your files', desc: 'PDFs, docs, slides — any file type' },
-    { num: '3', title: 'Share the code',    desc: 'Students enter it to unlock your materials' },
+    { num: '2', title: 'Upload your files',  desc: 'PDFs, docs, slides — any file type' },
+    { num: '3', title: 'Share the code',     desc: 'Students enter it to unlock your materials' },
   ];
 
   const toggle = () => {
-    Animated.spring(rotateAnim, {
-      toValue: open ? 0 : 1,
-      useNativeDriver: true,
-      tension: 50,
-      friction: 8,
-    }).start();
-    setOpen(!open);
+    Animated.spring(rotAnim, { toValue: open ? 0 : 1, useNativeDriver: true, tension: 50, friction: 8 }).start();
+    setOpen(v => !v);
   };
 
   return (
-    <View>
+    <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
       <TouchableOpacity style={styles.howToggle} onPress={toggle} activeOpacity={0.8}>
         <View style={styles.howToggleLeft}>
-          <View style={[styles.howToggleIcon, { backgroundColor: C.facultyBg }]}>
-            <Ionicons name="information-circle" size={16} color={C.faculty} />
+          <View style={[styles.howToggleIcon, { backgroundColor: C.secondaryBg, borderWidth: 1, borderColor: C.secondaryBdr }]}>
+            <Ionicons name="information-circle" size={15} color={C.secondary} />
           </View>
           <Text style={styles.howToggleText}>New here? See how it works</Text>
         </View>
-        <Animated.View style={{ transform: [{ rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
-          <Ionicons name="chevron-down" size={16} color={C.textMuted} />
+        <Animated.View style={{ transform: [{ rotate: rotAnim.interpolate({ inputRange: [0,1], outputRange: ['0deg','180deg'] }) }] }}>
+          <Ionicons name="chevron-down" size={15} color={C.textMuted} />
         </Animated.View>
       </TouchableOpacity>
 
       {open && (
         <View style={styles.howSteps}>
           {steps.map((step, i) => (
-            <View key={i} style={styles.howStep}>
-              <View style={[styles.stepNum, { backgroundColor: C.facultyBg, borderColor: C.facultyBorder }]}>
-                <Text style={[styles.stepNumText, { color: C.faculty }]}>{step.num}</Text>
+            <View key={i} style={[styles.howStep, i === steps.length - 1 && { marginBottom: 0 }]}>
+              <View style={[styles.stepNum, { borderColor: C.accentBorder, backgroundColor: C.accentBg }]}>
+                <Text style={[styles.stepNumText, { color: C.accent }]}>{step.num}</Text>
               </View>
-              <View style={styles.stepText}>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.stepTitle}>{step.title}</Text>
                 <Text style={styles.stepDesc}>{step.desc}</Text>
               </View>
@@ -296,7 +271,7 @@ const HowItWorks = () => {
 export default function FacultyDashboard({ navigation }) {
   const { user, logout } = useAuth();
   const [materials,   setMaterials]   = useState(MOCK_MATERIALS);
-  const [loading,     setLoading]     = useState(false);
+  const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -304,7 +279,7 @@ export default function FacultyDashboard({ navigation }) {
     try {
       const { data } = await getFolders();
       if (data.folders?.length) setMaterials(data.folders);
-    } catch (e) { /* non-critical */ }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -328,7 +303,7 @@ export default function FacultyDashboard({ navigation }) {
           onPress: async () => {
             try {
               await deleteFolder(material._id);
-              setMaterials((prev) => prev.filter((m) => m._id !== material._id));
+              setMaterials(prev => prev.filter(m => m._id !== material._id));
             } catch (e) {
               Alert.alert('Error', e.response?.data?.message || 'Failed to delete.');
             }
@@ -338,128 +313,140 @@ export default function FacultyDashboard({ navigation }) {
     );
   };
 
-  const handleShare = (material) =>
-    navigation.navigate('FacultyMaterialDetail', { material, openShare: true });
+  const totalFiles    = materials.reduce((s, m) => s + (Array.isArray(m.files) ? m.files.length : (m.fileCount || m.files || 0)), 0);
+  const totalSections = materials.reduce((s, m) => s + (Array.isArray(m.subFolders) ? m.subFolders.length : (m.sections || 0)), 0);
+  const totalViews    = materials.reduce((s, m) => s + (m.views || m.viewCount || 0), 0);
 
-  const totalFiles    = materials.reduce((sum, m) => sum + (m.files || 0), 0);
-  const totalSections = materials.reduce((s, m) => s + (m.sections || 0), 0);
-  const totalViews   = materials.reduce((s, m) => s + (m.views || 0), 0);
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out', style: 'destructive',
+          onPress: async () => {
+            try { await logout(); } catch {}
+          },
+        },
+      ]
+    );
+  };
 
   const firstName = user?.name?.split(' ')[0] || 'Faculty';
   const initial   = firstName.charAt(0).toUpperCase();
 
-  // Sparkline bars for hero card (mock weekly student trend)
   const sparkData = [8, 14, 10, 20, 16, 22, 18];
+
+  // Material card accent — alternate between accent and secondary
+  const matAccent = (colorIdx) => colorIdx % 2 === 0
+    ? { color: C.accent,    bg: C.accentBg,    border: C.accentBorder }
+    : { color: C.secondary, bg: C.secondaryBg, border: C.secondaryBdr };
+
+  if (loading) {
+    return (
+      <View style={[styles.root, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Animated.View style={{ opacity: 1 }}>
+          <Ionicons name="book-outline" size={32} color={C.accent} />
+        </Animated.View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.container} edges={['top']}>
 
-        {/* ── Notch / Status Bar ── */}
+        {/* ── Status pill ── */}
         <View style={styles.notch}>
           <View style={styles.notchPill} />
-          <View style={[styles.notchDot, { backgroundColor: C.faculty }]} />
+          {/* Faculty notch dot uses secondary color */}
+          <View style={[styles.notchDot, { backgroundColor: C.secondary }]} />
         </View>
 
         <ScrollView
           contentContainerStyle={styles.scroll}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.faculty} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
           showsVerticalScrollIndicator={false}
         >
 
           {/* ── Header ── */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.iconPill} onPress={() => setSidebarOpen(true)} activeOpacity={0.8}>
-              <Ionicons name="menu" size={20} color={C.textSecondary} />
+              <Ionicons name="menu" size={20} color={C.textSec} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.avatarWrap} onPress={() => setSidebarOpen(true)} activeOpacity={0.8}>
-              <View style={[styles.avatar, { backgroundColor: C.faculty }]}>
+            {/* Faculty avatar uses secondary (warm stone) */}
+            <View style={styles.avatarWrap}>
+              <View style={[styles.avatar, { backgroundColor: C.secondary, shadowColor: C.secondary }]}>
                 <Text style={styles.avatarText}>{initial}</Text>
               </View>
-              <View style={[styles.avatarStatus, { backgroundColor: C.success }]} />
-            </TouchableOpacity>
+              <View style={styles.avatarOnline} />
+            </View>
 
             <View style={styles.nameBlock}>
               <Text style={styles.headerName}>{firstName}</Text>
-              <Text style={[styles.headerSub, { color: C.faculty }]}>
+              {/* Faculty subtitle uses accent color to match HTML mockup */}
+              <Text style={[styles.headerSub, { color: C.accent }]}>
                 {user?.department || 'CSE'} · Instructor
               </Text>
             </View>
 
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.iconPill} activeOpacity={0.8}>
-                <Ionicons name="notifications-outline" size={18} color={C.textSecondary} />
-                <View style={styles.notifBadge} />
+                <Ionicons name="notifications-outline" size={18} color={C.textSec} />
+                <View style={styles.notifDot} />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.iconPillAccent, { borderColor: C.facultyBorder }]} onPress={logout} activeOpacity={0.8}>
-                <Ionicons name="log-out-outline" size={18} color={C.faculty} />
+              <TouchableOpacity
+                style={[styles.iconPill, { borderColor: C.accentBorder }]}
+                onPress={handleLogout} activeOpacity={0.8}
+              >
+                <Ionicons name="log-out-outline" size={18} color={C.accent} />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* ── Hero Stat Card — Students this week ── */}
+          {/* ── Hero stat card ── */}
           <Section delay={50}>
-            <TouchableOpacity style={styles.heroStat} activeOpacity={0.9}>
-              <Text style={styles.heroStatNum}>47</Text>
-              <Text style={styles.heroStatLabel}>Students accessing your materials this week</Text>
+            <TouchableOpacity style={styles.heroCard} activeOpacity={0.9} onPress={() => navigation.navigate('Analytics')}>
+              <Text style={styles.heroNum}>47</Text>
+              <Text style={styles.heroLabel}>Students accessing your materials this week</Text>
               {/* Sparkline */}
               <View style={styles.sparkline}>
                 {sparkData.map((h, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.sparkBar,
-                      { height: h * 1.2 },
-                    ]}
-                  />
+                  <View key={i} style={[styles.sparkBar, { height: h * 1.1 }]} />
                 ))}
               </View>
             </TouchableOpacity>
           </Section>
 
-          {/* ── Stats Grid ── */}
+          {/* ── Stats grid ── */}
           <Section delay={100}>
+            <SectionLabel>Your stats</SectionLabel>
             <View style={styles.statsGrid}>
-              <TouchableOpacity style={styles.statCard} activeOpacity={0.85}>
-                <View style={[styles.statIconWrap, { backgroundColor: C.accentBg }]}>
-                  <Ionicons name="book-outline" size={14} color={C.accent} />
+              {[
+                { icon: 'book-outline',          val: materials.length, label: 'Materials', iconBg: C.accentBg,    iconColor: C.accent    },
+                { icon: 'document-text-outline', val: totalFiles,       label: 'Total files',iconBg: C.accentBg,   iconColor: C.accent    },
+                { icon: 'layers-outline',        val: totalSections,    label: 'Sections',  iconBg: C.secondaryBg, iconColor: C.secondary },
+                { icon: 'eye-outline',           val: totalViews,       label: 'Total views',iconBg: C.secondaryBg,iconColor: C.secondary },
+              ].map((s, i) => (
+                <View key={i} style={styles.statCard}>
+                  <View style={[styles.statIconWrap, { backgroundColor: s.iconBg }]}>
+                    <Ionicons name={s.icon} size={13} color={s.iconColor} />
+                  </View>
+                  <Text style={styles.statNum}>{s.val}</Text>
+                  <Text style={styles.statLabel}>{s.label}</Text>
                 </View>
-                <Text style={styles.statNum}>{materials.length}</Text>
-                <Text style={styles.statLabel}>Materials</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statCard} activeOpacity={0.85}>
-                <View style={[styles.statIconWrap, { backgroundColor: C.success + '20' }]}>
-                  <Ionicons name="document-text-outline" size={14} color={C.success} />
-                </View>
-                <Text style={styles.statNum}>{totalFiles}</Text>
-                <Text style={styles.statLabel}>Total files</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statCard} activeOpacity={0.85}>
-                <View style={[styles.statIconWrap, { backgroundColor: C.facultyBg }]}>
-                  <Ionicons name="layers-outline" size={14} color={C.faculty} />
-                </View>
-                <Text style={styles.statNum}>{totalSections}</Text>
-                <Text style={styles.statLabel}>Sections</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statCard} activeOpacity={0.85}>
-                <View style={[styles.statIconWrap, { backgroundColor: C.accentBg }]}>
-                  <Ionicons name="eye-outline" size={14} color={C.accent} />
-                </View>
-                <Text style={styles.statNum}>{totalViews}</Text>
-                <Text style={styles.statLabel}>Total views</Text>
-              </TouchableOpacity>
+              ))}
             </View>
           </Section>
 
-          {/* ── Weekly Chart ── */}
+          {/* ── Weekly chart ── */}
           <Section delay={150}>
             <WeeklyChart />
           </Section>
 
-          {/* ── Create New Material ── */}
+          {/* ── Create new material ── */}
           <Section delay={200}>
             <TouchableOpacity
               style={styles.createBanner}
@@ -469,15 +456,15 @@ export default function FacultyDashboard({ navigation }) {
               <View style={styles.createIcon}>
                 <Ionicons name="add" size={22} color={C.accent} />
               </View>
-              <View style={styles.createText}>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.createTitle}>Create new material</Text>
-                <Text style={styles.createSub}>Add a subject folder for your students</Text>
+                <Text style={styles.createSub}>Add a subject folder for students</Text>
               </View>
-              <Ionicons name="arrow-forward" size={16} color={C.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
             </TouchableOpacity>
           </Section>
 
-          {/* ── Your Materials ── */}
+          {/* ── Your materials ── */}
           <Section delay={250}>
             <SectionLabel>Your materials</SectionLabel>
 
@@ -485,88 +472,94 @@ export default function FacultyDashboard({ navigation }) {
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyEmoji}>📁</Text>
                 <Text style={styles.emptyTitle}>No materials yet</Text>
-                <Text style={styles.emptyDesc}>
-                  Create your first material above to start sharing with students.
-                </Text>
+                <Text style={styles.emptyDesc}>Create your first material above to start sharing with students.</Text>
               </View>
             ) : (
-              materials.map((m, idx) => (
-                <View key={m._id} style={styles.materialCard}>
-                  {/* Top accent line */}
-                  <View style={[styles.materialAccentLine, {
-                    backgroundColor: m.colorIdx === 0 ? C.accent : m.colorIdx === 1 ? C.faculty : C.student,
-                  }]} />
+              materials.map((m, idx) => {
+                const acc = matAccent(m.colorIdx ?? idx);
+                const fileCount    = Array.isArray(m.files)      ? m.files.length      : (m.fileCount || m.files || 0);
+                const sectionCount = Array.isArray(m.subFolders) ? m.subFolders.length : (m.sections || 0);
+                const viewCount    = m.views || m.viewCount || 0;
 
-                  <View style={styles.materialTop}>
-                    <View style={[styles.materialIcon, {
-                      backgroundColor: m.colorIdx === 0 ? C.accentBg : m.colorIdx === 1 ? C.facultyBg : C.studentBg,
-                      borderColor: m.colorIdx === 0 ? C.accentBorder : m.colorIdx === 1 ? C.facultyBorder : C.studentBorder,
-                    }]}>
-                      <Ionicons
-                        name={SUBJECT_ICONS[m.colorIdx % SUBJECT_ICONS.length]}
-                        size={18}
-                        color={m.colorIdx === 0 ? C.accent : m.colorIdx === 1 ? C.faculty : C.student}
-                      />
-                    </View>
-                    <View style={styles.materialInfo}>
-                      <Text style={styles.materialTitle} numberOfLines={1}>{m.subjectName}</Text>
-                      <View style={[styles.materialSemBadge, {
-                        backgroundColor: m.colorIdx === 0 ? C.accentBg : m.colorIdx === 1 ? C.facultyBg : C.studentBg,
-                        borderColor: m.colorIdx === 0 ? C.accentBorder : m.colorIdx === 1 ? C.facultyBorder : C.studentBorder,
-                      }]}>
-                        <Text style={[styles.materialSemText, {
-                          color: m.colorIdx === 0 ? C.accent : m.colorIdx === 1 ? C.faculty : C.student,
-                        }]}>{m.semester}</Text>
+                return (
+                  <View key={m._id} style={styles.materialCard}>
+                    {/* Top accent line */}
+                    <View style={[styles.materialTopLine, { backgroundColor: acc.color }]} />
+
+                    {/* Card header — tap to open folder */}
+                    <TouchableOpacity
+                      style={styles.materialRow}
+                      onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m })}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.materialIcon, { backgroundColor: acc.bg, borderColor: acc.border }]}>
+                        <Ionicons name={SUBJECT_ICONS[(m.colorIdx || 0) % SUBJECT_ICONS.length]} size={17} color={acc.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.materialTitle} numberOfLines={1}>{m.subjectName}</Text>
+                        <View style={[styles.semBadge, { backgroundColor: acc.bg, borderColor: acc.border }]}>
+                          <Text style={[styles.semBadgeText, { color: acc.color }]}>{m.semester}</Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={15} color={C.textMuted} style={{ marginTop: 2 }} />
+                    </TouchableOpacity>
+
+                    {/* Meta */}
+                    <View style={styles.metaRow}>
+                      <View style={styles.metaItem}>
+                        <Ionicons name="document-outline" size={10} color={C.textMuted} />
+                        <Text style={styles.metaText}>Files <Text style={styles.metaVal}>{fileCount}</Text></Text>
+                      </View>
+                      <View style={styles.metaItem}>
+                        <Ionicons name="layers-outline" size={10} color={C.textMuted} />
+                        <Text style={styles.metaText}>Sections <Text style={styles.metaVal}>{sectionCount}</Text></Text>
+                      </View>
+                      <View style={styles.metaItem}>
+                        <Ionicons name="eye-outline" size={10} color={C.textMuted} />
+                        <Text style={styles.metaText}>Views <Text style={styles.metaVal}>{viewCount}</Text></Text>
                       </View>
                     </View>
-                  </View>
 
-                  <View style={styles.materialMeta}>
-                    <Text style={styles.metaItem}>
-                      <Ionicons name="documents-outline" size={11} color={C.textMuted} />
-                      {'  '}Files <Text style={styles.metaValue}>{m.files}</Text>
-                    </Text>
-                    <Text style={styles.metaItem}>
-                      <Ionicons name="layers-outline" size={11} color={C.textMuted} />
-                      {'  '}Sections <Text style={styles.metaValue}>{m.sections}</Text>
-                    </Text>
-                    <Text style={styles.metaItem}>
-                      <Ionicons name="eye-outline" size={11} color={C.textMuted} />
-                      {'  '}Views <Text style={styles.metaValue}>{m.views}</Text>
-                    </Text>
-                  </View>
+                    {/* Access code */}
+                    <AccessCodeBox code={m.code} />
 
-                  {/* Access Code Box */}
-                  <AccessCodeBox code={m.code} />
-
-                  {/* Action Buttons */}
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      onPress={() => navigation.navigate('UploadFiles', { material: m })}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="cloud-upload-outline" size={13} color={C.textSecondary} />
-                      <Text style={styles.actionBtnText}>Upload</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m, openMessage: true })}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="megaphone-outline" size={13} color={C.textSecondary} />
-                      <Text style={styles.actionBtnText}>Announce</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.actionBtnDanger]}
-                      onPress={() => handleDelete(m)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="trash-outline" size={13} color={C.error} />
-                    </TouchableOpacity>
+                    {/* Action buttons */}
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m })}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="folder-open-outline" size={13} color={C.accent} />
+                        <Text style={[styles.actionBtnText, { color: C.accent }]}>View</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => navigation.navigate('UploadFiles', { material: m })}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="cloud-upload-outline" size={13} color={C.textSec} />
+                        <Text style={styles.actionBtnText}>Upload</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m, openMessage: true })}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="megaphone-outline" size={13} color={C.textSec} />
+                        <Text style={styles.actionBtnText}>Announce</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.actionBtnDanger]}
+                        onPress={() => handleDelete(m)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="trash-outline" size={13} color={C.error} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </Section>
 
@@ -576,38 +569,34 @@ export default function FacultyDashboard({ navigation }) {
             <HowItWorks />
           </Section>
 
-          {/* ── Trust Pills ── */}
+          {/* ── Trust pills ── */}
           <Section delay={350}>
             <View style={styles.trustRow}>
-              {TRUST_PILLS.map((pill) => (
-                <TrustPill key={pill}>{pill}</TrustPill>
-              ))}
+              {TRUST_PILLS.map(p => <TrustPill key={p}>{p}</TrustPill>)}
             </View>
           </Section>
 
-          {/* ── FAB spacer ── */}
           <View style={{ height: 80 }} />
-
         </ScrollView>
 
-        {/* ── FAB — Create Material ── */}
+        {/* ── FAB — accent color for create ── */}
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: C.faculty }]}
+          style={styles.fab}
           onPress={() => navigation.navigate('CreateMaterial')}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={24} color={C.white} />
         </TouchableOpacity>
+
       </SafeAreaView>
 
-      {/* ── Sidebar ── */}
       <SidebarDrawer
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         navigation={navigation}
         role="faculty"
         user={user}
-        onLogout={logout}
+        onLogout={handleLogout}
       />
     </View>
   );
@@ -620,591 +609,194 @@ const styles = StyleSheet.create({
   root:      { flex: 1, backgroundColor: C.bg },
   container: { flex: 1 },
 
-  // ── Notch ───────────────────────────────────────────────────────────────
-  notch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    gap: 6,
-  },
-  notchPill: {
-    width: 46,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.elevated,
-  },
-  notchDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: C.accent,
-  },
+  // Notch
+  notch: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 6 },
+  notchPill: { width: 46, height: 6, borderRadius: 3, backgroundColor: C.elevated },
+  notchDot:  { width: 6, height: 6, borderRadius: 3 },
 
-  // ── Scroll ─────────────────────────────────────────────────────────────
-  scroll: {
-    paddingBottom: 40,
-  },
+  scroll: { paddingBottom: 40 },
 
-  // ── Header ─────────────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 4,
-  },
+  // Header
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 4 },
   iconPill: {
-    width: 38, height: 38,
-    borderRadius: R.sm,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 36, height: 36, borderRadius: R.sm,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  iconPillAccent: {
-    width: 38, height: 38,
-    borderRadius: R.sm,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarWrap: {
-    position: 'relative',
-    marginHorizontal: 4,
-  },
+  avatarWrap:  { position: 'relative', marginHorizontal: 6 },
   avatar: {
-    width: 38, height: 38,
-    borderRadius: 19,
-    backgroundColor: C.faculty,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: C.faculty,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+    shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
   },
-  avatarText: {
-    fontSize: T.base,
-    fontWeight: '700',
-    color: C.white,
+  avatarText:   { fontSize: T.base, fontWeight: '700', color: C.white },
+  avatarOnline: {
+    position: 'absolute', bottom: -1, right: -1,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: C.success, borderWidth: 2, borderColor: C.bg,
   },
-  avatarStatus: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: C.success,
-    borderWidth: 2,
-    borderColor: C.bg,
-  },
-  nameBlock: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  headerName: {
-    fontSize: T.base + 1,
-    fontWeight: '700',
-    color: C.textPrimary,
-    letterSpacing: -0.2,
-  },
-  headerSub: {
-    fontSize: T.xs,
-    marginTop: 1,
-    fontWeight: '600',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: 7,
-    right: 7,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: C.accent,
-    borderWidth: 1.5,
-    borderColor: C.bg,
+  nameBlock:  { flex: 1, marginLeft: 6 },
+  headerName: { fontSize: T.base + 1, fontWeight: '700', color: C.textPrimary, letterSpacing: -0.2 },
+  headerSub:  { fontSize: T.xs, marginTop: 1, fontWeight: '600' },
+  headerRight:{ flexDirection: 'row', alignItems: 'center', gap: 8 },
+  notifDot: {
+    position: 'absolute', top: 7, right: 7,
+    width: 7, height: 7, borderRadius: 3.5,
+    backgroundColor: C.accent, borderWidth: 1.5, borderColor: C.bg,
   },
 
-  // ── Section Label ────────────────────────────────────────────────────────
+  // Section label
   sectionLabel: {
-    fontSize: T.xs,
-    fontWeight: '700',
-    letterSpacing: 0.08,
-    textTransform: 'uppercase',
-    color: C.textDim,
-    marginBottom: 10,
-    paddingHorizontal: 16,
+    fontSize: T.xs, fontWeight: '600', letterSpacing: 0.08,
+    textTransform: 'uppercase', color: C.textMuted,
+    paddingHorizontal: 16, marginBottom: 9, marginTop: 4,
   },
 
-  // ── Hero Stat Card ───────────────────────────────────────────────────────
-  heroStat: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: C.accent,
-    borderRadius: R.xxl,
-    padding: 16,
-    overflow: 'hidden',
-    position: 'relative',
-    ...SHADOW_LG,
+  // Hero card
+  heroCard: {
+    marginHorizontal: 16, marginBottom: 12,
+    backgroundColor: C.accent, borderRadius: R.xl, padding: 16,
+    overflow: 'hidden', position: 'relative', ...SHADOW_LG,
   },
-  heroStatNum: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: C.white,
-    letterSpacing: -1.5,
-    lineHeight: 44,
-  },
-  heroStatLabel: {
-    fontSize: T.sm,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  sparkline: {
-    position: 'absolute',
-    bottom: 12,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
-  },
-  sparkBar: {
-    width: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 2,
-  },
+  heroNum:   { fontSize: 40, fontWeight: '800', color: C.white, letterSpacing: -1.5, lineHeight: 44 },
+  heroLabel: { fontSize: T.sm, color: 'rgba(255,255,255,0.75)', marginTop: 2, lineHeight: 18 },
+  sparkline: { position: 'absolute', bottom: 14, right: 16, flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
+  sparkBar:  { width: 4, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2 },
 
-  // ── Stats Grid ──────────────────────────────────────────────────────────
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
+  // Stats grid
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
   statCard: {
-    width: '48%',
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    padding: 14,
-    position: 'relative',
-    overflow: 'hidden',
+    width: '47%', backgroundColor: C.surface, borderRadius: R.md,
+    borderWidth: 1, borderColor: C.border, padding: 13,
+    position: 'relative', overflow: 'hidden',
   },
-  statIconWrap: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 28,
-    height: 28,
-    borderRadius: R.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statNum: {
-    fontSize: T['2xl'],
-    fontWeight: '800',
-    color: C.textPrimary,
-    letterSpacing: -1,
-  },
-  statLabel: {
-    fontSize: T.xs,
-    color: C.textMuted,
-    marginTop: 3,
-    fontWeight: '500',
-  },
+  statIconWrap: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center' },
+  statNum:   { fontSize: T['2xl'], fontWeight: '800', color: C.textPrimary, letterSpacing: -0.5 },
+  statLabel: { fontSize: T.xs, color: C.textSec, marginTop: 3, fontWeight: '500' },
 
-  // ── Weekly Chart ────────────────────────────────────────────────────────
+  // Weekly chart
   chartCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    padding: 14,
-    marginHorizontal: 16,
-    marginBottom: 12,
+    backgroundColor: C.surface, borderRadius: R.md, borderWidth: 1, borderColor: C.border,
+    padding: 13, marginHorizontal: 16, marginBottom: 12,
   },
-  chartHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  chartTitle: {
-    fontSize: T.sm,
-    fontWeight: '600',
-    color: C.textPrimary,
-  },
-  chartPeriod: {
-    fontSize: T.xs,
-    color: C.textMuted,
-  },
-  chartBars: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 5,
-    height: 48,
-  },
-  chartBarWrap: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  chartBarContainer: {
-    justifyContent: 'flex-end',
-    width: '100%',
-  },
-  chartBar: {
-    width: '100%',
-    borderRadius: 3,
-    borderWidth: 1,
-    minHeight: 3,
-  },
-  chartBarLabel: {
-    fontSize: 9,
-    color: C.textMuted,
-    fontWeight: '600',
-    marginTop: 4,
-  },
+  chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 },
+  chartTitle:  { fontSize: T.sm, fontWeight: '600', color: C.textPrimary },
+  chartPeriod: { fontSize: T.xs, color: C.textMuted },
+  chartBars:   { flexDirection: 'row', alignItems: 'flex-end', gap: 5, height: 48 },
+  chartBarWrap:{ flex: 1, alignItems: 'center' },
+  chartBar:    { width: '100%', borderRadius: 3, borderWidth: 1, minHeight: 3 },
+  chartBarLabel: { fontSize: 9, color: C.textMuted, fontWeight: '600', marginTop: 4 },
 
-  // ── Create Banner ───────────────────────────────────────────────────────
+  // Create banner
   createBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.accentBorder,
-    borderStyle: 'dashed',
-    borderRadius: R.xxl,
-    padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 13,
+    marginHorizontal: 16, marginBottom: 12,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderStyle: 'dashed', borderRadius: R.xl, padding: 13,
   },
   createIcon: {
-    width: 44, height: 44,
-    borderRadius: 12,
-    backgroundColor: C.accentBg,
-    borderWidth: 1,
-    borderColor: C.accentBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    width: 42, height: 42, borderRadius: R.md,
+    backgroundColor: C.accentBg, borderWidth: 1, borderColor: C.accentBorder,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  createText: {
-    flex: 1,
-  },
-  createTitle: {
-    fontSize: T.md,
-    fontWeight: '700',
-    color: C.textPrimary,
-  },
-  createSub: {
-    fontSize: T.sm,
-    color: C.textMuted,
-    marginTop: 3,
-  },
+  createTitle: { fontSize: T.md, fontWeight: '600', color: C.textPrimary },
+  createSub:   { fontSize: T.sm, color: C.textSec, marginTop: 2 },
 
-  // ── Material Cards ───────────────────────────────────────────────────────
+  // Material cards
   materialCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.xxl,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
-    position: 'relative',
+    backgroundColor: C.surface, borderRadius: R.xl, borderWidth: 1, borderColor: C.border,
+    padding: 14, marginHorizontal: 16, marginBottom: 10,
+    overflow: 'hidden', position: 'relative',
   },
-  materialAccentLine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-  },
-  materialTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 10,
-  },
-  materialIcon: {
-    width: 40, height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  materialInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  materialTitle: {
-    fontSize: T.md,
-    fontWeight: '600',
-    color: C.textPrimary,
-    lineHeight: 20,
-  },
-  materialSemBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: R.full,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-    marginTop: 5,
-    borderWidth: 1,
-  },
-  materialSemText: {
-    fontSize: T.xs,
-    fontWeight: '600',
-  },
-  materialMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  metaItem: {
-    fontSize: T.xs,
-    color: C.textMuted,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaValue: {
-    color: C.textSecondary,
-    fontWeight: '500',
-  },
+  materialTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 2 },
+  materialRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10, marginTop: 4 },
+  materialIcon: { width: 38, height: 38, borderRadius: R.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  materialTitle: { fontSize: T.md, fontWeight: '600', color: C.textPrimary, lineHeight: 19 },
+  semBadge: { alignSelf: 'flex-start', borderRadius: R.full, paddingVertical: 2, paddingHorizontal: 9, marginTop: 5, borderWidth: 1 },
+  semBadgeText: { fontSize: T.xs, fontWeight: '600' },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  metaItem:{ flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText:{ fontSize: T.xs, color: C.textMuted },
+  metaVal: { color: C.textSec, fontWeight: '500' },
 
-  // ── Access Code Box ──────────────────────────────────────────────────────
+  // Access code box
   codeBox: {
-    backgroundColor: '#0d0d14',
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: R.sm,
-    padding: 12,
-    marginBottom: 10,
-    overflow: 'hidden',
+    backgroundColor: C.elevated, borderWidth: 1.5, borderColor: C.accentBorder,
+    borderRadius: R.sm, padding: 11, marginBottom: 10,
   },
-  codeLabel: {
-    fontSize: T.xs - 1,
-    color: C.textDim,
-    marginBottom: 6,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.06,
-  },
-  codeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  codeLabel:   { fontSize: T.xs - 1, color: C.textSec, marginBottom: 6, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.08 },
+  codeRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   codeValue: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: C.accent,
-    letterSpacing: 3,
+    fontSize: 17, fontWeight: '800', color: C.accent, letterSpacing: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  codeActions: {
-    flexDirection: 'row',
-    gap: 6,
-  },
+  codeActions: { flexDirection: 'row', gap: 6 },
   codeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: C.surface2,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    borderRadius: R.xs,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: R.xs, paddingVertical: 4, paddingHorizontal: 9,
   },
-  codeBtnWhatsapp: {
-    borderColor: 'rgba(37, 211, 102, 0.3)',
-    backgroundColor: 'rgba(37, 211, 102, 0.05)',
-  },
-  codeBtnText: {
-    fontSize: T.xs,
-    color: C.textSecondary,
-    fontWeight: '500',
-  },
+  codeBtnWa:   { borderColor: 'rgba(37,211,102,0.3)', backgroundColor: 'rgba(37,211,102,0.05)' },
+  codeBtnText: { fontSize: T.xs, color: C.textSec, fontWeight: '500' },
 
-  // ── Action Buttons ──────────────────────────────────────────────────────
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  // Action buttons
+  actionRow: { flexDirection: 'row', gap: 7 },
   actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    backgroundColor: C.surface2,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    borderRadius: R.sm,
-    paddingVertical: 9,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border,
+    borderRadius: R.sm, paddingVertical: 9,
   },
   actionBtnDanger: {
-    flex: 0,
-    width: 44,
-    paddingVertical: 9,
-    flex: 0,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
-    backgroundColor: 'rgba(239, 68, 68, 0.06)',
+    flex: 0, width: 42, borderColor: 'rgba(248,113,113,0.2)',
+    backgroundColor: 'rgba(248,113,113,0.06)',
   },
-  actionBtnText: {
-    fontSize: T.sm,
-    fontWeight: '600',
-    color: C.textSecondary,
-  },
+  actionBtnText: { fontSize: T.sm, fontWeight: '600', color: C.textSec },
 
-  // ── How It Works ────────────────────────────────────────────────────────
+  // How it works
   howToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 16,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    borderRadius: R.md,
-    padding: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 12,
   },
-  howToggleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  howToggleIcon: {
-    width: 28, height: 28,
-    borderRadius: R.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  howToggleText: {
-    fontSize: T.sm,
-    color: C.textMuted,
-    fontWeight: '500',
-  },
+  howToggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  howToggleIcon: { width: 28, height: 28, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center' },
+  howToggleText: { fontSize: T.sm, color: C.textMuted, fontWeight: '500' },
   howSteps: {
-    marginHorizontal: 16,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: R.md,
-    borderBottomRightRadius: R.md,
-    padding: 14,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderTopWidth: 0, borderBottomLeftRadius: R.md, borderBottomRightRadius: R.md, padding: 13,
   },
-  howStep: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 12,
-  },
+  howStep: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   stepNum: {
-    width: 28, height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    width: 26, height: 26, borderRadius: 13, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  stepNumText: {
-    fontSize: T.xs,
-    fontWeight: '700',
-  },
-  stepText: {
-    flex: 1,
-    paddingTop: 3,
-  },
-  stepTitle: {
-    fontSize: T.sm,
-    fontWeight: '600',
-    color: C.textPrimary,
-  },
-  stepDesc: {
-    fontSize: T.xs,
-    color: C.textMuted,
-    marginTop: 3,
-    lineHeight: 16,
-  },
+  stepNumText: { fontSize: T.xs, fontWeight: '700' },
+  stepTitle: { fontSize: T.sm, fontWeight: '600', color: C.textPrimary },
+  stepDesc:  { fontSize: T.xs, color: C.textMuted, marginTop: 3, lineHeight: 16 },
 
-  // ── Trust Pills ─────────────────────────────────────────────────────────
-  trustRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
+  // Trust pills
+  trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingHorizontal: 16, marginBottom: 18 },
   trustPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
-    borderRadius: R.full,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: R.full, paddingVertical: 4, paddingHorizontal: 10,
   },
-  trustPillText: {
-    fontSize: T.xs,
-    color: C.textMuted,
-    fontWeight: '500',
-  },
+  trustPillText: { fontSize: T.xs, color: C.textSec, fontWeight: '500' },
 
-  // ── Divider ─────────────────────────────────────────────────────────────
-  divider: {
-    height: 1,
-    backgroundColor: C.borderSubtle,
-    marginHorizontal: 16,
-  },
-
-  // ── Empty State ─────────────────────────────────────────────────────────
+  // Empty
   emptyCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.xxl,
-    paddingVertical: 36,
-    alignItems: 'center',
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: C.borderSubtle,
+    backgroundColor: C.surface, borderRadius: R.xl, paddingVertical: 34,
+    alignItems: 'center', marginHorizontal: 16, borderWidth: 1, borderColor: C.border,
   },
-  emptyEmoji: { fontSize: 44, marginBottom: 12 },
-  emptyTitle: { fontSize: T.base + 1, fontWeight: '700', color: C.textPrimary, marginBottom: 6 },
-  emptyDesc:  { fontSize: T.base, color: C.textMuted, textAlign: 'center', paddingHorizontal: 28, lineHeight: 18 },
+  emptyEmoji: { fontSize: 40, marginBottom: 10 },
+  emptyTitle: { fontSize: T.md, fontWeight: '700', color: C.textPrimary, marginBottom: 4 },
+  emptyDesc:  { fontSize: T.sm, color: C.textMuted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 18 },
 
-  // ── FAB ─────────────────────────────────────────────────────────────────
+  // FAB
   fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 50, height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: C.faculty,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 10,
+    position: 'absolute', bottom: 24, right: 20,
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: C.accent,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 10,
   },
 });
