@@ -16,7 +16,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Alert, Share, Platform,
+  RefreshControl, Share, Platform,
   Dimensions, Animated,
 } from 'react-native';
 
@@ -254,18 +254,8 @@ export default function StudentDashboard({ navigation }) {
   const firstName = user?.name?.split(' ')[0] || 'Student';
   const initial   = firstName.charAt(0).toUpperCase();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign out', style: 'destructive',
-          onPress: async () => { try { await logout(); } catch {} },
-        },
-      ]
-    );
+  const handleLogout = async () => {
+    try { await logout(); } catch {}
   };
 
   // Alternating subject accent — primary accent then secondary
@@ -277,11 +267,7 @@ export default function StudentDashboard({ navigation }) {
     <View style={styles.root}>
       <SafeAreaView style={styles.container} edges={['top']}>
 
-        {/* ── Status pill ── */}
-        <View style={styles.notch}>
-          <View style={styles.notchPill} />
-          <View style={styles.notchDot} />
-        </View>
+        
 
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -312,13 +298,6 @@ export default function StudentDashboard({ navigation }) {
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.iconPill} activeOpacity={0.8}>
                 <Ionicons name="notifications-outline" size={18} color={C.textSec} />
-                <View style={styles.notifDot} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.iconPill, { borderColor: C.accentBorder }]}
-                onPress={handleLogout} activeOpacity={0.8}
-              >
-                <Ionicons name="log-out-outline" size={18} color={C.accent} />
               </TouchableOpacity>
             </View>
           </View>
@@ -526,10 +505,7 @@ const styles = StyleSheet.create({
   root:      { flex: 1, backgroundColor: C.bg },
   container: { flex: 1 },
 
-  // Notch
-  notch: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 6 },
-  notchPill: { width: 46, height: 6, borderRadius: 3, backgroundColor: C.elevated },
-  notchDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent },
+  
 
   scroll: { paddingBottom: 40 },
 

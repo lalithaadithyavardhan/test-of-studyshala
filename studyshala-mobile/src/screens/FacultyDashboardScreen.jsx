@@ -317,22 +317,6 @@ export default function FacultyDashboard({ navigation }) {
   const totalSections = materials.reduce((s, m) => s + (Array.isArray(m.subFolders) ? m.subFolders.length : (m.sections || 0)), 0);
   const totalViews    = materials.reduce((s, m) => s + (m.views || m.viewCount || 0), 0);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign out', style: 'destructive',
-          onPress: async () => {
-            try { await logout(); } catch {}
-          },
-        },
-      ]
-    );
-  };
-
   const firstName = user?.name?.split(' ')[0] || 'Faculty';
   const initial   = firstName.charAt(0).toUpperCase();
 
@@ -357,12 +341,7 @@ export default function FacultyDashboard({ navigation }) {
     <View style={styles.root}>
       <SafeAreaView style={styles.container} edges={['top']}>
 
-        {/* ── Status pill ── */}
-        <View style={styles.notch}>
-          <View style={styles.notchPill} />
-          {/* Faculty notch dot uses secondary color */}
-          <View style={[styles.notchDot, { backgroundColor: C.secondary }]} />
-        </View>
+       
 
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -395,13 +374,6 @@ export default function FacultyDashboard({ navigation }) {
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.iconPill} activeOpacity={0.8}>
                 <Ionicons name="notifications-outline" size={18} color={C.textSec} />
-                <View style={styles.notifDot} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.iconPill, { borderColor: C.accentBorder }]}
-                onPress={handleLogout} activeOpacity={0.8}
-              >
-                <Ionicons name="log-out-outline" size={18} color={C.accent} />
               </TouchableOpacity>
             </View>
           </View>
@@ -596,7 +568,7 @@ export default function FacultyDashboard({ navigation }) {
         navigation={navigation}
         role="faculty"
         user={user}
-        onLogout={handleLogout}
+        onLogout={logout}
       />
     </View>
   );
@@ -609,12 +581,7 @@ const styles = StyleSheet.create({
   root:      { flex: 1, backgroundColor: C.bg },
   container: { flex: 1 },
 
-  // Notch
-  notch: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 6 },
-  notchPill: { width: 46, height: 6, borderRadius: 3, backgroundColor: C.elevated },
-  notchDot:  { width: 6, height: 6, borderRadius: 3 },
-
-  scroll: { paddingBottom: 40 },
+  
 
   // Header
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 4 },
