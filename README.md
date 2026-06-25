@@ -489,71 +489,214 @@ node scripts/get-drive-token.js
 
 ## 🗂️ Project Structure
 
-```
-studyshala/
-├── backend/
-│   ├── config/
-│   │   ├── database.js       # MongoDB connection
-│   │   └── passport.js       # Google OAuth strategy
-│   ├── controllers/
-│   │   ├── authController.js
-│   │   ├── studentController.js
-│   │   ├── facultyController.js
-│   │   └── adminController.js
-│   ├── models/
-│   │   ├── User.js           # User schema with savedMaterials & history
-│   │   ├── Folder.js         # Material schema with files array
-│   │   └── Log.js            # Audit log schema
-│   ├── routes/
-│   │   ├── authRoutes.js
-│   │   ├── studentRoutes.js
-│   │   ├── facultyRoutes.js
-│   │   └── adminRoutes.js
-│   ├── services/
-│   │   └── driveService.js   # Google Drive integration
-│   ├── middleware/
-│   │   ├── auth.js           # JWT authentication
-│   │   └── logging.js        # Audit logging
-│   ├── utils/
-│   │   ├── jwt.js
-│   │   └── logger.js         # Winston logger
-│   └── server.js             # Express app entry point
+```text
+StudyShala/
 │
-└── frontend/
-    ├── public/
-    │   └── index.html
-    ├── src/
-    │   ├── assets/
-    │   │   └── logo.svg      # StudyShala logo
-    │   ├── components/
-    │   │   ├── Sidebar.jsx
-    │   │   ├── Navbar.jsx
-    │   │   ├── Card.jsx
-    │   │   ├── Button.jsx
-    │   │   ├── Input.jsx
-    │   │   ├── Modal.jsx
-    │   │   └── ProtectedRoute.jsx
-    │   ├── context/
-    │   │   └── AuthContext.jsx
-    │   ├── pages/
-    │   │   ├── Login.jsx
-    │   │   ├── AdminLogin.jsx
-    │   │   ├── AuthCallback.jsx
-    │   │   ├── StudentEnterCode.jsx
-    │   │   ├── StudentMaterialAccess.jsx
-    │   │   ├── StudentSavedMaterials.jsx
-    │   │   ├── StudentHistory.jsx
-    │   │   ├── FacultyDashboard.jsx
-    │   │   ├── FacultyMaterials.jsx
-    │   │   └── AdminDashboard.jsx
-    │   ├── api/
-    │   │   └── axios.js
-    │   ├── styles/
-    │   │   └── global.css
-    │   └── App.jsx
-    └── package.json
+├── studyshala-backend/
+│   │
+│   ├── config/
+│   │   ├── database.js
+│   │   └── passport.js
+│   │
+│   ├── controllers/
+│   │   ├── adminController.js
+│   │   ├── authController.js
+│   │   ├── facultyController.js
+│   │   ├── feedbackController.js
+│   │   ├── mobileAuthController.js
+│   │   ├── statsController.js
+│   │   ├── storageController.js
+│   │   └── studentController.js
+│   │
+│   ├── logs/
+│   │   ├── combined.log
+│   │   └── error.log
+│   │
+│   ├── middleware/
+│   │   ├── auth.js
+│   │   └── logging.js
+│   │
+│   ├── models/
+│   │   ├── Announcement.js
+│   │   ├── Feedback.js
+│   │   ├── Folder.js
+│   │   ├── Log.js
+│   │   ├── SystemSettings.js
+│   │   ├── User.js
+│   │   └── Visit.js
+│   │
+│   ├── routes/
+│   │   ├── adminRoutes.js
+│   │   ├── announcementRoutes.js
+│   │   ├── authRoutes.js
+│   │   ├── facultyRoutes.js
+│   │   ├── feedbackRoutes.js
+│   │   ├── statsRoutes.js
+│   │   ├── storageRoutes.js
+│   │   └── studentRoutes.js
+│   │
+│   ├── scripts/
+│   │   └── seed.js
+│   │
+│   ├── services/
+│   │   ├── driveService.js
+│   │   └── watermarkService.js
+│   │
+│   ├── utils/
+│   │   ├── wt.js
+│   │   └── logger.js
+│   │
+│   ├── node_modules/
+│   │
+│   ├── .env.example
+│   ├── package-lock.json
+│   ├── package.json
+│   └── server.js
+│
+├── studyshala-mobile/
+│   │
+│   ├── .expo/
+│   ├── android/
+│   ├── assets/
+│   ├── dist/
+│   ├── node_modules/
+│   │
+│   ├── src/
+│   │   │
+│   │   ├── api/
+│   │   │   ├── authApi.js
+│   │   │   ├── client.js
+│   │   │   ├── facultyApi.js
+│   │   │   └── studentApi.js
+│   │   │
+│   │   ├── components/
+│   │   │   ├── FileListItem.jsx
+│   │   │   ├── MaterialCard.jsx
+│   │   │   ├── RoleSwitchButton.jsx
+│   │   │   ├── SidebarDrawer.jsx
+│   │   │   └── theme.js
+│   │   │
+│   │   ├── config/
+│   │   │   └── config.js
+│   │   │
+│   │   ├── configs/
+│   │   │
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   │
+│   │   ├── navigation/
+│   │   │   └── AppNavigator.jsx
+│   │   │
+│   │   ├── screens/
+│   │   │   ├── CreateMaterialScreen.jsx
+│   │   │   ├── DashboardScreen.jsx
+│   │   │   ├── EnterCodeScreen.jsx
+│   │   │   ├── FacultyDashboardScreen.jsx
+│   │   │   ├── FacultyMaterialDetailsScreen.jsx
+│   │   │   ├── FacultyMaterialsScreen.jsx
+│   │   │   ├── FILE_STRUCTURE.md
+│   │   │   ├── FileViewerScreen.jsx
+│   │   │   ├── HistoryScreen.jsx
+│   │   │   ├── LoginScreen.jsx
+│   │   │   ├── MaterialAccessScreen.jsx
+│   │   │   ├── MOBILE_APP_STRUCTURE.md
+│   │   │   ├── PROJECT_STRUCTURE.md
+│   │   │   ├── SavedMaterialsScreen.jsx
+│   │   │   ├── SplashScreen.jsx
+│   │   │   ├── StarredScreen.jsx
+│   │   │   └── UploadFilesScreen.jsx
+│   │   │
+│   │   └── utils/
+│   │       └── fileActions.js
+│   │
+│   ├── .gitignore
+│   ├── App.js
+│   ├── app.json
+│   ├── babel.config.js
+│   ├── eas.json
+│   ├── package-lock.json
+│   └── package.json
+│
+├── studyshalaFrontend/
+│   │
+│   ├── public/
+│   │   ├── _redirects
+│   │   └── manifest.json
+│   │
+│   ├── src/
+│   │   │
+│   │   ├── api/
+│   │   │   └── axios.js
+│   │   │
+│   │   ├── assets/
+│   │   │
+│   │   ├── components/
+│   │   │   ├── Button.jsx
+│   │   │   ├── Card.jsx
+│   │   │   ├── FileManager.css
+│   │   │   ├── FileManager.jsx
+│   │   │   ├── FilePreviewModal.css
+│   │   │   ├── FilePreviewModal.jsx
+│   │   │   ├── Input.jsx
+│   │   │   ├── MessageBanner.css
+│   │   │   ├── MessageBanner.jsx
+│   │   │   ├── Modal.css
+│   │   │   ├── Modal.jsx
+│   │   │   ├── Navbar.css
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── ProtectedRoute.jsx
+│   │   │   ├── Sidebar.css
+│   │   │   ├── Sidebar.jsx
+│   │   │   ├── StorageWidget.css
+│   │   │   ├── StorageWidget.jsx
+│   │   │   ├── TourTooltip.css
+│   │   │   └── TourTooltip.jsx
+│   │   │
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── AdminCoursesView.css
+│   │   │   ├── AdminCoursesView.jsx
+│   │   │   ├── AdminDashboard.css
+│   │   │   ├── AdminDashboard.jsx
+│   │   │   ├── AdminLogin.jsx
+│   │   │   ├── AuthCallback.jsx
+│   │   │   ├── BrowseMaterials.css
+│   │   │   ├── BrowseMaterials.jsx
+│   │   │   ├── FacultyDashboard.css
+│   │   │   ├── FacultyDashboard.jsx
+│   │   │   ├── FacultyMaterials.css
+│   │   │   ├── FacultyMaterials.jsx
+│   │   │   ├── Login.css
+│   │   │   ├── Login.jsx
+│   │   │   ├── LoginDev.jsx
+│   │   │   ├── StudentDashboard.css
+│   │   │   ├── StudentDashboard.jsx
+│   │   │   ├── StudentEnterCode.css
+│   │   │   ├── StudentEnterCode.jsx
+│   │   │   ├── StudentHistory.css
+│   │   │   ├── StudentHistory.jsx
+│   │   │   ├── StudentMaterialAccess.css
+│   │   │   ├── StudentMaterialAccess.jsx
+│   │   │   ├── StudentSavedMaterials.css
+│   │   │   ├── StudentSavedMaterials.jsx
+│   │   │   ├── StudentStarred.css
+│   │   │   └── StudentStarred.jsx
+│   │   │
+│   │   ├── styles/
+│   │   │   └── global.css
+│   │   │
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   │
+│   ├── .gitignore
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+│
+└── README.md
 ```
-
 ---
 
 ## 🔒 Security Features
