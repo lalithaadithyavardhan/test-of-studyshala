@@ -117,6 +117,92 @@
 - **📝 Audit Logs** — Track all system actions and user activities
 
 ---
+## 📱 StudyShala Mobile App (Under Development)
+
+StudyShala is expanding beyond the web platform with a dedicated mobile application designed to provide a seamless learning experience for students and faculty on smartphones and tablets.
+
+The mobile application is currently under active development and focuses on bringing all major StudyShala features directly to Android devices, including:
+
+### Planned Features
+
+* 🔑 Secure Student & Faculty Login
+* 📚 Material Access via Access Codes
+* 💾 Save Materials for Quick Access
+* ⭐ Star/Favorite Materials
+* 📜 Access History Tracking
+* 📂 File Preview & Downloads
+* 📤 Faculty File Uploads
+* 📊 Faculty Dashboard & Material Management
+* 🔔 Future Push Notification Support
+
+### Current Development Status
+
+* ✅ Android application development in progress
+* ✅ React Native + Expo architecture implemented
+* ✅ Authentication system integrated
+* ✅ Material access workflow implemented
+* ✅ Faculty and Student dashboards available
+* 🚧 UI/UX improvements ongoing
+* 🚧 File management enhancements ongoing
+* 🚧 Performance optimization ongoing
+* ⏳ iOS support planned for future releases
+
+### Mobile Technology Stack
+
+| Technology       | Purpose                           |
+| ---------------- | --------------------------------- |
+| React Native     | Cross-platform mobile development |
+| Expo             | Mobile app framework and tooling  |
+| React Navigation | Navigation management             |
+| Axios            | API communication                 |
+| Context API      | State management                  |
+| Node.js Backend  | Shared API layer                  |
+| MongoDB          | Shared database                   |
+
+### Mobile Application Structure
+
+The complete mobile application source code is available inside the repository:
+
+```text
+studyshala-mobile/
+```
+
+Developers can explore the source code, run the application locally, and contribute to future development.
+
+### Running the Mobile App
+
+```bash
+cd studyshala-mobile
+npm install
+npx expo start
+```
+
+Then:
+
+* Press `a` to launch on Android Emulator
+* Scan the QR code using Expo Go on a physical Android device
+* Run directly from Android Studio
+
+### Future Roadmap
+
+#### Android
+
+* Material downloads
+* Improved file previews
+* Enhanced faculty workflow
+* Offline caching
+
+#### iOS
+
+* Native iOS support
+* App Store release
+* iPhone and iPad optimization
+
+> The mobile application is being developed alongside the web platform to provide a unified StudyShala experience across desktop, web, and mobile devices.
+
+
+
+
 
 ## 🎯 How It Works
 
