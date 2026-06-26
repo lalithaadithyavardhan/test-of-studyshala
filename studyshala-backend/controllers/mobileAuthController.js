@@ -49,6 +49,9 @@ const googleMobileLogin = async (req, res) => {
         role: chosenRole,
         profilePicture: payload.picture,
         lastLogin: new Date(),
+        // Set profileCompleted to true for faculty, false for students
+        profileCompleted: chosenRole === 'faculty',
+
       });
       await user.save();
       logger.info(`New mobile user: ${email} as ${chosenRole}`);
@@ -65,6 +68,8 @@ const googleMobileLogin = async (req, res) => {
         email: user.email,
         role: user.role,
         department: user.department,
+        semester: user.semester,
+        profileCompleted: user.profileCompleted,
         profilePicture: user.profilePicture,
         tourCompleted: user.tourCompleted || false,
         phase2TourCompleted: user.phase2TourCompleted || false,

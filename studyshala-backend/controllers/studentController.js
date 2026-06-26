@@ -399,6 +399,75 @@ const getStarredFiles = async (req, res) => {
   }
 };
 
+
+
+
+// ── Complete profile (for students) ─────────────────────────────────────────────
+
+
+const completeProfile = async (req, res) => {
+  try {
+    const { department, semester } = req.body;
+    if (!department || !semester) {
+      return res.status(400).json({
+        message: "Department and semester are required",
+      });
+    }
+    req.user.department = department;
+    req.user.semester = semester;
+    req.user.profileCompleted = true;
+
+    await req.user.save();
+
+    res.json({
+      message: "Profile completed successfully",
+      user: req.user,
+    });
+  } catch (err) {
+    logger.error(`completeProfile: ${err.message}`);
+    res.status(500).json({ message: "Failed to complete profile" });
+  }
+};
+
+// ── Get profile (for students) ─────────────────────────────────────────────
+const getProfile = async (req, res) => {
+  try {
+    res.json({
+      department: req.user.department,
+      semester: req.user.semester,
+      profileCompleted: req.user.profileCompleted,
+    });
+  } catch (err) {
+    logger.error(`getProfile: ${err.message}`);
+    res.status(500).json({ message: "Failed to fetch profile" });
+  }
+};
+
+
+// ── Get materials by profile (for students) ─────────────────────────────────────────────
+const getMaterialsByProfile = async (req, res) => {
+  try {
+        if (!req.user.profileCompleted) {
+          return res.status(400).json({
+           message: "Please complete your profile first",
+          });
+        }
+    const materials = await Folder.find({
+      department: req.user.department,
+      semester: req.user.semester,
+      active: true,
+    }).sort({ createdAt: -1 });
+
+    res.json({ materials });
+  } catch (err) {
+    logger.error(`getMaterialsByProfile: ${err.message}`);
+    res.status(500).json({ message: "Failed to fetch materials" });
+  }
+};
+
+
+
+
 module.exports = {
   validateAccessCode,
   saveMaterial,
@@ -411,5 +480,9 @@ module.exports = {
   getRecentFiles,
   starFile,
   unstarFile,
-  getStarredFiles
+  getStarredFiles,
+
+  completeProfile,
+  getProfile,
+  getMaterialsByProfile
 };

@@ -31,7 +31,7 @@ const ROLES = [
   },
 ];
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
   const { login, lastRole } = useAuth();
   const [selectedRole, setSelectedRole] = useState(lastRole || null);
   const [loading, setLoading] = useState(false);
@@ -71,7 +71,22 @@ export default function LoginScreen() {
       });
       const data = await response.json();
       if (!response.ok) { Alert.alert('Sign-in failed', data.message || `Error ${response.status}`); return; }
+
+      // ── Save auth state ──
       await login(data.user, data.token);
+
+      // ── Navigate based on role + profile status ──
+      const role = data.user?.role;
+      const profileCompleted = data.user?.profileCompleted;
+
+      if (role === 'faculty') {
+        navigation.replace('Dashboard');
+      } else if (role === 'student' && profileCompleted) {
+        navigation.replace('Dashboard');
+      } else if (role === 'student' && !profileCompleted) {
+        navigation.replace('CompleteProfile');
+      }
+
     } catch (error) {
       if (error.code === statusCodes.SIGN_IN_CANCELLED) { /* silent */ }
       else if (error.code === statusCodes.IN_PROGRESS) Alert.alert('Please wait', 'Sign-in already in progress.');

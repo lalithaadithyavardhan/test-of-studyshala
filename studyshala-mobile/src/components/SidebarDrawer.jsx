@@ -14,10 +14,11 @@
  *   onLogout     {() => void}
  *   onRoleSwitch {() => void}
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Animated, Pressable, Platform, Modal,
+  ScrollView, TextInput, Linking, Alert as RNAlert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,8 +72,39 @@ export default function SidebarDrawer({
 }) {
   const translateX  = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
-  const [showLogout, setShowLogout] = useState(false);
-  const [showAbout,  setShowAbout]  = useState(false);
+  const [showLogout,   setShowLogout]   = useState(false);
+  const [showAbout,    setShowAbout]    = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [fbText,       setFbText]       = useState('');
+  const [fbSending,    setFbSending]    = useState(false);
+
+  const DEV_GITHUB = 'https://github.com/lalithaadithyavardhan';
+  const DEV_EMAIL  = 'adithyasai533@gmail.com';
+
+  const openGitHub = useCallback(() => {
+    Linking.openURL(DEV_GITHUB).catch(() =>
+      RNAlert.alert('Could not open', 'Check your internet connection and try again.')
+    );
+  }, []);
+
+  const openMail = useCallback((subject = '', body = '') => {
+    const uri = `mailto:${DEV_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    Linking.openURL(uri).catch(() =>
+      RNAlert.alert('No mail app found', 'Please email us at ' + DEV_EMAIL)
+    );
+  }, []);
+
+  const sendFeedback = useCallback(() => {
+    if (!fbText.trim()) return;
+    setFbSending(true);
+    // Small artificial delay so the spinner is visible, then open mail
+    setTimeout(() => {
+      openMail('StudyShala Feedback', fbText.trim());
+      setFbSending(false);
+      setFbText('');
+      setShowFeedback(false);
+    }, 500);
+  }, [fbText, openMail]);
 
   useEffect(() => {
     Animated.parallel([
@@ -194,7 +226,7 @@ export default function SidebarDrawer({
           <View style={s.footer}>
             <View style={s.divider} />
 
-            {/* About — visible to both faculty and student */}
+            {/* About */}
             <TouchableOpacity
               style={s.footerLink}
               onPress={() => setShowAbout(true)}
@@ -206,7 +238,19 @@ export default function SidebarDrawer({
               <Text style={s.footerLinkText}>About StudyShala</Text>
             </TouchableOpacity>
 
-            {/* Sign out — opens in-drawer confirmation instead of native Alert */}
+            {/* Feedback */}
+            <TouchableOpacity
+              style={s.footerLink}
+              onPress={() => setShowFeedback(true)}
+              activeOpacity={0.75}
+            >
+              <View style={[s.footerIconWrap, { backgroundColor: 'rgba(222,115,86,0.07)', borderColor: 'rgba(222,115,86,0.20)' }]}>
+                <Ionicons name="chatbox-ellipses-outline" size={15} color={C.accent} />
+              </View>
+              <Text style={s.footerLinkText}>Give Feedback</Text>
+            </TouchableOpacity>
+
+            {/* Sign out */}
             <TouchableOpacity
               style={s.footerLink}
               onPress={() => setShowLogout(true)}
@@ -291,112 +335,259 @@ export default function SidebarDrawer({
       >
         <Pressable style={s.aboutBackdrop} onPress={() => setShowAbout(false)}>
           <Pressable style={s.aboutCard} onPress={() => {}}>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
 
-            {/* Handle bar */}
+              {/* Handle bar */}
+              <View style={s.aboutHandle} />
+
+              {/* ── Brand ── */}
+              <View style={s.aboutBrandRow}>
+                <View style={[s.aboutBrandMark, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
+                  <Text style={s.aboutBrandMarkText}>S</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.aboutAppName}>StudyShala</Text>
+                  <Text style={s.aboutTagline}>Empowering education through seamless material sharing.</Text>
+                </View>
+              </View>
+
+              {/* Trust pills */}
+              <View style={s.aboutPillsRow}>
+                {['No ads', 'Free forever', 'Drive-backed', 'Instant access'].map((p) => (
+                  <View key={p} style={s.aboutPill}>
+                    <Ionicons name="checkmark-circle" size={11} color={C.accent} />
+                    <Text style={s.aboutPillText}>{p}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={s.aboutDivider} />
+
+              {/* ── Developer card ── */}
+              <Text style={s.aboutSectionLabel}>DEVELOPER</Text>
+              <View style={s.devCard}>
+
+                {/* Avatar + name + role */}
+                <View style={s.devTopRow}>
+                  <View style={s.devAvatar}>
+                    <Text style={s.devAvatarText}>A</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.devName}>Borra Adithya</Text>
+                    <Text style={s.devSubTitle}>Lalitha Adithya Vardhan</Text>
+                    <Text style={s.devRole}>Student · Full-stack Developer</Text>
+                  </View>
+                </View>
+
+                {/* Built with love badge */}
+                <View style={[s.devBuiltBadge, { backgroundColor: C.accentBg, borderColor: C.accentBorder, alignSelf: 'flex-start', marginBottom: 14 }]}>
+                  <Ionicons name="heart" size={11} color={C.accent} />
+                  <Text style={s.devBuiltBadgeText}>Built with love for students</Text>
+                </View>
+
+                {/* GitHub banner */}
+                <View style={s.devGithubBanner}>
+                  <View style={s.devBannerLeft}>
+                    <View style={s.devBannerIconBox}>
+                      <Ionicons name="logo-github" size={20} color={C.textPrimary} />
+                    </View>
+                    <View>
+                      <Text style={s.devBannerHandle}>lalithaadithyavardhan</Text>
+                      <Text style={s.devBannerMeta}>github.com · Open source projects</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={s.devFollowBtn} onPress={openGitHub} activeOpacity={0.8}>
+                    <Ionicons name="person-add-outline" size={13} color={C.white} />
+                    <Text style={s.devFollowBtnText}>Follow</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Follow CTA full-width */}
+                <TouchableOpacity style={s.devGithubCta} onPress={openGitHub} activeOpacity={0.8}>
+                  <Ionicons name="logo-github" size={15} color={C.textPrimary} />
+                  <Text style={s.devGithubCtaText}>View GitHub Profile</Text>
+                  <Ionicons name="arrow-forward-outline" size={14} color={C.textMuted} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+
+                {/* Email banner */}
+                <View style={[s.devGithubBanner, { borderColor: C.accentBorder, backgroundColor: C.accentBg, marginTop: 10 }]}>
+                  <View style={s.devBannerLeft}>
+                    <View style={[s.devBannerIconBox, { backgroundColor: 'rgba(222,115,86,0.15)', borderColor: C.accentBorder }]}>
+                      <Ionicons name="mail" size={18} color={C.accent} />
+                    </View>
+                    <View>
+                      <Text style={[s.devBannerHandle, { color: C.accent }]}>adithyasai533@gmail.com</Text>
+                      <Text style={s.devBannerMeta}>Direct contact · replies within 24h</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[s.devFollowBtn, s.devContactBtn]}
+                    onPress={() => openMail('Hello — StudyShala', '')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="send-outline" size={13} color={C.accent} />
+                    <Text style={[s.devFollowBtnText, { color: C.accent }]}>Mail</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Contact CTA full-width */}
+                <TouchableOpacity
+                  style={[s.devGithubCta, { borderColor: C.accentBorder, backgroundColor: 'rgba(222,115,86,0.06)', marginTop: 8 }]}
+                  onPress={() => openMail('Hello — StudyShala', '')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="mail-outline" size={15} color={C.accent} />
+                  <Text style={[s.devGithubCtaText, { color: C.accent }]}>Send a Message</Text>
+                  <Ionicons name="arrow-forward-outline" size={14} color={C.accent} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Bio */}
+              <Text style={s.aboutBio}>
+                Built StudyShala to make it easy for faculty to share study materials and for students to access them without friction — free, ad-free, always.
+              </Text>
+
+              {/* Quote */}
+              <View style={s.aboutQuoteBox}>
+                <Ionicons name="chatbubble-ellipses-outline" size={14} color={C.textMuted} style={{ marginBottom: 4 }} />
+                <Text style={s.aboutQuote}>
+                  "If it helps even one student, that's all the reward I need."
+                </Text>
+              </View>
+
+              <View style={s.aboutDivider} />
+
+              {/* What it does */}
+              <Text style={s.aboutSectionLabel}>WHAT IT DOES</Text>
+              <View style={s.aboutFeatureGrid}>
+                {[
+                  { icon: 'key-outline',          text: 'Access materials with a code' },
+                  { icon: 'cloud-upload-outline',  text: 'Upload PDFs, docs & slides' },
+                  { icon: 'share-social-outline',  text: 'Share instantly with class' },
+                  { icon: 'download-outline',      text: 'Download & save for offline' },
+                  { icon: 'bookmark-outline',      text: 'Save & star favourites' },
+                  { icon: 'time-outline',          text: 'Full access history' },
+                ].map((f) => (
+                  <View key={f.text} style={s.aboutFeatureItem}>
+                    <View style={[s.aboutFeatureIcon, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
+                      <Ionicons name={f.icon} size={13} color={C.accent} />
+                    </View>
+                    <Text style={s.aboutFeatureText}>{f.text}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={s.aboutDivider} />
+
+              {/* Footer line */}
+              <Text style={s.aboutFooterLine}>
+                © {new Date().getFullYear()} StudyShala · Built by Borra Adithya
+              </Text>
+
+              {/* Close */}
+              <TouchableOpacity
+                style={s.aboutCloseBtn}
+                onPress={() => setShowAbout(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.aboutCloseBtnText}>Close</Text>
+              </TouchableOpacity>
+
+              <View style={{ height: 8 }} />
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Feedback modal ──────────────────────────────────────────────────── */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={showFeedback}
+        onRequestClose={() => setShowFeedback(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={s.aboutBackdrop} onPress={() => setShowFeedback(false)}>
+          <Pressable style={s.aboutCard} onPress={() => {}}>
+
+            {/* Handle */}
             <View style={s.aboutHandle} />
 
-            {/* Brand */}
-            <View style={s.aboutBrandRow}>
-              <View style={[s.aboutBrandMark, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-                <Text style={s.aboutBrandMarkText}>S</Text>
-              </View>
-              <View>
-                <Text style={s.aboutAppName}>StudyShala</Text>
-                <Text style={s.aboutTagline}>Empowering education through seamless material sharing.</Text>
-              </View>
-            </View>
-
-            {/* Trust pills */}
-            <View style={s.aboutPillsRow}>
-              {['No ads', 'Free forever', 'Drive-backed', 'Instant access'].map((p) => (
-                <View key={p} style={s.aboutPill}>
-                  <Ionicons name="checkmark-circle" size={11} color={C.accent} />
-                  <Text style={s.aboutPillText}>{p}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Divider */}
-            <View style={s.aboutDivider} />
-
-            {/* Creator */}
-            <View style={s.aboutCreatorCard}>
-              <View style={s.aboutCreatorAvatar}>
-                <Text style={s.aboutCreatorAvatarText}>A</Text>
+            {/* Header */}
+            <View style={s.fbHeaderRow}>
+              <View style={[s.fbIconBox, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
+                <Ionicons name="chatbox-ellipses" size={20} color={C.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.aboutCreatorName}>Borra Adithya</Text>
-                <Text style={s.aboutCreatorMeta}>Student · Developer</Text>
+                <Text style={s.fbTitle}>Give Feedback</Text>
+                <Text style={s.fbSub}>Your thoughts help make StudyShala better</Text>
               </View>
-              <View style={[s.aboutBuiltBadge, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-                <Ionicons name="heart" size={10} color={C.accent} />
-                <Text style={s.aboutBuiltBadgeText}>Built with love</Text>
-              </View>
-            </View>
-
-            {/* Bio */}
-            <Text style={s.aboutBio}>
-              Built StudyShala to make it easy for faculty to share study materials and for students to access them without friction — free, ad-free, always.
-            </Text>
-
-            {/* Quote */}
-            <View style={s.aboutQuoteBox}>
-              <Ionicons name="chatbubble-ellipses-outline" size={14} color={C.textMuted} style={{ marginBottom: 4 }} />
-              <Text style={s.aboutQuote}>
-                "If it helps even one student, that's all the reward I need."
-              </Text>
             </View>
 
             <View style={s.aboutDivider} />
 
-            {/* What it does */}
-            <Text style={s.aboutSectionLabel}>WHAT IT DOES</Text>
-            <View style={s.aboutFeatureGrid}>
-              {[
-                { icon: 'key-outline',         text: 'Access materials with a code' },
-                { icon: 'cloud-upload-outline', text: 'Upload PDFs, docs & slides' },
-                { icon: 'share-social-outline', text: 'Share instantly with class' },
-                { icon: 'download-outline',     text: 'Download & save for offline' },
-                { icon: 'bookmark-outline',     text: 'Save & star favourites' },
-                { icon: 'time-outline',         text: 'Full access history' },
-              ].map((f) => (
-                <View key={f.text} style={s.aboutFeatureItem}>
-                  <View style={[s.aboutFeatureIcon, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-                    <Ionicons name={f.icon} size={13} color={C.accent} />
-                  </View>
-                  <Text style={s.aboutFeatureText}>{f.text}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={s.aboutDivider} />
-
-            {/* Links */}
-            <View style={s.aboutLinksRow}>
-              <View style={s.aboutLink}>
-                <Ionicons name="logo-github" size={14} color={C.textSec} />
-                <Text style={s.aboutLinkText}>lalithaadithyavardhan</Text>
-              </View>
-              <View style={s.aboutLink}>
-                <Ionicons name="mail-outline" size={14} color={C.textSec} />
-                <Text style={s.aboutLinkText}>adithyasai533@gmail.com</Text>
-              </View>
-            </View>
-
-            {/* Footer line */}
-            <Text style={s.aboutFooterLine}>
-              © {new Date().getFullYear()} StudyShala · Built by Borra Adithya
-            </Text>
-
-            {/* Close */}
-            <TouchableOpacity
-              style={s.aboutCloseBtn}
-              onPress={() => setShowAbout(false)}
-              activeOpacity={0.8}
+            {/* Quick-pick chips */}
+            <Text style={s.fbChipLabel}>What's this about?</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.fbChipRow}
             >
-              <Text style={s.aboutCloseBtnText}>Close</Text>
-            </TouchableOpacity>
+              {['Bug report', 'Feature request', 'UI/UX', 'Performance', 'Other'].map((chip) => (
+                <TouchableOpacity
+                  key={chip}
+                  style={s.fbChip}
+                  onPress={() => setFbText((t) => t ? t : chip + ': ')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.fbChipText}>{chip}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
 
+            {/* Text area */}
+            <TextInput
+              style={s.fbInput}
+              placeholder="Describe your feedback…"
+              placeholderTextColor={C.textMuted}
+              value={fbText}
+              onChangeText={setFbText}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              returnKeyType="default"
+            />
+
+            {/* Recipient note */}
+            <View style={s.fbRecipientRow}>
+              <Ionicons name="mail-outline" size={12} color={C.textMuted} />
+              <Text style={s.fbRecipientText}>Sends to adithyasai533@gmail.com</Text>
+            </View>
+
+            {/* Action buttons */}
+            <View style={s.fbBtnRow}>
+              <TouchableOpacity
+                style={[s.fbBtn, s.fbBtnCancel]}
+                onPress={() => { setShowFeedback(false); setFbText(''); }}
+                activeOpacity={0.8}
+              >
+                <Text style={s.fbBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.fbBtn, s.fbBtnSend, (!fbText.trim() || fbSending) && s.fbBtnDisabled]}
+                onPress={sendFeedback}
+                disabled={!fbText.trim() || fbSending}
+                activeOpacity={0.8}
+              >
+                {fbSending
+                  ? <Ionicons name="hourglass-outline" size={14} color={C.white} />
+                  : <Ionicons name="send" size={14} color={C.white} />
+                }
+                <Text style={s.fbBtnSendText}>{fbSending ? 'Opening…' : 'Send feedback'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 8 }} />
           </Pressable>
         </Pressable>
       </Modal>
@@ -785,4 +976,238 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   aboutCloseBtnText: { fontSize: T.base, fontWeight: '600', color: C.textSec },
+
+  // ── Dev card ──────────────────────────────────────────────────────────────
+  devCard: {
+    backgroundColor: C.elevated,
+    borderRadius: R.lg,
+    borderWidth: 1, borderColor: C.border,
+    padding: 14,
+    marginBottom: 14,
+  },
+  devTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    marginBottom: 10,
+  },
+  devAvatar: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: C.accent,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+    borderWidth: 2, borderColor: C.accentBorder,
+  },
+  devAvatarText: { fontSize: T.xl, fontWeight: '800', color: C.white },
+  devName: {
+    fontSize: T.lg,
+    fontWeight: '800',
+    color: C.textPrimary,
+    letterSpacing: -0.3,
+  },
+  devSubTitle: {
+    fontSize: T.sm,
+    fontWeight: '600',
+    color: C.accent,
+    marginTop: 1,
+  },
+  devRole: {
+    fontSize: T.xs,
+    fontWeight: '500',
+    color: C.textMuted,
+    marginTop: 3,
+  },
+  devBuiltBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: R.full,
+    paddingVertical: 4, paddingHorizontal: 10,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  devBuiltBadgeText: { fontSize: T.xs, fontWeight: '700', color: C.accent },
+
+  // GitHub / Email banners
+  devGithubBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    borderWidth: 1, borderColor: C.border,
+    padding: 11,
+    marginBottom: 6,
+  },
+  devBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  devBannerIconBox: {
+    width: 36, height: 36, borderRadius: R.sm,
+    backgroundColor: C.elevated,
+    borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  devBannerHandle: {
+    fontSize: T.sm,
+    fontWeight: '700',
+    color: C.textPrimary,
+  },
+  devBannerMeta: {
+    fontSize: T.xs,
+    color: C.textMuted,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  devFollowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: C.textPrimary,
+    borderRadius: R.full,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flexShrink: 0,
+  },
+  devFollowBtnText: {
+    fontSize: T.xs,
+    fontWeight: '700',
+    color: C.bg,
+  },
+  devContactBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: C.accentBorder,
+  },
+
+  // Full-width CTA rows
+  devGithubCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: C.surface,
+    borderRadius: R.md,
+    borderWidth: 1, borderColor: C.border,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    marginBottom: 2,
+  },
+  devGithubCtaText: {
+    fontSize: T.base,
+    fontWeight: '600',
+    color: C.textSec,
+    flex: 1,
+  },
+
+  // ── Feedback modal ────────────────────────────────────────────────────────
+  fbHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18,
+  },
+  fbIconBox: {
+    width: 44, height: 44,
+    borderRadius: R.md,
+    borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  fbTitle: {
+    fontSize: T.lg,
+    fontWeight: '800',
+    color: C.textPrimary,
+    letterSpacing: -0.3,
+  },
+  fbSub: {
+    fontSize: T.xs,
+    color: C.textMuted,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  fbChipLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    color: C.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  fbChipRow: {
+    flexDirection: 'row',
+    gap: 7,
+    paddingBottom: 14,
+  },
+  fbChip: {
+    backgroundColor: C.elevated,
+    borderRadius: R.full,
+    paddingVertical: 6,
+    paddingHorizontal: 13,
+    borderWidth: 1, borderColor: C.border,
+  },
+  fbChipText: {
+    fontSize: T.xs,
+    fontWeight: '600',
+    color: C.textSec,
+  },
+  fbInput: {
+    backgroundColor: C.elevated,
+    borderRadius: R.md,
+    borderWidth: 1, borderColor: C.border,
+    padding: 13,
+    fontSize: T.base,
+    color: C.textPrimary,
+    minHeight: 110,
+    marginBottom: 10,
+  },
+  fbRecipientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 16,
+  },
+  fbRecipientText: {
+    fontSize: T.xs,
+    color: C.textMuted,
+    fontWeight: '500',
+  },
+  fbBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  fbBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 13,
+    borderRadius: R.md,
+    borderWidth: 1,
+  },
+  fbBtnCancel: {
+    backgroundColor: C.elevated,
+    borderColor: C.border,
+    flex: 0.4,
+  },
+  fbBtnCancelText: {
+    fontSize: T.base,
+    fontWeight: '600',
+    color: C.textSec,
+  },
+  fbBtnSend: {
+    backgroundColor: C.accent,
+    borderColor: 'transparent',
+  },
+  fbBtnSendText: {
+    fontSize: T.base,
+    fontWeight: '700',
+    color: C.white,
+  },
+  fbBtnDisabled: {
+    opacity: 0.45,
+  },
 });

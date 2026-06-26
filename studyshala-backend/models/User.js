@@ -45,7 +45,11 @@ const userSchema = new mongoose.Schema({
   departmentCode: String,  // legacy - current active code
 
   token:               { type: String, default: null },
-
+  // new change for profile completion tracking
+  profileCompleted: {
+  type: Boolean,
+  default: false,
+  },
   
   // Student-specific fields
   savedMaterials: [savedMaterialSchema],

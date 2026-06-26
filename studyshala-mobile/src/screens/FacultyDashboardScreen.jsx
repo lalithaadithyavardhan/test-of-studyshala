@@ -198,16 +198,18 @@ const AccessCodeBox = ({ code }) => {
 
   return (
     <View style={styles.codeBox}>
-      <Text style={styles.codeLabel}>Student access code</Text>
+      <Text style={styles.codeLabel}>🔑 Student access code</Text>
       <View style={styles.codeRow}>
-        <Text style={styles.codeValue}>{code}</Text>
+        <View style={styles.codeValueWrap}>
+          <Text style={styles.codeValue}>{code}</Text>
+        </View>
         <View style={styles.codeActions}>
           <TouchableOpacity style={styles.codeBtn} onPress={handleCopy} activeOpacity={0.8}>
-            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={11} color={copied ? C.success : C.textSec} />
+            <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={12} color={copied ? C.success : C.textSec} />
             <Text style={[styles.codeBtnText, copied && { color: C.success }]}>{copied ? 'Copied!' : 'Copy'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.codeBtn, styles.codeBtnWa]} onPress={handleShare} activeOpacity={0.8}>
-            <Ionicons name="logo-whatsapp" size={11} color={C.whatsapp} />
+            <Ionicons name="logo-whatsapp" size={12} color={C.whatsapp} />
             <Text style={[styles.codeBtnText, { color: C.whatsapp }]}>Share</Text>
           </TouchableOpacity>
         </View>
@@ -438,7 +440,18 @@ export default function FacultyDashboard({ navigation }) {
 
           {/* ── Your materials ── */}
           <Section delay={250}>
-            <SectionLabel>Your materials</SectionLabel>
+            {/* Section header row: label + "See all" button */}
+            <View style={styles.sectionRow}>
+              <Text style={[styles.sectionLabel, { paddingHorizontal: 0, marginBottom: 0, marginTop: 0 }]}>Recent materials</Text>
+              <TouchableOpacity
+                style={styles.seeAllBtn}
+                onPress={() => navigation.navigate('FacultyMaterials')}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.seeAllText}>See all</Text>
+                <Ionicons name="arrow-forward" size={13} color={C.accent} />
+              </TouchableOpacity>
+            </View>
 
             {materials.length === 0 ? (
               <View style={styles.emptyCard}>
@@ -447,91 +460,112 @@ export default function FacultyDashboard({ navigation }) {
                 <Text style={styles.emptyDesc}>Create your first material above to start sharing with students.</Text>
               </View>
             ) : (
-              materials.map((m, idx) => {
-                const acc = matAccent(m.colorIdx ?? idx);
-                const fileCount    = Array.isArray(m.files)      ? m.files.length      : (m.fileCount || m.files || 0);
-                const sectionCount = Array.isArray(m.subFolders) ? m.subFolders.length : (m.sections || 0);
-                const viewCount    = m.views || m.viewCount || 0;
+              <>
+                {/* Show only the 2 most recently created */}
+                {[...materials]
+                  .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                  .slice(0, 2)
+                  .map((m, idx) => {
+                    const acc = matAccent(m.colorIdx ?? idx);
+                    const fileCount    = Array.isArray(m.files)      ? m.files.length      : (m.fileCount || m.files || 0);
+                    const sectionCount = Array.isArray(m.subFolders) ? m.subFolders.length : (m.sections || 0);
+                    const viewCount    = m.views || m.viewCount || 0;
 
-                return (
-                  <View key={m._id} style={styles.materialCard}>
-                    {/* Top accent line */}
-                    <View style={[styles.materialTopLine, { backgroundColor: acc.color }]} />
+                    return (
+                      <View key={m._id} style={styles.materialCard}>
+                        {/* Top accent line */}
+                        <View style={[styles.materialTopLine, { backgroundColor: acc.color }]} />
 
-                    {/* Card header — tap to open folder */}
-                    <TouchableOpacity
-                      style={styles.materialRow}
-                      onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m })}
-                      activeOpacity={0.75}
-                    >
-                      <View style={[styles.materialIcon, { backgroundColor: acc.bg, borderColor: acc.border }]}>
-                        <Ionicons name={SUBJECT_ICONS[(m.colorIdx || 0) % SUBJECT_ICONS.length]} size={17} color={acc.color} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.materialTitle} numberOfLines={1}>{m.subjectName}</Text>
-                        <View style={[styles.semBadge, { backgroundColor: acc.bg, borderColor: acc.border }]}>
-                          <Text style={[styles.semBadgeText, { color: acc.color }]}>{m.semester}</Text>
+                        {/* Card header — tap to open folder */}
+                        <TouchableOpacity
+                          style={styles.materialRow}
+                          onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m })}
+                          activeOpacity={0.75}
+                        >
+                          <View style={[styles.materialIcon, { backgroundColor: acc.bg, borderColor: acc.border }]}>
+                            <Ionicons name={SUBJECT_ICONS[(m.colorIdx || 0) % SUBJECT_ICONS.length]} size={17} color={acc.color} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.materialTitle} numberOfLines={1}>{m.subjectName}</Text>
+                            <View style={[styles.semBadge, { backgroundColor: acc.bg, borderColor: acc.border }]}>
+                              <Text style={[styles.semBadgeText, { color: acc.color }]}>{m.semester}</Text>
+                            </View>
+                          </View>
+                          <Ionicons name="chevron-forward" size={15} color={C.textMuted} style={{ marginTop: 2 }} />
+                        </TouchableOpacity>
+
+                        {/* Meta */}
+                        <View style={styles.metaRow}>
+                          <View style={styles.metaItem}>
+                            <Ionicons name="document-outline" size={10} color={C.textMuted} />
+                            <Text style={styles.metaText}>Files <Text style={styles.metaVal}>{fileCount}</Text></Text>
+                          </View>
+                          <View style={styles.metaItem}>
+                            <Ionicons name="layers-outline" size={10} color={C.textMuted} />
+                            <Text style={styles.metaText}>Sections <Text style={styles.metaVal}>{sectionCount}</Text></Text>
+                          </View>
+                          <View style={styles.metaItem}>
+                            <Ionicons name="eye-outline" size={10} color={C.textMuted} />
+                            <Text style={styles.metaText}>Views <Text style={styles.metaVal}>{viewCount}</Text></Text>
+                          </View>
+                        </View>
+
+                        {/* Access code */}
+                       {/* <AccessCodeBox code={m.code} />*/}
+                        <AccessCodeBox code={m.accessCode} />
+                        
+                        {/* Action buttons */}
+                        <View style={styles.actionRow}>
+                          <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m })}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="folder-open-outline" size={13} color={C.accent} />
+                            <Text style={[styles.actionBtnText, { color: C.accent }]}>View</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={() => navigation.navigate('UploadFiles', { material: m })}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="cloud-upload-outline" size={13} color={C.textSec} />
+                            <Text style={styles.actionBtnText}>Upload</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m, openMessage: true })}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="megaphone-outline" size={13} color={C.textSec} />
+                            <Text style={styles.actionBtnText}>Announce</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, styles.actionBtnDanger]}
+                            onPress={() => handleDelete(m)}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="trash-outline" size={13} color={C.error} />
+                          </TouchableOpacity>
                         </View>
                       </View>
-                      <Ionicons name="chevron-forward" size={15} color={C.textMuted} style={{ marginTop: 2 }} />
-                    </TouchableOpacity>
+                    );
+                  })
+                }
 
-                    {/* Meta */}
-                    <View style={styles.metaRow}>
-                      <View style={styles.metaItem}>
-                        <Ionicons name="document-outline" size={10} color={C.textMuted} />
-                        <Text style={styles.metaText}>Files <Text style={styles.metaVal}>{fileCount}</Text></Text>
-                      </View>
-                      <View style={styles.metaItem}>
-                        <Ionicons name="layers-outline" size={10} color={C.textMuted} />
-                        <Text style={styles.metaText}>Sections <Text style={styles.metaVal}>{sectionCount}</Text></Text>
-                      </View>
-                      <View style={styles.metaItem}>
-                        <Ionicons name="eye-outline" size={10} color={C.textMuted} />
-                        <Text style={styles.metaText}>Views <Text style={styles.metaVal}>{viewCount}</Text></Text>
-                      </View>
-                    </View>
-
-                    {/* Access code */}
-                    <AccessCodeBox code={m.code} />
-
-                    {/* Action buttons */}
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m })}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="folder-open-outline" size={13} color={C.accent} />
-                        <Text style={[styles.actionBtnText, { color: C.accent }]}>View</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => navigation.navigate('UploadFiles', { material: m })}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="cloud-upload-outline" size={13} color={C.textSec} />
-                        <Text style={styles.actionBtnText}>Upload</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => navigation.navigate('FacultyMaterialDetail', { material: m, openMessage: true })}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="megaphone-outline" size={13} color={C.textSec} />
-                        <Text style={styles.actionBtnText}>Announce</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.actionBtnDanger]}
-                        onPress={() => handleDelete(m)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="trash-outline" size={13} color={C.error} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })
+                {/* "View all materials" footer row — shown whenever there are any materials */}
+                <TouchableOpacity
+                  style={styles.viewAllRow}
+                  onPress={() => navigation.navigate('FacultyMaterials')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="folder-open-outline" size={14} color={C.accent} />
+                  <Text style={styles.viewAllText}>
+                    View all {materials.length} material{materials.length !== 1 ? 's' : ''}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={14} color={C.accent} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+              </>
             )}
           </Section>
 
@@ -619,6 +653,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, marginBottom: 9, marginTop: 4,
   },
 
+  // Section header row (label + "See all" side by side)
+  sectionRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16, marginBottom: 9, marginTop: 4,
+  },
+  seeAllBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingVertical: 3, paddingHorizontal: 9,
+    backgroundColor: C.accentBg, borderRadius: R.full,
+    borderWidth: 1, borderColor: C.accentBorder,
+  },
+  seeAllText: { fontSize: T.xs, fontWeight: '700', color: C.accent },
+
+  // "View all N materials" footer row below the 2 cards
+  viewAllRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 16, marginBottom: 12,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+    borderRadius: R.md, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  viewAllText: { fontSize: T.sm, fontWeight: '600', color: C.accent },
+
   // Hero card
   heroCard: {
     marginHorizontal: 16, marginBottom: 12,
@@ -688,23 +745,32 @@ const styles = StyleSheet.create({
 
   // Access code box
   codeBox: {
-    backgroundColor: C.elevated, borderWidth: 1.5, borderColor: C.accentBorder,
-    borderRadius: R.sm, padding: 11, marginBottom: 10,
+    backgroundColor: 'rgba(222,115,86,0.08)', borderWidth: 1.5, borderColor: C.accentBorder,
+    borderRadius: R.md, padding: 12, marginBottom: 10,
   },
-  codeLabel:   { fontSize: T.xs - 1, color: C.textSec, marginBottom: 6, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.08 },
-  codeRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  codeLabel: {
+    fontSize: T.xs - 1, color: C.accent, marginBottom: 8, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 0.8,
+  },
+  codeRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  codeValueWrap: {
+    flex: 1,
+    backgroundColor: C.bg, borderRadius: R.sm,
+    borderWidth: 1, borderColor: C.accentBorder,
+    paddingVertical: 8, paddingHorizontal: 12,
+  },
   codeValue: {
-    fontSize: 17, fontWeight: '800', color: C.accent, letterSpacing: 4,
+    fontSize: 18, fontWeight: '800', color: C.accent, letterSpacing: 5,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   codeActions: { flexDirection: 'row', gap: 6 },
   codeBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
-    borderRadius: R.xs, paddingVertical: 4, paddingHorizontal: 9,
+    backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
+    borderRadius: R.xs, paddingVertical: 6, paddingHorizontal: 10,
   },
-  codeBtnWa:   { borderColor: 'rgba(37,211,102,0.3)', backgroundColor: 'rgba(37,211,102,0.05)' },
-  codeBtnText: { fontSize: T.xs, color: C.textSec, fontWeight: '500' },
+  codeBtnWa:   { borderColor: 'rgba(37,211,102,0.3)', backgroundColor: 'rgba(37,211,102,0.07)' },
+  codeBtnText: { fontSize: T.xs, color: C.textSec, fontWeight: '600' },
 
   // Action buttons
   actionRow: { flexDirection: 'row', gap: 7 },

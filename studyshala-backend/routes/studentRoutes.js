@@ -24,4 +24,13 @@ router.post('/starred-files',         studentController.starFile);
 router.delete('/starred-files/:fileId', studentController.unstarFile);
 router.get('/starred-files',          studentController.getStarredFiles);
 
+
+// Student Profile
+router.post('/profile', studentController.completeProfile);
+router.get('/profile', studentController.getProfile);
+
+// Auto Materials
+router.get('/materials', studentController.getMaterialsByProfile);
+
+
 module.exports = router;

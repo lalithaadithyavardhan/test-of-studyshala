@@ -30,7 +30,10 @@ try {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { getRecentFiles } from '../api/studentApi';
+import {
+    getRecentFiles,
+    getMaterialsByProfile
+} from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
 import SidebarDrawer from '../components/SidebarDrawer';
 import { API_BASE_URL } from '../config/config';
@@ -209,24 +212,25 @@ export default function StudentDashboard({ navigation }) {
   const [sidebarOpen,    setSidebarOpen]    = useState(false);
   const [platformStats,  setPlatformStats]  = useState(null);
 
-  const [subjects, setSubjects] = useState([
-    {
-      _id: '1', subjectName: 'Data Structures & Algorithms',
-      facultyName: 'Dr. Sharma', code: 'A3F9K2BX',
-      department: 'CSE', semester: 'Sem 4', files: 14, iconIdx: 0,
-    },
-    {
-      _id: '2', subjectName: 'Operating Systems',
-      facultyName: 'Dr. Rao', code: 'BX71QP2Z',
-      department: 'CSE', semester: 'Sem 4', files: 9, iconIdx: 1,
-    },
-  ]);
+
+//   const [subjects, setSubjects] = useState([]);  // This line is already present in the code
+
+
+  const [subjects, setSubjects] = useState([]);
 
   const loadRecent = useCallback(async () => {
     try {
       const { data } = await getRecentFiles();
       setRecentFiles(data.recentFiles || []);
     } catch {}
+  }, []);
+  const loadMaterials = useCallback(async () => {
+    try {
+      const { data } = await getMaterialsByProfile();
+      setSubjects(data.materials || []);
+    }   catch (error) {
+          console.log(error);
+        }
   }, []);
 
   const loadStats = useCallback(async () => {
@@ -236,11 +240,19 @@ export default function StudentDashboard({ navigation }) {
     } catch {}
   }, []);
 
-  useEffect(() => { loadRecent(); loadStats(); }, [loadRecent, loadStats]);
+  useEffect(() => {
+    loadRecent();
+    loadStats();
+    loadMaterials();
+}, [loadRecent, loadStats, loadMaterials]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadRecent(), loadStats()]);
+    await Promise.all([
+     loadRecent(),
+     loadStats(),
+     loadMaterials()
+    ]);
     setRefreshing(false);
   };
 
@@ -291,7 +303,7 @@ export default function StudentDashboard({ navigation }) {
             <View style={styles.nameBlock}>
               <Text style={styles.headerName}>{firstName}</Text>
               <Text style={styles.headerSub}>
-                {user?.department || 'CSE'} · {user?.semester ? `Sem ${user.semester}` : 'Student'}
+                {user?.department || 'Not Selected'} · {user?.semester ? `Sem ${user.semester}` : 'Student'}
               </Text>
             </View>
 
@@ -341,86 +353,168 @@ export default function StudentDashboard({ navigation }) {
           </Section>
 
           {/* ── Your subjects ── */}
-          <Section delay={150}>
-            <SectionLabel>Your subjects</SectionLabel>
+<Section delay={150}>
+  <SectionLabel>Your subjects</SectionLabel>
 
-            {subjects.map((subj, idx) => {
-              const acc = subjectAccent(idx);
-              return (
-                <TouchableOpacity
-                  key={subj._id}
-                  style={styles.subjectCard}
-                  onPress={() => navigation.navigate('MaterialAccess', { material: subj })}
-                  activeOpacity={0.85}
-                >
-                  {/* Top accent line */}
-                  <View style={[styles.subjectTopLine, { backgroundColor: acc.color }]} />
+  {subjects.length === 0 ? (
+    <View style={styles.emptyCard}>
+      <Text style={styles.emptyTitle}>
+        No materials available
+      </Text>
 
-                  <View style={styles.subjectRow}>
-                    <View style={[styles.subjectIcon, { backgroundColor: acc.bg, borderColor: acc.border }]}>
-                      <Ionicons name={SUBJECT_ICONS[idx % SUBJECT_ICONS.length]} size={17} color={acc.color} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.subjectName} numberOfLines={1}>{subj.subjectName}</Text>
-                      <View style={[styles.semBadge, { backgroundColor: acc.bg, borderColor: acc.border }]}>
-                        <Text style={[styles.semBadgeText, { color: acc.color }]}>{subj.semester}</Text>
-                      </View>
-                    </View>
-                  </View>
+      <Text style={styles.emptyDesc}>
+        Your faculty hasn't uploaded any materials yet.
+      </Text>
+    </View>
+  ) : (
+    subjects.map((subj, idx) => {
+      const acc = subjectAccent(idx);
 
-                  <View style={styles.metaRow}>
-                    <View style={styles.metaItem}>
-                      <Ionicons name="person-outline" size={10} color={C.textMuted} />
-                      <Text style={styles.metaText}>Faculty <Text style={styles.metaVal}>{subj.facultyName}</Text></Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Ionicons name="documents-outline" size={10} color={C.textMuted} />
-                      <Text style={styles.metaText}>Files <Text style={styles.metaVal}>{subj.files}</Text></Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Ionicons name="business-outline" size={10} color={C.textMuted} />
-                      <Text style={styles.metaText}>Dept <Text style={styles.metaVal}>{subj.department}</Text></Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <Ionicons name="key-outline" size={10} color={C.textMuted} />
-                      <Text style={styles.metaText}>Code <Text style={styles.metaVal}>{subj.code}</Text></Text>
-                    </View>
-                  </View>
+      return (
+        <TouchableOpacity
+          key={subj._id}
+          style={styles.subjectCard}
+          onPress={() => navigation.navigate('MaterialAccess', { material: subj })}
+          activeOpacity={0.85}
+        >
+          {/* Top accent line */}
+          <View
+            style={[
+              styles.subjectTopLine,
+              { backgroundColor: acc.color },
+            ]}
+          />
 
-                  <TouchableOpacity
-                    style={[styles.subjectBtn, { backgroundColor: acc.color }]}
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate('MaterialAccess', { material: subj })}
-                  >
-                    <Ionicons name="folder-open-outline" size={13} color={C.white} />
-                    <Text style={styles.subjectBtnText}>Browse files</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            })}
-          </Section>
-
-          {/* ── Workspace ── */}
-          <Section delay={200}>
-            <SectionLabel>Workspace</SectionLabel>
-            <View style={styles.wsGrid}>
-              {WORKSPACE.map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={styles.wsCard}
-                  onPress={() => navigation.navigate(item.key)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.wsAccentLine} />
-                  <View style={styles.wsIcon}>
-                    <Ionicons name={item.icon} size={16} color={C.accent} />
-                  </View>
-                  <Text style={styles.wsName}>{item.label}</Text>
-                  <Text style={styles.wsCount}>{item.count}</Text>
-                </TouchableOpacity>
-              ))}
+          <View style={styles.subjectRow}>
+            <View
+              style={[
+                styles.subjectIcon,
+                {
+                  backgroundColor: acc.bg,
+                  borderColor: acc.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name={SUBJECT_ICONS[idx % SUBJECT_ICONS.length]}
+                size={17}
+                color={acc.color}
+              />
             </View>
-          </Section>
+
+            <View style={{ flex: 1 }}>
+              <Text
+                style={styles.subjectName}
+                numberOfLines={1}
+              >
+                {subj.subjectName}
+              </Text>
+
+              <View
+                style={[
+                  styles.semBadge,
+                  {
+                    backgroundColor: acc.bg,
+                    borderColor: acc.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.semBadgeText,
+                    { color: acc.color },
+                  ]}
+                >
+                  {subj.semester}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Ionicons
+                name="person-outline"
+                size={10}
+                color={C.textMuted}
+              />
+              <Text style={styles.metaText}>
+                Faculty{' '}
+                <Text style={styles.metaVal}>
+                  {subj.facultyName}
+                </Text>
+              </Text>
+            </View>
+
+            <View style={styles.metaItem}>
+              <Ionicons
+                name="documents-outline"
+                size={10}
+                color={C.textMuted}
+              />
+              <Text style={styles.metaText}>
+                Files{' '}
+                <Text style={styles.metaVal}>
+                  {subj.files}
+                </Text>
+              </Text>
+            </View>
+
+            <View style={styles.metaItem}>
+              <Ionicons
+                name="business-outline"
+                size={10}
+                color={C.textMuted}
+              />
+              <Text style={styles.metaText}>
+                Dept{' '}
+                <Text style={styles.metaVal}>
+                  {subj.department}
+                </Text>
+              </Text>
+            </View>
+
+            <View style={styles.metaItem}>
+              <Ionicons
+                name="key-outline"
+                size={10}
+                color={C.textMuted}
+              />
+              <Text style={styles.metaText}>
+                Code{' '}
+                <Text style={styles.metaVal}>
+                  {subj.code}
+                </Text>
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.subjectBtn,
+              { backgroundColor: acc.color },
+            ]}
+            activeOpacity={0.8}
+            onPress={() =>
+              navigation.navigate('MaterialAccess', {
+                material: subj,
+              })
+            }
+          >
+            <Ionicons
+              name="folder-open-outline"
+              size={13}
+              color={C.white}
+            />
+            <Text style={styles.subjectBtnText}>
+              Browse files
+            </Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      );
+    })
+  )}
+</Section>
 
           {/* ── How it works ── */}
           <Section delay={250}>

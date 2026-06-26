@@ -12,6 +12,8 @@ import { useAuth } from '../context/AuthContext';
 
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
+import CompleteProfileScreen from '../screens/Completeprofilescreen';
+
 
 // Student screens
 import DashboardScreen from '../screens/DashboardScreen';
@@ -40,7 +42,11 @@ function StudentRoot() {
         name="Dashboard"
         component={DashboardScreen}
       />
-
+      <StudentStack.Screen
+        name="CompleteProfile"
+        component={CompleteProfileScreen}
+      />
+      
       <StudentStack.Screen
         name="EnterCode"
         component={EnterCodeScreen}
@@ -139,12 +145,17 @@ export default function AppNavigator() {
             name="FacultyRoot"
             component={FacultyRoot}
           />
+        ) : !user?.profileCompleted ? (
+          <RootStack.Screen
+            name="CompleteProfile"
+            component={CompleteProfileScreen}
+          />
         ) : (
           <RootStack.Screen
             name="StudentRoot"
             component={StudentRoot}
           />
-        )}
+      )}
       </RootStack.Navigator>
     </NavigationContainer>
   );

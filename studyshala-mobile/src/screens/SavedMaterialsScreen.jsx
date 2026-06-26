@@ -3,12 +3,13 @@
  * Warm dark theme matching StudentDashboard
  *   bg #13120f · surface #1e1c19 · accent #DE7356
  *
- * Features added:
+ * Features:
  *  - Back button  (goBack)
  *  - Sidebar open button
  *  - Search bar  (filters by subjectName client-side)
  *  - Sort pills  (Latest first / Oldest first / Name A–Z)
  *  - Item count badge
+ *  - File-card style material cards (matching reference screenshot)
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -19,7 +20,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MaterialCard from '../components/MaterialCard';
 import SidebarDrawer from '../components/SidebarDrawer';
 import { getSavedMaterials, removeSavedMaterial, getMaterialFiles } from '../api/studentApi';
 import { useAuth } from '../context/AuthContext';
@@ -33,34 +33,215 @@ const C = {
   border:       '#2e2c28',
   borderSub:    '#2a2724',
   accent:       '#DE7356',
-  accentBg:     'rgba(222,115,86,0.09)',
-  accentBorder: 'rgba(222,115,86,0.25)',
+  accentBg:     'rgba(222,115,86,0.12)',
+  accentBorder: 'rgba(222,115,86,0.28)',
   textPrimary:  '#e8e4de',
   textSec:      '#b1ada1',
   textMuted:    '#6b6760',
   white:        '#ffffff',
-  success:      '#4ade80',
 };
-const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 16, full: 999 };
+const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 16, xxl: 20, full: 999 };
 const T = { xs: 10, sm: 12, base: 13, md: 14, lg: 16, xl: 18 };
 
+// ─── Subject icon map — warm theme colors only ────────────────────────────────
+const SUBJECT_ICONS = {
+  default:   { icon: 'book-outline',       bg: 'rgba(222,115,86,0.14)',  color: '#DE7356' },
+  cs:        { icon: 'code-slash-outline', bg: 'rgba(222,115,86,0.10)',  color: '#C4623F' },
+  math:      { icon: 'calculator-outline', bg: 'rgba(177,173,161,0.12)', color: '#B1ADA1' },
+  physics:   { icon: 'planet-outline',     bg: 'rgba(177,173,161,0.10)', color: '#9a9690' },
+  chemistry: { icon: 'flask-outline',      bg: 'rgba(222,115,86,0.12)',  color: '#c86a4a' },
+  bio:       { icon: 'leaf-outline',       bg: 'rgba(177,173,161,0.10)', color: '#B1ADA1' },
+  english:   { icon: 'language-outline',   bg: 'rgba(222,115,86,0.14)',  color: '#DE7356' },
+  history:   { icon: 'time-outline',       bg: 'rgba(177,173,161,0.12)', color: '#9a9690' },
+};
+
+function getSubjectStyle(name = '') {
+  const n = name.toLowerCase();
+  if (n.includes('data') || n.includes('algorithm') || n.includes('program') || n.includes('operating') || n.includes('network') || n.includes('software') || n.includes('computer') || n.includes('web') || n.includes('database') || n.includes('cloud')) return SUBJECT_ICONS.cs;
+  if (n.includes('math') || n.includes('calculus') || n.includes('algebra') || n.includes('statistic')) return SUBJECT_ICONS.math;
+  if (n.includes('physics') || n.includes('mechanic') || n.includes('electro')) return SUBJECT_ICONS.physics;
+  if (n.includes('chem')) return SUBJECT_ICONS.chemistry;
+  if (n.includes('bio') || n.includes('life')) return SUBJECT_ICONS.bio;
+  if (n.includes('english') || n.includes('communication') || n.includes('language')) return SUBJECT_ICONS.english;
+  if (n.includes('history') || n.includes('social')) return SUBJECT_ICONS.history;
+  return SUBJECT_ICONS.default;
+}
+
+// ─── Material Card ────────────────────────────────────────────────────────────
+function MaterialCard({ material, onPress, onRemove }) {
+  const subStyle = getSubjectStyle(material.subjectName);
+
+  const meta = [
+    material.facultyName  && { icon: 'person-outline',   label: 'Faculty', value: material.facultyName },
+    material.fileCount !== undefined && { icon: 'document-outline', label: 'Files', value: String(material.fileCount ?? material.files?.length ?? 0) },
+    material.department   && { icon: 'business-outline', label: 'Dept',    value: material.department },
+    material.accessCode   && { icon: 'key-outline',       label: 'Code',    value: material.accessCode },
+  ].filter(Boolean);
+
+  return (
+    <View style={card.root}>
+      {/* ── Top: icon + title + sem + remove ── */}
+      <View style={card.top}>
+        <View style={[card.iconBox, { backgroundColor: subStyle.bg }]}>
+          <Ionicons name={subStyle.icon} size={20} color={subStyle.color} />
+        </View>
+
+        <View style={card.titleBlock}>
+          <Text style={card.subjectName} numberOfLines={1}>{material.subjectName || 'Untitled'}</Text>
+          {material.semester != null && (
+            <View style={card.semPill}>
+              <Text style={card.semPillText}>Sem {material.semester}</Text>
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity style={card.removeBtn} onPress={() => onRemove(material)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="bookmark" size={15} color={C.accent} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Meta row ── */}
+      {meta.length > 0 && (
+        <View style={card.metaRow}>
+          {meta.map((m, i) => (
+            <View key={i} style={card.metaItem}>
+              <Ionicons name={m.icon} size={11} color={C.textMuted} />
+              <Text style={card.metaLabel}>{m.label} </Text>
+              <Text style={card.metaValue}>{m.value}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* ── Browse files button ── */}
+      <TouchableOpacity style={card.browseBtn} onPress={() => onPress(material)} activeOpacity={0.82}>
+        <Ionicons name="folder-open-outline" size={14} color={C.white} />
+        <Text style={card.browseBtnText}>Browse files</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const card = StyleSheet.create({
+  root: {
+    backgroundColor: C.surface,
+    borderRadius: R.xl,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    paddingBottom: 10,
+    gap: 10,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: R.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  titleBlock: {
+    flex: 1,
+    gap: 5,
+  },
+  subjectName: {
+    fontSize: T.md,
+    fontWeight: '700',
+    color: C.textPrimary,
+  },
+  semPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: C.elevated,
+    borderRadius: R.full,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  semPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.textSec,
+  },
+  removeBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: R.xs,
+    backgroundColor: C.accentBg,
+    borderWidth: 1,
+    borderColor: C.accentBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+
+  // Meta
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  metaLabel: {
+    fontSize: 11,
+    color: C.textMuted,
+  },
+  metaValue: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.textSec,
+  },
+
+  // Browse button
+  browseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    paddingVertical: 10,
+    borderRadius: R.lg,
+    backgroundColor: C.accent,
+  },
+  browseBtnText: {
+    fontSize: T.sm,
+    fontWeight: '700',
+    color: C.white,
+    letterSpacing: 0.2,
+  },
+});
+
+// ─── Sort config ──────────────────────────────────────────────────────────────
 const SORTS = [
-  { key: 'latest', label: 'Latest first', icon: 'time-outline'     },
-  { key: 'oldest', label: 'Oldest first', icon: 'hourglass-outline' },
-  { key: 'name',   label: 'Name A–Z',     icon: 'text-outline'      },
+  { key: 'latest', label: 'Latest first', icon: 'time-outline'      },
+  { key: 'oldest', label: 'Oldest first', icon: 'hourglass-outline'  },
+  { key: 'name',   label: 'Name A–Z',     icon: 'text-outline'       },
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function SavedMaterialsScreen({ navigation }) {
-  const { user, logout }            = useAuth();
-  const [materials, setMaterials]   = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { user, logout }              = useAuth();
+  const [materials, setMaterials]     = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
-  const [sort, setSort]             = useState('latest');
-  const searchRef = useRef(null);
+  const [sort, setSort]               = useState('latest');
+  const searchRef  = useRef(null);
   const searchAnim = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
@@ -142,14 +323,12 @@ export default function SavedMaterialsScreen({ navigation }) {
     <View style={s.root}>
       <SafeAreaView style={s.safe} edges={['top']}>
 
-        {/* ── Top header ── */}
+        {/* ── Header (unchanged) ── */}
         <View style={s.header}>
-          {/* Back */}
           <TouchableOpacity style={s.iconBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={18} color={C.textSec} />
           </TouchableOpacity>
 
-          {/* Title + count */}
           <View style={s.headerMid}>
             <View style={s.headerIconBox}>
               <Ionicons name="bookmark" size={16} color={C.accent} />
@@ -160,7 +339,6 @@ export default function SavedMaterialsScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Right actions */}
           <View style={s.headerRight}>
             <TouchableOpacity style={s.iconBtn} onPress={toggleSearch}>
               <Ionicons name={searchVisible ? 'close' : 'search-outline'} size={18} color={C.textSec} />
@@ -171,7 +349,7 @@ export default function SavedMaterialsScreen({ navigation }) {
           </View>
         </View>
 
-        {/* ── Search bar (animated) ── */}
+        {/* ── Search bar ── */}
         {searchVisible && (
           <Animated.View style={[s.searchWrap, { opacity: searchAnim }]}>
             <Ionicons name="search-outline" size={15} color={C.textMuted} />
@@ -202,11 +380,7 @@ export default function SavedMaterialsScreen({ navigation }) {
               onPress={() => setSort(opt.key)}
               activeOpacity={0.8}
             >
-              <Ionicons
-                name={opt.icon}
-                size={12}
-                color={sort === opt.key ? C.white : C.textMuted}
-              />
+              <Ionicons name={opt.icon} size={12} color={sort === opt.key ? C.white : C.textMuted} />
               <Text style={[s.sortPillText, sort === opt.key && s.sortPillTextActive]}>
                 {opt.label}
               </Text>
@@ -225,7 +399,11 @@ export default function SavedMaterialsScreen({ navigation }) {
           }
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <MaterialCard material={item} onPress={handleOpen} onRemove={handleRemove} dark />
+            <MaterialCard
+              material={item}
+              onPress={handleOpen}
+              onRemove={handleRemove}
+            />
           )}
           ListEmptyComponent={
             <View style={s.emptyCard}>
@@ -255,13 +433,13 @@ export default function SavedMaterialsScreen({ navigation }) {
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Screen Styles ────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
-  safe: { flex: 1 },
+  root:   { flex: 1, backgroundColor: C.bg },
+  safe:   { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
 
-  // Header
+  // Header (unchanged)
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 10,
@@ -273,15 +451,15 @@ const s = StyleSheet.create({
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerMid: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerMid:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerIconBox: {
     width: 34, height: 34, borderRadius: R.sm,
     backgroundColor: C.accentBg, borderWidth: 1, borderColor: C.accentBorder,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: T.md, fontWeight: '700', color: C.textPrimary },
-  headerSub:   { fontSize: T.xs, color: C.textMuted, marginTop: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerTitle:  { fontSize: T.md, fontWeight: '700', color: C.textPrimary },
+  headerSub:    { fontSize: T.xs, color: C.textMuted, marginTop: 1 },
+  headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   // Search
   searchWrap: {
@@ -298,20 +476,20 @@ const s = StyleSheet.create({
     gap: 6, paddingHorizontal: 14, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: C.borderSub,
   },
-  sortLabel: { fontSize: T.xs, color: C.textMuted, fontWeight: '500', marginRight: 2 },
+  sortLabel:         { fontSize: T.xs, color: C.textMuted, fontWeight: '500', marginRight: 2 },
   sortPill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingVertical: 5, paddingHorizontal: 11,
     borderRadius: R.full, backgroundColor: C.surface,
     borderWidth: 1, borderColor: C.border,
   },
-  sortPillActive: { backgroundColor: C.elevated, borderColor: C.accent + '60' },
-  sortPillText:   { fontSize: T.xs, color: C.textMuted, fontWeight: '500' },
-  sortPillTextActive: { color: C.textPrimary, fontWeight: '700' },
-  countBadge: { marginLeft: 'auto', fontSize: T.xs, color: C.textMuted, fontWeight: '500' },
+  sortPillActive:    { backgroundColor: C.elevated, borderColor: C.accent + '60' },
+  sortPillText:      { fontSize: T.xs, color: C.textMuted, fontWeight: '500' },
+  sortPillTextActive:{ color: C.textPrimary, fontWeight: '700' },
+  countBadge:        { marginLeft: 'auto', fontSize: T.xs, color: C.textMuted, fontWeight: '500' },
 
   // List
-  listContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 40, flexGrow: 1 },
+  listContent: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 40, flexGrow: 1 },
 
   // Empty
   emptyCard: {

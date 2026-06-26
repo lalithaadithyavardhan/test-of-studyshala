@@ -96,6 +96,18 @@ export const AuthProvider = ({ children }) => {
       return next;
     });
   }, []);
+  
+  const completeProfile = useCallback(async (department, semester) => {
+    updateUser({
+     department,
+     semester,
+     profileCompleted: true,
+    });
+  }, [updateUser]);
+
+
+
+
 
   // switchRole('faculty' | 'student') — Option A: re-authenticate the SAME
   // Google account against the mobile login endpoint with a different role.
@@ -140,16 +152,17 @@ export const AuthProvider = ({ children }) => {
   }, [login]);
 
   const value = {
-    user,
-    token,
-    loading,
-    lastRole,
-    switchingRole,
-    isAuthenticated: !!token && !!user,
-    login,
-    logout,
-    updateUser,
-    switchRole,
+   user,
+   token,
+   loading,
+   lastRole,
+   switchingRole,
+   isAuthenticated: !!token && !!user,
+   login,
+   logout,
+   updateUser,
+   completeProfile,
+   switchRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

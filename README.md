@@ -5,6 +5,7 @@
 ![Express.js](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Google Drive API](https://img.shields.io/badge/Google_Drive_API-4285F4?style=for-the-badge&logo=google-drive&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 **StudyShala** is a modern, cloud-based study material management platform that connects faculty and students seamlessly. Faculty can upload and share educational resources, while students can access, save, and download materials using unique access codes — all without ever needing to interact directly with Google Drive.
 
@@ -207,7 +208,7 @@
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/studyshala.git
+git clone https://github.com/lalithaadithyavardhan/test-of-studyshala.git
 cd studyshala
 ```
 
