@@ -406,6 +406,8 @@ const getStarredFiles = async (req, res) => {
 
 
 const completeProfile = async (req, res) => {
+  
+  console.log("✅ completeProfile API called");
   try {
     const { department, semester } = req.body;
     if (!department || !semester) {

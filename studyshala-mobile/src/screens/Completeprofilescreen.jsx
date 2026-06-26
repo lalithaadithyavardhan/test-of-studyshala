@@ -7,8 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/config';
 
-const BRANCHES = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AIDS', 'AIML'];
-const SEMESTERS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+const departments = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT'];
+const semesters   = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
 export default function CompleteProfileScreen({ navigation }) {
   const { token, updateUser } = useAuth();
@@ -28,7 +28,7 @@ export default function CompleteProfileScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/student/complete-profile`, {
+      const response = await fetch(`${API_BASE_URL}/api/student/profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,12 +36,12 @@ export default function CompleteProfileScreen({ navigation }) {
         },
         body: JSON.stringify({
           name: name.trim(),
-          branch,
+          department: branch,
           semester,
           section: section.trim() || null,
           rollNumber: rollNumber.trim() || null,
-        }),
-      });
+          }),
+        });
 
       const data = await response.json();
 
@@ -52,7 +52,16 @@ export default function CompleteProfileScreen({ navigation }) {
 
       // Update user in AuthContext so profileCompleted = true
       // This triggers AppNavigator to auto-switch to StudentRoot
-      if (updateUser) updateUser({ profileCompleted: true, name, branch, semester });
+      updateUser({
+    profileCompleted: true,
+    name,
+    department: branch,
+    semester,
+});
+Alert.alert(
+    "Success",
+    "Profile completed successfully!"
+);
 
     } catch (error) {
       Alert.alert('Error', error.message || 'Something went wrong.');
@@ -68,18 +77,19 @@ export default function CompleteProfileScreen({ navigation }) {
         <Text style={s.title}>Complete Your Profile</Text>
 
         {/* Name */}
-        <Text style={s.label}>Name *</Text>
         <TextInput
-          style={s.input}
-          placeholder="Enter your name"
-          value={name}
-          onChangeText={setName}
-        />
+    style={s.input}
+    placeholder="Enter your name"
+    placeholderTextColor="#999"
+    autoCapitalize="words"
+    value={name}
+    onChangeText={setName}
+/>
 
         {/* Branch */}
         <Text style={s.label}>Branch *</Text>
         <View style={s.optionRow}>
-          {BRANCHES.map((b) => (
+          {departments.map((b) => (
             <TouchableOpacity
               key={b}
               style={[s.chip, branch === b && s.chipActive]}
@@ -93,7 +103,7 @@ export default function CompleteProfileScreen({ navigation }) {
         {/* Semester */}
         <Text style={s.label}>Semester *</Text>
         <View style={s.optionRow}>
-          {SEMESTERS.map((sem) => (
+          {semesters.map((sem) => (
             <TouchableOpacity
               key={sem}
               style={[s.chip, semester === sem && s.chipActive]}
@@ -107,6 +117,7 @@ export default function CompleteProfileScreen({ navigation }) {
         {/* Section (Optional) */}
         <Text style={s.label}>Section (Optional)</Text>
         <TextInput
+    placeholderTextColor="#999"
           style={s.input}
           placeholder="e.g. A, B, C"
           value={section}
@@ -114,13 +125,14 @@ export default function CompleteProfileScreen({ navigation }) {
         />
 
         {/* Roll Number (Optional) */}
-        <Text style={s.label}>Roll Number (Optional)</Text>
-        <TextInput
-          style={s.input}
-          placeholder="e.g. 21CS001"
-          value={rollNumber}
-          onChangeText={setRollNumber}
-        />
+       <TextInput
+    style={s.input}
+    placeholder="e.g. 21CS001"
+    placeholderTextColor="#999"
+    autoCapitalize="characters"
+    value={rollNumber}
+    onChangeText={setRollNumber}
+/>
 
         {/* Submit */}
         <TouchableOpacity style={s.btn} onPress={handleSubmit} disabled={loading}>
