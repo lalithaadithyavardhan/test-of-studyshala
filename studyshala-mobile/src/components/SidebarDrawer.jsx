@@ -68,15 +68,39 @@ const FACULTY_LINKS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function SidebarDrawer({
-  visible, onClose, navigation, role = 'student', user, onLogout, onRoleSwitch,
+  visible, onClose, navigation, role = 'student', user, onLogout, onRoleSwitch, onProfileSave,
 }) {
   const translateX  = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const [showLogout,   setShowLogout]   = useState(false);
   const [showAbout,    setShowAbout]    = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showProfile,  setShowProfile]  = useState(false);
   const [fbText,       setFbText]       = useState('');
   const [fbSending,    setFbSending]    = useState(false);
+
+  // Editable profile fields (student only)
+  const [editName,     setEditName]     = useState('');
+  const [editBranch,   setEditBranch]   = useState('');
+  const [editSem,      setEditSem]      = useState('');
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  const openProfileEdit = useCallback(() => {
+    setEditName(user?.name   || '');
+    setEditBranch(user?.department || '');
+    setEditSem(user?.semester ? String(user.semester) : '');
+    setProfileSaved(false);
+    setShowProfile(true);
+  }, [user]);
+
+  const saveProfile = useCallback(() => {
+    // Persist locally — caller can wire onProfileSave prop to push to backend
+    setProfileSaved(true);
+    setTimeout(() => {
+      setShowProfile(false);
+      setProfileSaved(false);
+    }, 900);
+  }, []);
 
   const DEV_GITHUB = 'https://github.com/lalithaadithyavardhan';
   const DEV_EMAIL  = 'adithyasai533@gmail.com';
@@ -167,7 +191,11 @@ export default function SidebarDrawer({
           </View>
 
           {/* ── User identity card ────────────────────────────────────────── */}
-          <View style={[s.userCard, { borderColor: roleBorder, backgroundColor: roleBg }]}>
+          <TouchableOpacity
+            style={[s.userCard, { borderColor: roleBorder, backgroundColor: roleBg }]}
+            onPress={role === 'student' ? openProfileEdit : undefined}
+            activeOpacity={role === 'student' ? 0.75 : 1}
+          >
             <View style={[s.userAvatar, { backgroundColor: roleColor }]}>
               <Text style={s.userAvatarText}>{initial}</Text>
             </View>
@@ -177,9 +205,18 @@ export default function SidebarDrawer({
                 {user?.department || (role === 'faculty' ? 'CSE' : 'Student')}
                 {role === 'faculty' ? ' · Instructor' : user?.semester ? ` · Sem ${user.semester}` : ''}
               </Text>
+              {role === 'student' && (
+                <Text style={s.userEditHint}>Tap to edit profile</Text>
+              )}
             </View>
-            <View style={s.onlineDot} />
-          </View>
+            {role === 'student' ? (
+              <View style={s.userEditIcon}>
+                <Ionicons name="create-outline" size={14} color={roleColor} />
+              </View>
+            ) : (
+              <View style={s.onlineDot} />
+            )}
+          </TouchableOpacity>
 
           {/* ── Nav links ─────────────────────────────────────────────────── */}
           <View style={s.nav}>
@@ -277,6 +314,98 @@ export default function SidebarDrawer({
         </SafeAreaView>
       </Animated.View>
 
+      {/* ── Student Profile Edit modal ─────────────────────────────────────── */}
+      <Modal
+        transparent
+        animationType="slide"
+        visible={showProfile}
+        onRequestClose={() => setShowProfile(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={s.aboutBackdrop} onPress={() => setShowProfile(false)}>
+          <Pressable style={s.aboutCard} onPress={() => {}}>
+            <View style={s.aboutHandle} />
+
+            {/* Header */}
+            <View style={s.fbHeaderRow}>
+              <View style={[s.fbIconBox, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
+                <Ionicons name="person-circle-outline" size={22} color={C.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.fbTitle}>Student Profile</Text>
+                <Text style={s.fbSub}>Edit your credentials anytime</Text>
+              </View>
+            </View>
+
+            <View style={s.aboutDivider} />
+
+            {/* Name field */}
+            <Text style={s.profileFieldLabel}>Full Name</Text>
+            <TextInput
+              style={s.profileInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Your full name"
+              placeholderTextColor={C.textMuted}
+              returnKeyType="next"
+            />
+
+            {/* Branch field */}
+            <Text style={s.profileFieldLabel}>Branch / Department</Text>
+            <TextInput
+              style={s.profileInput}
+              value={editBranch}
+              onChangeText={setEditBranch}
+              placeholder="e.g. Computer Science & Engineering"
+              placeholderTextColor={C.textMuted}
+              returnKeyType="next"
+            />
+
+            {/* Semester field */}
+            <Text style={s.profileFieldLabel}>Semester</Text>
+            <TextInput
+              style={s.profileInput}
+              value={editSem}
+              onChangeText={setEditSem}
+              placeholder="e.g. 4"
+              placeholderTextColor={C.textMuted}
+              keyboardType="number-pad"
+              returnKeyType="done"
+            />
+
+            <View style={{ height: 6 }} />
+
+            {/* Action buttons */}
+            <View style={s.fbBtnRow}>
+              <TouchableOpacity
+                style={[s.fbBtn, s.fbBtnCancel]}
+                onPress={() => setShowProfile(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.fbBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.fbBtn, s.fbBtnSend, profileSaved && { backgroundColor: C.success, borderColor: 'transparent' }]}
+                onPress={() => {
+                  onProfileSave?.({ name: editName, department: editBranch, semester: editSem });
+                  saveProfile();
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={profileSaved ? 'checkmark-circle' : 'save-outline'}
+                  size={15}
+                  color={C.white}
+                />
+                <Text style={s.fbBtnSendText}>{profileSaved ? 'Saved!' : 'Save Changes'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 10 }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ── Sign-out confirmation modal ─────────────────────────────────────── */}
       <Modal
         transparent
@@ -347,126 +476,25 @@ export default function SidebarDrawer({
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.aboutAppName}>StudyShala</Text>
-                  <Text style={s.aboutTagline}>Empowering education through seamless material sharing.</Text>
+                  <Text style={s.aboutTagline}>A material-sharing platform for students & faculty.</Text>
                 </View>
               </View>
 
-              {/* Trust pills */}
-              <View style={s.aboutPillsRow}>
-                {['No ads', 'Free forever', 'Drive-backed', 'Instant access'].map((p) => (
-                  <View key={p} style={s.aboutPill}>
-                    <Ionicons name="checkmark-circle" size={11} color={C.accent} />
-                    <Text style={s.aboutPillText}>{p}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={s.aboutDivider} />
-
-              {/* ── Developer card ── */}
-              <Text style={s.aboutSectionLabel}>DEVELOPER</Text>
-              <View style={s.devCard}>
-
-                {/* Avatar + name + role */}
-                <View style={s.devTopRow}>
-                  <View style={s.devAvatar}>
-                    <Text style={s.devAvatarText}>A</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.devName}>Borra Adithya</Text>
-                    <Text style={s.devSubTitle}>Lalitha Adithya Vardhan</Text>
-                    <Text style={s.devRole}>Student · Full-stack Developer</Text>
-                  </View>
-                </View>
-
-                {/* Built with love badge */}
-                <View style={[s.devBuiltBadge, { backgroundColor: C.accentBg, borderColor: C.accentBorder, alignSelf: 'flex-start', marginBottom: 14 }]}>
-                  <Ionicons name="heart" size={11} color={C.accent} />
-                  <Text style={s.devBuiltBadgeText}>Built with love for students</Text>
-                </View>
-
-                {/* GitHub banner */}
-                <View style={s.devGithubBanner}>
-                  <View style={s.devBannerLeft}>
-                    <View style={s.devBannerIconBox}>
-                      <Ionicons name="logo-github" size={20} color={C.textPrimary} />
-                    </View>
-                    <View>
-                      <Text style={s.devBannerHandle}>lalithaadithyavardhan</Text>
-                      <Text style={s.devBannerMeta}>github.com · Open source projects</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity style={s.devFollowBtn} onPress={openGitHub} activeOpacity={0.8}>
-                    <Ionicons name="person-add-outline" size={13} color={C.white} />
-                    <Text style={s.devFollowBtnText}>Follow</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Follow CTA full-width */}
-                <TouchableOpacity style={s.devGithubCta} onPress={openGitHub} activeOpacity={0.8}>
-                  <Ionicons name="logo-github" size={15} color={C.textPrimary} />
-                  <Text style={s.devGithubCtaText}>View GitHub Profile</Text>
-                  <Ionicons name="arrow-forward-outline" size={14} color={C.textMuted} style={{ marginLeft: 'auto' }} />
-                </TouchableOpacity>
-
-                {/* Email banner */}
-                <View style={[s.devGithubBanner, { borderColor: C.accentBorder, backgroundColor: C.accentBg, marginTop: 10 }]}>
-                  <View style={s.devBannerLeft}>
-                    <View style={[s.devBannerIconBox, { backgroundColor: 'rgba(222,115,86,0.15)', borderColor: C.accentBorder }]}>
-                      <Ionicons name="mail" size={18} color={C.accent} />
-                    </View>
-                    <View>
-                      <Text style={[s.devBannerHandle, { color: C.accent }]}>adithyasai533@gmail.com</Text>
-                      <Text style={s.devBannerMeta}>Direct contact · replies within 24h</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={[s.devFollowBtn, s.devContactBtn]}
-                    onPress={() => openMail('Hello — StudyShala', '')}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="send-outline" size={13} color={C.accent} />
-                    <Text style={[s.devFollowBtnText, { color: C.accent }]}>Mail</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Contact CTA full-width */}
-                <TouchableOpacity
-                  style={[s.devGithubCta, { borderColor: C.accentBorder, backgroundColor: 'rgba(222,115,86,0.06)', marginTop: 8 }]}
-                  onPress={() => openMail('Hello — StudyShala', '')}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="mail-outline" size={15} color={C.accent} />
-                  <Text style={[s.devGithubCtaText, { color: C.accent }]}>Send a Message</Text>
-                  <Ionicons name="arrow-forward-outline" size={14} color={C.accent} style={{ marginLeft: 'auto' }} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Bio */}
+              {/* What it is / how it helps */}
               <Text style={s.aboutBio}>
-                Built StudyShala to make it easy for faculty to share study materials and for students to access them without friction — free, ad-free, always.
+                StudyShala lets faculty upload study materials — PDFs, slides, docs — and share them with students via a simple access code. Students can save, star, and revisit materials anytime, making it easy to stay organised without chasing WhatsApp groups or emails.
               </Text>
 
-              {/* Quote */}
-              <View style={s.aboutQuoteBox}>
-                <Ionicons name="chatbubble-ellipses-outline" size={14} color={C.textMuted} style={{ marginBottom: 4 }} />
-                <Text style={s.aboutQuote}>
-                  "If it helps even one student, that's all the reward I need."
-                </Text>
-              </View>
-
               <View style={s.aboutDivider} />
 
-              {/* What it does */}
-              <Text style={s.aboutSectionLabel}>WHAT IT DOES</Text>
+              {/* ── Tech stack ── */}
+              <Text style={s.aboutSectionLabel}>BUILT WITH</Text>
               <View style={s.aboutFeatureGrid}>
                 {[
-                  { icon: 'key-outline',          text: 'Access materials with a code' },
-                  { icon: 'cloud-upload-outline',  text: 'Upload PDFs, docs & slides' },
-                  { icon: 'share-social-outline',  text: 'Share instantly with class' },
-                  { icon: 'download-outline',      text: 'Download & save for offline' },
-                  { icon: 'bookmark-outline',      text: 'Save & star favourites' },
-                  { icon: 'time-outline',          text: 'Full access history' },
+                  { icon: 'logo-react',          text: 'React Native + Expo' },
+                  { icon: 'server-outline',       text: 'Node.js / Express backend' },
+                  { icon: 'cloud-outline',        text: 'Google Drive API for storage' },
+                  { icon: 'flame-outline',        text: 'Firebase Authentication' },
                 ].map((f) => (
                   <View key={f.text} style={s.aboutFeatureItem}>
                     <View style={[s.aboutFeatureIcon, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
@@ -478,6 +506,71 @@ export default function SidebarDrawer({
               </View>
 
               <View style={s.aboutDivider} />
+
+              {/* ── Developer card ── */}
+              <Text style={s.aboutSectionLabel}>DEVELOPER</Text>
+              <View style={s.devCard}>
+
+                {/* Avatar + name */}
+                <View style={s.devTopRow}>
+                  <View style={s.devAvatar}>
+                    <Text style={s.devAvatarText}>A</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.devName}>Borra Adithya</Text>
+                    <Text style={s.devSubTitle}>lalithaadithyavardhan</Text>
+                    <Text style={s.devRole}>Student · Full-stack Developer</Text>
+                  </View>
+                </View>
+
+                {/* GitHub banner — Follow + Open */}
+                <View style={s.devGithubBanner}>
+                  <View style={s.devBannerLeft}>
+                    <View style={s.devBannerIconBox}>
+                      <Ionicons name="logo-github" size={20} color={C.textPrimary} />
+                    </View>
+                    <View>
+                      <Text style={s.devBannerHandle}>lalithaadithyavardhan</Text>
+                      <Text style={s.devBannerMeta}>github.com</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <TouchableOpacity style={s.devFollowBtn} onPress={openGitHub} activeOpacity={0.8}>
+                      <Ionicons name="person-add-outline" size={12} color={C.bg} />
+                      <Text style={s.devFollowBtnText}>Follow</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.devFollowBtn, { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border }]}
+                      onPress={openGitHub}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="open-outline" size={12} color={C.textPrimary} />
+                      <Text style={[s.devFollowBtnText, { color: C.textPrimary }]}>Open</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Email / Contact banner */}
+                <View style={[s.devGithubBanner, { borderColor: C.accentBorder, backgroundColor: C.accentBg, marginTop: 8 }]}>
+                  <View style={s.devBannerLeft}>
+                    <View style={[s.devBannerIconBox, { backgroundColor: 'rgba(222,115,86,0.15)', borderColor: C.accentBorder }]}>
+                      <Ionicons name="mail" size={18} color={C.accent} />
+                    </View>
+                    <View>
+                      <Text style={[s.devBannerHandle, { color: C.accent }]}>adithyasai533</Text>
+                      <Text style={s.devBannerMeta}>@gmail.com</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[s.devFollowBtn, s.devContactBtn]}
+                    onPress={() => openMail('Hello — StudyShala', '')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="mail-outline" size={12} color={C.accent} />
+                    <Text style={[s.devFollowBtnText, { color: C.accent }]}>Contact</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               {/* Footer line */}
               <Text style={s.aboutFooterLine}>
@@ -670,6 +763,37 @@ const s = StyleSheet.create({
   userAvatarText: { fontSize: T.base, fontWeight: '700', color: C.white },
   userName:       { fontSize: T.base, fontWeight: '700', color: C.textPrimary },
   userRole:       { fontSize: T.xs,   fontWeight: '600', marginTop: 2 },
+  userEditHint: {
+    fontSize: 9, color: C.textMuted, fontWeight: '500', marginTop: 2,
+  },
+  userEditIcon: {
+    width: 26, height: 26, borderRadius: R.xs,
+    backgroundColor: C.elevated,
+    borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+
+  // ── Profile edit fields ───────────────────────────────────────────────────
+  profileFieldLabel: {
+    fontSize: T.xs,
+    fontWeight: '700',
+    color: C.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  profileInput: {
+    backgroundColor: C.elevated,
+    borderRadius: R.md,
+    borderWidth: 1, borderColor: C.border,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    fontSize: T.base,
+    color: C.textPrimary,
+  },
+
   onlineDot: {
     position: 'absolute', top: 10, right: 10,
     width: 8, height: 8, borderRadius: 4,

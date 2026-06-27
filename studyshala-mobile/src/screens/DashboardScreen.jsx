@@ -455,7 +455,7 @@ export default function StudentDashboard({ navigation }) {
               <Text style={styles.metaText}>
                 Files{' '}
                 <Text style={styles.metaVal}>
-                  {subj.files}
+                  {subj.files?.length || 0}
                 </Text>
               </Text>
             </View>

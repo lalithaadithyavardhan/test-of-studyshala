@@ -35,3 +35,15 @@ export const starFile = (payload) => api.post('/student/starred-files', payload)
 export const unstarFile = (fileId) => api.delete(`/student/starred-files/${fileId}`);
 
 export const getStarredFiles = () => api.get('/student/starred-files');
+
+// Student Profile
+export const completeProfile = (data) =>
+  api.post('/student/profile', data);
+
+export const getProfile = () =>
+  api.get('/student/profile');
+
+// Auto Materials
+export const getMaterialsByProfile = () =>
+  api.get('/student/materials');
+

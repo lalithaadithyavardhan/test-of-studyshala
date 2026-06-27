@@ -190,9 +190,25 @@ const getMaterialFiles = async (req, res) => {
     const folder = await Folder.findOne({ _id: id, active: true });
     if (!folder) return res.status(404).json({ message: 'Material not found' });
 
-    const hasAccess =
-      req.user.savedMaterials.some(m => m.materialId.toString() === id) ||
-      req.user.accessHistory.some(h => h.materialId.toString() === id);
+    const profileMatch =
+  req.user.profileCompleted &&
+  req.user.department === folder.department &&
+  req.user.semester === folder.semester;
+
+const hasCodeAccess =
+  req.user.accessHistory.some(
+    h => h.materialId.toString() === id
+  );
+
+const isSaved =
+  req.user.savedMaterials.some(
+    m => m.materialId.toString() === id
+  );
+
+const hasAccess =
+  profileMatch ||
+  hasCodeAccess ||
+  isSaved;
 
     if (!hasAccess) return res.status(403).json({ message: 'Access denied. Enter the access code first.' });
 
