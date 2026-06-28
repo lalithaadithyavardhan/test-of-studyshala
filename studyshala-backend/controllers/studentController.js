@@ -449,9 +449,15 @@ const getMaterialVersion = async (req, res) => {
       updatedAt: folder.updatedAt,
       files
     });
+  } catch (err) {
+    logger.error(`getMaterialVersion: ${err.message}`);
+    res.status(500).json({ message: 'Failed to get version info' });
+  }
+};
 
 
-    module.exports = {
+
+module.exports = {
   validateAccessCode,
   saveMaterial,
   getSavedMaterials,
@@ -465,9 +471,4 @@ const getMaterialVersion = async (req, res) => {
   unstarFile,
   getStarredFiles,
   getMaterialVersion
-};
-  } catch (err) {
-    logger.error(`getMaterialVersion: ${err.message}`);
-    res.status(500).json({ message: 'Failed to get version info' });
-  }
 };
