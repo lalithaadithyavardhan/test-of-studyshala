@@ -1,0 +1,223 @@
+/* ══════════════════════════════════════════════════════════════
+   TOUR TOOLTIP v2 — always stays within viewport
+   ══════════════════════════════════════════════════════════════ */
+
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.tour-root--visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.tour-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  transition: clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.tour-highlight {
+  position: fixed;
+  border-radius: 10px;
+  border: 2.5px solid rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  transition:
+    top    0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    left   0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    width  0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: tourPulse 2s ease-in-out infinite;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12);
+}
+@keyframes tourPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255,255,255,0.12); }
+  50%       { box-shadow: 0 0 0 7px rgba(255,255,255,0.22), 0 0 32px rgba(255,255,255,0.15); }
+}
+
+/* ── Tooltip card ── */
+.tour-tooltip {
+  position: fixed;
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.125rem 1.25rem 1rem;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.30),
+    0 4px 16px rgba(0, 0, 0, 0.14);
+  z-index: 100000;
+  pointer-events: all;
+  transition:
+    top    0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    left   0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  max-height: 90vh;
+  overflow-y: auto;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+}
+body.dark-mode .tour-tooltip {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.tour-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.625rem;
+}
+.tour-step-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+}
+body.dark-mode .tour-step-badge { background: #334155; color: #94a3b8; }
+
+.tour-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.tour-close:hover { color: #475569; background: #f1f5f9; }
+body.dark-mode .tour-close:hover { color: #e2e8f0; background: #334155; }
+
+.tour-emoji {
+  font-size: 1.6rem;
+  margin-bottom: 0.4rem;
+  line-height: 1;
+}
+.tour-title {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 0.975rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.35rem;
+  line-height: 1.35;
+}
+body.dark-mode .tour-title { color: #f1f5f9; }
+
+.tour-desc {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.6;
+}
+body.dark-mode .tour-desc { color: #94a3b8; }
+
+.tour-dots {
+  display: flex;
+  gap: 5px;
+  margin: 0.75rem 0 0.625rem;
+  flex-wrap: wrap;
+}
+.tour-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+  flex-shrink: 0;
+}
+.tour-dot:hover          { background: #94a3b8; }
+.tour-dot--done          { background: #94a3b8; }
+.tour-dot--active        { background: #2563eb; transform: scale(1.35); }
+body.dark-mode .tour-dot         { background: #334155; }
+body.dark-mode .tour-dot--done   { background: #475569; }
+body.dark-mode .tour-dot--active { background: #3b82f6; }
+
+.tour-actions {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.tour-btn {
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: background 0.15s, transform 0.12s;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tour-btn:active { transform: scale(0.96); }
+
+.tour-btn--back  { background: #f1f5f9; color: #475569; }
+.tour-btn--back:hover { background: #e2e8f0; color: #1e293b; }
+body.dark-mode .tour-btn--back { background: #334155; color: #94a3b8; }
+
+.tour-btn--skip  { background: none; color: #94a3b8; margin-right: auto; padding-left: 0.2rem; }
+.tour-btn--skip:hover { color: #475569; }
+body.dark-mode .tour-btn--skip:hover { color: #cbd5e1; }
+
+.tour-btn--next  { background: #1e293b; color: #fff; padding: 0.4rem 0.95rem; }
+.tour-btn--next:hover { background: #0f172a; }
+body.dark-mode .tour-btn--next       { background: #3b82f6; }
+body.dark-mode .tour-btn--next:hover { background: #2563eb; }
+
+/* ── Sidebar replay button ── */
+.tour-replay-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--sb-ink3, #8c8880);
+  font-size: 0.72rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  padding: 0.4rem 0.625rem;
+  border-radius: 7px;
+  transition: background 0.18s, color 0.18s;
+  width: 100%;
+  letter-spacing: 0.02em;
+}
+.tour-replay-btn svg { font-size: 0.95rem; flex-shrink: 0; }
+.tour-replay-btn:hover {
+  background: var(--sb-bg2, #eeecea);
+  color: var(--sb-ink, #1a1916);
+}
+body.dark-mode .tour-replay-btn:hover {
+  background: rgba(255,255,255,0.05);
+  color: #e2e8f0;
+}
+
+/* ── Small screens ── */
+@media (max-width: 480px) {
+  .tour-tooltip {
+    padding: 0.875rem 1rem;
+    border-radius: 14px;
+  }
+  .tour-emoji  { font-size: 1.3rem; }
+  .tour-title  { font-size: 0.88rem; }
+  .tour-desc   { font-size: 0.77rem; }
+  .tour-btn    { font-size: 0.75rem; padding: 0.35rem 0.6rem; }
+  .tour-btn--next { padding: 0.35rem 0.8rem; }
+}

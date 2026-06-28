@@ -1,0 +1,307 @@
+/* ══════════════════════════════════════════════════════
+   NAVBAR — matches Sidebar design system
+   Same font stack · warm off-white · Editorial feel
+   ══════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Lato:wght@300;400;500;700&display=swap');
+
+.navbar {
+  /* Same background as sidebar */
+  background: #f5f4f0;
+  border-bottom: 1px solid #dddbd6;
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  font-family: 'Lato', system-ui, sans-serif;
+  transition: background 0.25s, border-color 0.25s;
+}
+
+body.dark-mode .navbar {
+  background: #0c4a6e;
+  border-bottom-color: #075985;
+}
+
+.navbar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Brand title — matches sidebar Lora serif */
+.navbar-title {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1916;
+  margin: 0;
+  letter-spacing: -0.2px;
+  transition: color 0.25s;
+}
+
+body.dark-mode .navbar-title { color: #e0f2fe; }
+
+/* ── Actions area ──────────────────────────────────────── */
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── Profile button ────────────────────────────────────── */
+.profile-dropdown { position: relative; }
+
+.profile-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px solid #dddbd6;
+  cursor: pointer;
+  padding: 0.35rem 0.625rem 0.35rem 0.35rem;
+  border-radius: 10px;
+  transition: background 0.18s, border-color 0.18s;
+  font-family: 'Lato', system-ui, sans-serif;
+}
+
+body.dark-mode .profile-button { border-color: #075985; }
+
+.profile-button:hover {
+  background: #eeedea;
+  border-color: #c8c5be;
+}
+
+body.dark-mode .profile-button:hover {
+  background: #052e3d;
+  border-color: #0369a1;
+}
+
+/* ── Avatar ────────────────────────────────────────────── */
+.profile-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #1a1916;
+  color: #f5f4f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: background 0.25s;
+}
+
+body.dark-mode .profile-avatar {
+  background: #2d5be3;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Profile info ──────────────────────────────────────── */
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.profile-name {
+  font-family: 'Lato', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #1a1916;
+  line-height: 1.3;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.25s;
+}
+
+body.dark-mode .profile-name { color: #e0f2fe; }
+
+.profile-role {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: #2d5be3;
+  background: #eef2ff;
+  border: 1px solid rgba(45,91,227,0.15);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+  transition: color 0.25s, background 0.25s;
+}
+
+body.dark-mode .profile-role {
+  color: #60a5fa;
+  background: #1e3a8a22;
+  border-color: rgba(96,165,250,0.2);
+}
+
+/* ── Dropdown arrow ────────────────────────────────────── */
+.dropdown-arrow {
+  font-size: 1.1rem;
+  color: #8c8880;
+  transition: transform 0.2s ease, color 0.25s;
+  flex-shrink: 0;
+}
+
+.dropdown-arrow.rotated { transform: rotate(180deg); }
+
+body.dark-mode .dropdown-arrow { color: #7dd3fc; }
+
+/* ── Dropdown menu ─────────────────────────────────────── */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: #faf9f6;
+  border: 1px solid #dddbd6;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(26,25,22,0.12), 0 2px 8px rgba(26,25,22,0.06);
+  min-width: 230px;
+  z-index: 1000;
+  overflow: hidden;
+  animation: nbSlideDown 0.18s cubic-bezier(0.16,1,0.3,1);
+  font-family: 'Lato', system-ui, sans-serif;
+}
+
+body.dark-mode .dropdown-menu {
+  background: #0c4a6e;
+  border-color: #075985;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
+@keyframes nbSlideDown {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.dropdown-header {
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dropdown-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: #1a1916;
+  color: #f5f4f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: background 0.25s;
+}
+
+body.dark-mode .dropdown-avatar { background: #2d5be3; }
+
+.dropdown-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dropdown-name {
+  font-family: 'Lora', Georgia, serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #1a1916;
+  margin: 0 0 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 155px;
+  transition: color 0.25s;
+}
+
+body.dark-mode .dropdown-name { color: #e0f2fe; }
+
+.dropdown-email {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: #8c8880;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 155px;
+  transition: color 0.25s;
+}
+
+body.dark-mode .dropdown-email { color: #7dd3fc; }
+
+.dropdown-divider {
+  border: none;
+  border-top: 1px solid #dddbd6;
+  margin: 0;
+  transition: border-color 0.25s;
+}
+
+body.dark-mode .dropdown-divider { border-top-color: #075985; }
+
+.dropdown-item {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: #1a1916;
+  font-family: 'Lato', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+body.dark-mode .dropdown-item { color: #e0f2fe; }
+
+.dropdown-item:hover { background: #eeedea; }
+body.dark-mode .dropdown-item:hover { background: #052e3d; }
+
+.dropdown-item--danger        { color: #dc2626; }
+body.dark-mode .dropdown-item--danger { color: #f87171; }
+.dropdown-item--danger:hover  { background: #fef2f2; color: #b91c1c; }
+body.dark-mode .dropdown-item--danger:hover { background: #7f1d1d22; color: #fca5a5; }
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0 1rem;
+    padding-left: 3.5rem;
+  }
+  .navbar-title  { font-size: 0.95rem; }
+  .profile-info  { display: none; }
+  .dropdown-arrow{ display: none; }
+}
+
+@media (max-width: 380px) {
+  .navbar { padding-left: 3.25rem; }
+  .dropdown-menu { min-width: 200px; right: -0.5rem; }
+  .profile-name  { max-width: 90px; }
+}
+
+@media (max-width: 320px) {
+  .dropdown-menu { min-width: 180px; right: 0; left: auto; }
+}

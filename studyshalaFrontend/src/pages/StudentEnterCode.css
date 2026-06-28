@@ -1,0 +1,674 @@
+/* ══════════════════════════════════════════════════════════════
+   STUDENT ENTER CODE
+   - Full dark mode via body.dark-mode
+   - Cursor fix: text cursor on char boxes
+   - Matches Login page editorial theme
+   ══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500;600&family=Lato:wght@300;400;500;700&display=swap');
+
+/* Light mode */
+:root {
+  --ec-bg:      #f5f4f0;
+  --ec-bg2:     #eeecea;
+  --ec-card:    #ffffff;
+  --ec-ink:     #1a1916;
+  --ec-ink2:    #4a4843;
+  --ec-ink3:    #8c8880;
+  --ec-ink4:    #b8b5b0;
+  --ec-accent:  #2d5be3;
+  --ec-border:  #dddbd6;
+  --ec-border2: #c8c5be;
+  --ease-expo:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Dark mode — use global body.dark-mode */
+body.dark-mode {
+  --ec-bg:      #0f172a;
+  --ec-bg2:     #1e293b;
+  --ec-card:    #1e293b;
+  --ec-ink:     #f1f5f9;
+  --ec-ink2:    #cbd5e1;
+  --ec-ink3:    #94a3b8;
+  --ec-ink4:    #64748b;
+  --ec-accent:  #60a5fa;
+  --ec-border:  #334155;
+  --ec-border2: #475569;
+}
+
+/* ── Layout ── */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  background: var(--ec-bg);
+  font-family: 'Lato', system-ui, sans-serif;
+  transition: background 0.25s;
+}
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--ec-bg);
+  transition: background 0.25s;
+}
+
+/* ── Page ── */
+.ec-page {
+  flex: 1;
+  padding: 3rem 3rem 4rem;
+  max-width: 1100px;
+}
+
+/* ── Entrance animations ── */
+.ec-enter {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: none;
+}
+.ec-ready .ec-enter {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity   0.7s var(--ease-expo),
+    transform 0.7s var(--ease-expo);
+}
+
+/* ── Hero ── */
+.ec-hero { margin-bottom: 2.5rem; }
+
+.ec-hero-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--ec-ink3);
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+  transition: color 0.25s;
+}
+
+.ec-title {
+  font-family: 'Lora', Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  color: var(--ec-ink);
+  letter-spacing: -1px;
+  line-height: 1.13;
+  margin-bottom: 1rem;
+  transition: color 0.25s;
+}
+.ec-title-accent {
+  color: var(--ec-accent);
+  font-style: italic;
+  transition: color 0.25s;
+}
+
+.ec-subtitle {
+  font-size: 1rem;
+  color: var(--ec-ink2);
+  line-height: 1.75;
+  font-weight: 300;
+  max-width: 420px;
+  transition: color 0.25s;
+}
+
+/* ── Card ── */
+.ec-card {
+  background: var(--ec-card);
+  border: 1px solid var(--ec-border);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.05);
+  margin-bottom: 1.5rem;
+  transition: box-shadow 0.3s var(--ease-expo), background 0.25s, border-color 0.25s;
+}
+.ec-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+
+.ec-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--ec-border);
+  transition: border-color 0.25s;
+}
+.ec-card-icon {
+  width: 40px; height: 40px;
+  background: var(--ec-ink);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: var(--ec-card);
+  flex-shrink: 0;
+  transition: transform 0.4s var(--ease-spring), background 0.25s, color 0.25s;
+}
+.ec-card:hover .ec-card-icon { transform: rotate(-8deg) scale(1.08); }
+
+.ec-card-title {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ec-ink);
+  transition: color 0.25s;
+}
+.ec-card-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--ec-ink3);
+  margin-top: 2px;
+  transition: color 0.25s;
+}
+
+/* ── Error ── */
+.ec-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 0.8375rem;
+  padding: 0.6rem 0.875rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  animation: errShake 0.4s var(--ease-spring);
+}
+body.dark-mode .ec-error {
+  background: #451a1a;
+  border-color: #7f1d1d;
+  color: #fca5a5;
+}
+@keyframes errShake {
+  0%,100% { transform: translateX(0); }
+  25%     { transform: translateX(-5px); }
+  75%     { transform: translateX(5px); }
+}
+
+/* ── Form ── */
+.ec-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ══════════════════════════════════════
+   INPUT WRAPPER — CURSOR FIX
+   - cursor: text on the wrapper makes
+     the whole row show a text cursor
+   - real input is positioned over chars
+     so it captures all keyboard input
+   ══════════════════════════════════════ */
+.ec-input-wrap {
+  position: relative;
+  cursor: text;        /* ← FIX: text cursor everywhere on the box row */
+}
+
+/* Character boxes */
+.ec-input-chars {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  pointer-events: none; /* let clicks pass through to real input */
+}
+
+.ec-char-box {
+  width: 52px; height: 60px;
+  border: 1.5px solid var(--ec-border);
+  border-radius: 8px;
+  background: var(--ec-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--ec-ink);
+  letter-spacing: 0;
+  transition:
+    border-color 0.2s,
+    background   0.2s,
+    transform    0.2s var(--ease-spring),
+    box-shadow   0.2s,
+    color        0.25s;
+}
+.ec-input-wrap:focus-within .ec-char-box {
+  border-color: var(--ec-border2);
+}
+.ec-char-box--filled {
+  border-color: var(--ec-accent) !important;
+  background: var(--ec-bg2);
+  transform: scale(1.04);
+  box-shadow: 0 4px 12px rgba(45,91,227,0.15);
+}
+body.dark-mode .ec-char-box--filled {
+  background: #1e3a8a33;
+  box-shadow: 0 4px 12px rgba(96,165,250,0.12);
+}
+
+/* Active (next to type) box — highlighted with pulsing border */
+.ec-char-box--active {
+  border-color: var(--ec-accent) !important;
+  border-width: 2px;
+  background: var(--ec-accent-bg, rgba(45,91,227,0.04));
+  box-shadow: 0 0 0 3px rgba(45,91,227,0.12);
+  animation: ecBoxPulse 1.5s ease-in-out infinite;
+}
+body.dark-mode .ec-char-box--active {
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.15);
+}
+@keyframes ecBoxPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(45,91,227,0.12); }
+  50%       { box-shadow: 0 0 0 5px rgba(45,91,227,0.22); }
+}
+
+/* Blinking text cursor inside the active box */
+.ec-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.5rem;
+  background: var(--ec-accent);
+  border-radius: 2px;
+  animation: ecCaretBlink 1s step-start infinite;
+}
+@keyframes ecCaretBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* Real input — transparent overlay, covers the char box row */
+.ec-real-input {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  opacity: 0;              /* invisible but receives focus + keypresses */
+  cursor: text;
+  font-size: 16px;         /* prevents iOS zoom on focus */
+  border: none;
+  background: transparent;
+  z-index: 2;
+  /* Make it fully clickable */
+  pointer-events: all;
+}
+
+/* ── Submit button ── */
+.ec-submit {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 0.9rem 1.5rem;
+  background: var(--ec-ink);
+  border: none;
+  border-radius: 9px;
+  color: var(--ec-card);
+  font-family: 'Lato', system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition:
+    background 0.2s,
+    transform  0.2s var(--ease-spring),
+    box-shadow 0.2s,
+    color      0.25s;
+}
+.ec-submit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.5s var(--ease-expo);
+}
+.ec-submit:hover:not(.ec-submit--off)::after { transform: translateX(100%); }
+.ec-submit:hover:not(.ec-submit--off) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(26,25,22,0.22);
+}
+body.dark-mode .ec-submit:hover:not(.ec-submit--off) {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+.ec-submit:active:not(.ec-submit--off) { transform: translateY(0); }
+.ec-submit--off     { opacity: 0.35; cursor: not-allowed; }
+.ec-submit--loading { opacity: 0.7;  cursor: wait; }
+.ec-spin { animation: spin 0.75s linear infinite; font-size: 1rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Quick links ── */
+.ec-quick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.ec-quick-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--ec-card);
+  border: 1px solid var(--ec-border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition:
+    border-color 0.2s,
+    background   0.2s,
+    transform    0.25s var(--ease-spring),
+    box-shadow   0.2s;
+}
+.ec-quick-btn:hover {
+  border-color: var(--ec-border2);
+  background: var(--ec-bg2);
+  transform: translateX(5px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+}
+.ec-quick-icon {
+  width: 34px; height: 34px;
+  background: var(--ec-bg);
+  border: 1px solid var(--ec-border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: var(--ec-ink2);
+  flex-shrink: 0;
+  transition: transform 0.3s var(--ease-spring), color 0.2s, background 0.2s;
+}
+.ec-quick-btn:hover .ec-quick-icon {
+  color: var(--ec-accent);
+  transform: scale(1.12);
+}
+.ec-quick-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ec-quick-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ec-ink);
+  font-family: 'Lato', system-ui, sans-serif;
+  transition: color 0.25s;
+}
+.ec-quick-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--ec-ink3);
+  transition: color 0.25s;
+}
+.ec-quick-arrow {
+  font-size: 1rem;
+  color: var(--ec-ink4);
+  transition: transform 0.25s var(--ease-spring), color 0.2s;
+}
+.ec-quick-btn:hover .ec-quick-arrow {
+  transform: translateX(4px);
+  color: var(--ec-accent);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .ec-page { padding: 2rem 1.5rem 3rem; }
+  .ec-char-box { width: 38px; height: 50px; font-size: 1.1rem; }
+  .ec-input-chars { gap: 0.35rem; }
+}
+@media (max-width: 480px) {
+  .ec-page { padding: 1.75rem 1.25rem; }
+  .ec-char-box { width: 32px; height: 44px; font-size: 1rem; }
+  .ec-input-chars { gap: 0.25rem; }
+}
+
+@media (max-width: 360px) {
+  .ec-page { padding: 1.5rem 0.875rem; }
+  .ec-char-box { width: 28px; height: 40px; font-size: 0.875rem; border-radius: 6px; }
+  .ec-input-chars { gap: 0.18rem; }
+  .ec-card { padding: 1.25rem 1rem; }
+  .ec-quick-btn { padding: 0.75rem 0.875rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ec-enter { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .ec-char-box, .ec-submit, .ec-quick-btn { transition: none !important; }
+}
+/* ══════════════════════════════════════════════════════
+   ANNOUNCEMENT BANNER
+   Add this CSS to both StudentEnterCode.css and FacultyDashboard.css
+   ══════════════════════════════════════════════════════ */
+
+.ann-banner-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.ann-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+  animation: annSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+body.dark-mode .ann-banner {
+  background: #2d240833;
+  border-color: #92400e55;
+  border-left-color: #d97706;
+}
+
+@keyframes annSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ann-banner-icon {
+  font-size: 1.2rem;
+  color: #d97706;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+body.dark-mode .ann-banner-icon { color: #fbbf24; }
+
+.ann-banner-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.ann-banner-title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #92400e;
+  line-height: 1.3;
+}
+
+body.dark-mode .ann-banner-title { color: #fcd34d; }
+
+.ann-banner-msg {
+  font-size: 0.82rem;
+  color: #78350f;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+body.dark-mode .ann-banner-msg { color: #fef3c7; }
+
+.ann-banner-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #b45309;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  transition: background 0.18s, color 0.18s;
+  margin-top: -2px;
+}
+
+.ann-banner-close:hover {
+  background: #fef3c7;
+  color: #78350f;
+}
+
+body.dark-mode .ann-banner-close       { color: #fbbf24; }
+body.dark-mode .ann-banner-close:hover { background: #45260044; }
+
+@media (max-width: 480px) {
+  .ann-banner { padding: 0.75rem; gap: 0.5rem; }
+  .ann-banner-title { font-size: 0.82rem; }
+  .ann-banner-msg   { font-size: 0.78rem; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PLATFORM STATS STRIP — shown between code card and quick links
+   Horizontal pill row — subtle, informational, no visual noise
+   ══════════════════════════════════════════════════════════════ */
+/* ── Two-column body grid ───────────────────────────────────────────────────── */
+.ec-body-grid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 2rem;
+  align-items: start;
+}
+.ec-body-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+/* ── Platform stats panel (right column on desktop) ─────────────────────────── */
+.ec-stats-panel {
+  background: var(--ec-card);
+  border: 1px solid var(--ec-border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  position: sticky;
+  top: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  transition: background 0.25s, border-color 0.25s;
+}
+.ec-stats-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ec-ink2);
+  margin-bottom: 0.35rem;
+  transition: color 0.25s;
+}
+.ec-stats-panel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ec-accent);
+  flex-shrink: 0;
+  animation: ecDotPulse 2.5s ease-in-out infinite;
+}
+@keyframes ecDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.8); }
+}
+.ec-stats-panel-sub {
+  font-family: 'Lato', system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--ec-ink3);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+  transition: color 0.25s;
+}
+.ec-stats-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.ec-stats-panel-item {
+  background: var(--ec-bg);
+  border: 1px solid var(--ec-border);
+  border-radius: 10px;
+  padding: 0.875rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  transition: background 0.25s, border-color 0.25s;
+}
+.ec-stats-panel-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ec-ink);
+  line-height: 1;
+  transition: color 0.25s;
+}
+.ec-stats-panel-lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ec-ink3);
+  line-height: 1.3;
+  transition: color 0.25s;
+}
+.ec-stats-panel-footer {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--ec-ink4, var(--ec-ink3));
+  text-align: center;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--ec-border);
+  transition: color 0.25s, border-color 0.25s;
+}
+
+/* ── On tablet/mobile: stack to single column ──────────────────────────────── */
+@media (max-width: 800px) {
+  .ec-body-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .ec-stats-panel {
+    position: static;
+    /* On mobile: horizontal 2x2 grid already works, just reduce padding */
+    padding: 1.25rem;
+  }
+  .ec-stats-panel-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .ec-stats-panel-val { font-size: 1rem; }
+  .ec-stats-panel-item { padding: 0.75rem 0.625rem; }
+}
+
+@media (max-width: 360px) {
+  .ec-stats-panel-grid { gap: 0.5rem; }
+  .ec-stats-panel-val  { font-size: 0.9rem; }
+  .ec-stats-panel-lbl  { font-size: 0.52rem; }
+}

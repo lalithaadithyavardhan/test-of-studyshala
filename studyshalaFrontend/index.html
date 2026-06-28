@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ── Favicon (your owl logo) ──────────────────────────────────────── -->
+    <!-- SVG favicon: modern browsers (Chrome, Firefox, Edge, Safari 16+)   -->
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <!-- PNG fallback: older browsers and Android homescreen                 -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
+    
+    <!-- Apple devices (Safari iOS/macOS bookmarks & homescreen)             -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo-180.png" />
+    <!-- PWA manifest (makes your app installable + homescreen icon)         -->
+    <link rel="manifest" href="/manifest.json" />
+    <!-- Theme colour (browser tab bar on mobile)                            -->
+    <meta name="theme-color" content="#ffffff" />
+
+    <!-- ── Primary SEO ──────────────────────────────────────────────────── -->
+    <title>StudyShala — Study smarter. Share faster. Access anywhere.</title>
+    <meta name="description"
+      content="StudyShala is a free, code-based study material platform connecting faculty and students. Upload materials, generate an access code, and share with your class instantly — no broken links, no friction." />
+    <meta name="keywords"
+      content="StudyShala, study materials, study shala, studyshala.dev, faculty portal, student portal, access code, Google Drive materials, education platform, free study platform" />
+    <meta name="author" content="Borra Adithya" />
+    <link rel="canonical" href="https://studyshala.dev/" />
+
+    <!-- ── Open Graph (WhatsApp, Facebook, LinkedIn previews) ───────────── -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:url"         content="https://studyshala.dev/" />
+    <meta property="og:title"       content="StudyShala — Study smarter. Share faster." />
+    <meta property="og:description" content="A free code-based platform for faculty to share study materials and students to access them instantly. No broken links, no friction." />
+    <meta property="og:image"       content="https://studyshala.dev/og-image.png" />
+    <meta property="og:image:width"  content="1081" />
+    <meta property="og:image:height" content="1027" />
+    <meta property="og:site_name"   content="StudyShala" />
+    <meta property="og:locale"      content="en_IN" />
+
+    <!-- ── Twitter / X Card ─────────────────────────────────────────────── -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="StudyShala — Study smarter. Share faster." />
+    <meta name="twitter:description" content="A free code-based platform for faculty to share study materials and students to access them instantly." />
+    <meta name="twitter:image"       content="https://studyshala.dev/og-image.png" />
+
+    <!-- ── Structured data (Google Knowledge Panel + rich results) ───────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "StudyShala",
+      "url": "https://studyshala.dev",
+      "logo": "https://studyshala.dev/logo-192.png",
+      "description": "A free, code-based study material platform connecting faculty and students. Upload materials, share a code, access anywhere.",
+      "applicationCategory": "EducationApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "INR"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Borra Adithya",
+        "url": "https://github.com/lalithaadithyavardhan"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

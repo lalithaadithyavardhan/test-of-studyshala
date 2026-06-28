@@ -1,0 +1,40 @@
+.material-access-info { display: flex; flex-direction: column; gap: 0.625rem; }
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-solid);
+  font-size: 0.875rem;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label { font-weight: 700; color: var(--text-sub); }
+.info-value  { font-weight: 600; color: var(--text); }
+
+.action-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.action-card { text-align: center; }
+
+.action-card-icon {
+  width: 64px; height: 64px;
+  border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2rem;
+  margin: 0 auto 1rem;
+}
+.action-card--save .action-card-icon    { background: #dbeafe; color: #2563eb; }
+.action-card--download .action-card-icon{ background: #d1fae5; color: #059669; }
+
+.action-card-title { font-size: 1.125rem; font-weight: 800; margin-bottom: 0.625rem; color: var(--text); }
+.action-card-description { color: var(--text-sub); margin-bottom: 1rem; font-size: 0.875rem; }
+
+.action-card-benefits { list-style: none; padding: 0; margin: 0 0 1.5rem; font-size: 0.8375rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.action-card-benefits li { color: var(--success); font-weight: 500; }
+
+@media (max-width: 768px) { .action-cards-grid { grid-template-columns: 1fr; } }

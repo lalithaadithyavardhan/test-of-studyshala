@@ -1,0 +1,39 @@
+/* StorageWidget.css — compact sidebar only */
+
+.sw--compact {
+  display: flex; flex-direction: column; gap: 0.25rem;
+  padding: 0.35rem 0.1rem 0.1rem;
+}
+.sw-compact-header { display: flex; align-items: center; gap: 0.4rem; }
+.sw-compact-icon {
+  font-size: 0.85rem; color: var(--sb-accent, #2d5be3);
+  flex-shrink: 0; line-height: 1; transition: color 0.25s;
+}
+.sw-compact-title {
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem;
+  font-weight: 600; color: var(--sb-ink2, #4a4843); flex: 1; transition: color 0.25s;
+}
+.sw-compact-spin { font-size: 0.7rem; color: var(--sb-ink3, #8c8880); flex-shrink: 0; }
+.sw-compact-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem;
+  color: var(--sb-ink3, #8c8880); transition: color 0.25s;
+}
+.sw-compact-error {
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.57rem; color: #dc2626;
+}
+.sw-track {
+  width: 100%; height: 6px; background: var(--sb-border, #dddbd6);
+  border-radius: 999px; overflow: hidden; transition: background 0.25s;
+}
+.sw-fill {
+  height: 100%; border-radius: 999px;
+  transition: width 0.7s cubic-bezier(0.16,1,0.3,1);
+}
+.sw-bar--green { background: linear-gradient(90deg, #16a34a, #22c55e); }
+.sw-spin { animation: swSpin 0.7s linear infinite; display: inline-block; }
+@keyframes swSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Dark mode */
+body.dark-mode .sw-compact-icon  { color: var(--sb-accent, #60a5fa); }
+body.dark-mode .sw-compact-title { color: var(--sb-ink2, #bae6fd); }
+body.dark-mode .sw-compact-label { color: var(--sb-ink3, #7dd3fc); }

@@ -1,0 +1,150 @@
+/**
+ * StudentSavedMaterials  v2
+ * =========================
+ * Shows message indicator. Opens FileManager overlay with sub-folder support.
+ */
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios';
+import Sidebar from '../components/Sidebar';
+import Navbar from '../components/Navbar';
+import Card from '../components/Card';
+import Button from '../components/Button';
+import FileManager from '../components/FileManager';
+import MessageBanner from '../components/MessageBanner';
+import { MdBook, MdBookmark, MdDelete, MdCampaign, MdFolderOpen } from 'react-icons/md';
+import './StudentSavedMaterials.css';
+
+const StudentSavedMaterials = () => {
+  const navigate = useNavigate();
+  const [materials,    setMaterials]    = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+  const [fmOpen,       setFmOpen]       = useState(false);
+  const [fmLoading,    setFmLoading]    = useState(false);
+  const [fmFiles,      setFmFiles]      = useState([]);
+  const [fmSubFolders, setFmSubFolders] = useState([]);
+  const [fmMaterial,   setFmMaterial]   = useState(null);
+
+  useEffect(() => { fetchMaterials(); }, []);
+
+  const fetchMaterials = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/student/saved-materials');
+      setMaterials(res.data.materials || []);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch saved materials');
+    } finally { setLoading(false); }
+  };
+
+  const handleRemove = async (id) => {
+    if (!window.confirm('Remove this material from your saved list?')) return;
+    try {
+      await api.delete(`/student/saved-materials/${id}`);
+      fetchMaterials();
+    } catch (err) { setError('Failed to remove material'); }
+  };
+
+  const openBrowse = async (m) => {
+    setFmMaterial(m);
+    setFmLoading(true);
+    setFmOpen(true);
+    try {
+      const res = await api.get(`/student/materials/${m._id}/files`);
+      setFmFiles(res.data.files || []);
+      setFmSubFolders(res.data.subFolders || []);
+      setFmMaterial(prev => ({ ...prev, ...res.data.material }));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load files');
+      setFmOpen(false);
+    } finally { setFmLoading(false); }
+  };
+
+  return (
+    <div className="app-container">
+      <Sidebar role="student" />
+      <div className="main-content">
+        <Navbar />
+        <div className="page-container">
+
+          <div className="page-header">
+            <div>
+              <h1>My Saved Materials</h1>
+              <p className="page-description">Materials you've saved for permanent access</p>
+            </div>
+          </div>
+
+          {error && <div className="alert alert-error">{error}</div>}
+
+          {loading ? (
+            <div className="loading-container"><div className="spinner"></div></div>
+          ) : materials.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon"><MdBookmark /></div>
+              <h3>No Saved Materials</h3>
+              <p>Materials you save will appear here for easy access</p>
+            </div>
+          ) : (
+            <div className="saved-materials-grid">
+              {materials.map(m => {
+                const hasMsg  = !!m.messageToStudents?.trim();
+                const sfCount = m.subFolderCount || 0;
+                return (
+                  <Card key={m._id} className="saved-material-card">
+                    <div className="saved-material-header">
+                      <div className="material-icon"><MdBook /></div>
+                      <h3 className="material-title">{m.subjectName}</h3>
+                    </div>
+                    <div className="saved-material-body">
+                      <div className="detail-row"><span className="detail-label">Faculty</span><span className="detail-value">{m.facultyName}</span></div>
+                      <div className="detail-row"><span className="detail-label">Department</span><span className="detail-value">{m.department}</span></div>
+                      <div className="detail-row"><span className="detail-label">Semester</span><span className="detail-value">Semester {m.semester}</span></div>
+                      <div className="detail-row">
+                        <span className="detail-label">Files</span>
+                        <span className="detail-value">{m.fileCount} file(s){sfCount > 0 ? ` · ${sfCount} folder(s)` : ''}</span>
+                      </div>
+                      {hasMsg && (
+                        <div className="detail-row" style={{ alignItems: 'flex-start' }}>
+                          <span className="detail-label" style={{ paddingTop: '0.15rem' }}>
+                            <MdCampaign style={{ color: '#d97706', verticalAlign: 'middle', marginRight: '0.2rem' }} />
+                            Msg
+                          </span>
+                          <span className="detail-value" style={{ color: '#92400e', fontSize: '0.8rem' }}>
+                            {m.messageToStudents.slice(0, 80)}{m.messageToStudents.length > 80 ? '…' : ''}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="saved-material-footer">
+                      <Button variant="primary" size="sm" onClick={() => openBrowse(m)}>
+                        📂 Browse Files
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => navigate('/browse-materials')}>
+                        <MdFolderOpen style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} /> Full View
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={() => handleRemove(m._id)}>
+                        Remove
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {fmOpen && !fmLoading && fmMaterial && (
+        <FileManager
+          files={fmFiles}
+          subFolders={fmSubFolders}
+          materialName={fmMaterial.subjectName}
+          onClose={() => { setFmOpen(false); setFmFiles([]); setFmSubFolders([]); setFmMaterial(null); }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default StudentSavedMaterials;
