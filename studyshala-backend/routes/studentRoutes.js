@@ -25,6 +25,6 @@ router.delete('/starred-files/:fileId', studentController.unstarFile);
 router.get('/starred-files',          studentController.getStarredFiles);
 
 // Material version check for delta sync
-router.get('/material-version/:id',   studentController.getMaterialVersion);
+router.get('/materials/:id/version', studentController.getMaterialVersion);
 
 module.exports = router;
