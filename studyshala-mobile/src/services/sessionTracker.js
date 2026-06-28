@@ -1,0 +1,83 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '../database/db';
+
+const SESSION_PREFIX = 'session:';
+const uuidv4 = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+export const sessionTracker = {
+
+  _activeSessions: {},
+
+  async startSession(fileId, materialId) {
+    const sessionId = uuidv4();
+    this._activeSessions[fileId] = {
+      sessionId,
+      fileId,
+      materialId,
+      startTime: new Date().toISOString(),
+      lastPage: 1,
+    };
+    return sessionId;
+  },
+
+  updatePage(fileId, page) {
+    if (this._activeSessions[fileId]) {
+      this._activeSessions[fileId].lastPage = page;
+    }
+  },
+
+  async endSession(fileId, totalPages) {
+    const session = this._activeSessions[fileId];
+    if (!session) return;
+
+    const endTime = new Date();
+    const startTime = new Date(session.startTime);
+    const totalMinutes = Math.round((endTime - startTime) / 60000);
+
+    const sessionData = {
+      sessionId: session.sessionId,
+      fileId: session.fileId,
+      materialId: session.materialId,
+      startTime: session.startTime,
+      endTime: endTime.toISOString(),
+      totalMinutes,
+      lastPage: session.lastPage,
+      totalPages: totalPages || 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    await storage.set(SESSION_PREFIX + session.sessionId, sessionData);
+    await this.saveLastPage(fileId, session.lastPage);
+    delete this._activeSessions[fileId];
+  },
+
+  async saveLastPage(fileId, page) {
+    await AsyncStorage.setItem(`lastPage_${fileId}`, String(page));
+  },
+
+  async getLastPage(fileId) {
+    const page = await AsyncStorage.getItem(`lastPage_${fileId}`);
+    return page ? parseInt(page) : 1;
+  },
+
+  async getWeeklyStats() {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const sessions = await storage.getAllByPrefix(SESSION_PREFIX);
+    const recent = sessions.filter(s => s.createdAt && new Date(s.createdAt) > weekAgo);
+    const totalMinutes = recent.reduce((sum, s) => sum + (s.totalMinutes || 0), 0);
+    return { totalMinutes, sessions: recent.length };
+  },
+
+  async getMaterialStats(materialId) {
+    const sessions = await storage.getAllByPrefix(SESSION_PREFIX);
+    const matSessions = sessions.filter(s => s.materialId === materialId);
+    const byFile = {};
+    for (const s of matSessions) {
+      if (!byFile[s.fileId]) byFile[s.fileId] = { fileId: s.fileId, totalMinutes: 0, furthestPage: 0 };
+      byFile[s.fileId].totalMinutes += s.totalMinutes || 0;
+      byFile[s.fileId].furthestPage = Math.max(byFile[s.fileId].furthestPage, s.lastPage || 0);
+    }
+    return Object.values(byFile);
+  },
+};
