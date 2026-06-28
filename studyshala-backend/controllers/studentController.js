@@ -399,21 +399,7 @@ const getStarredFiles = async (req, res) => {
   }
 };
 
-module.exports = {
-  validateAccessCode,
-  saveMaterial,
-  getSavedMaterials,
-  getAccessHistory,
-  getMaterialFiles,
-  downloadFile,
-  removeSavedMaterial,
-  trackRecentFile,
-  getRecentFiles,
-  starFile,
-  unstarFile,
-  getStarredFiles,
-  getMaterialVersion
-};
+
 
 // ── Get material version info (for delta sync) ────────────────────────────────
 const getMaterialVersion = async (req, res) => {
@@ -463,6 +449,23 @@ const getMaterialVersion = async (req, res) => {
       updatedAt: folder.updatedAt,
       files
     });
+
+
+    module.exports = {
+  validateAccessCode,
+  saveMaterial,
+  getSavedMaterials,
+  getAccessHistory,
+  getMaterialFiles,
+  downloadFile,
+  removeSavedMaterial,
+  trackRecentFile,
+  getRecentFiles,
+  starFile,
+  unstarFile,
+  getStarredFiles,
+  getMaterialVersion
+};
   } catch (err) {
     logger.error(`getMaterialVersion: ${err.message}`);
     res.status(500).json({ message: 'Failed to get version info' });
