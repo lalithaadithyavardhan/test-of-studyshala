@@ -9,11 +9,12 @@
  *   3. Download failed + no previewUrl → clear offline error
  *   4. Download failed + previewUrl exists → stream from URL as last resort
  *
- * downloadFile() — permanent save to Downloads dir via share sheet.
+ * downloadFile() — silently saves to Downloads dir via downloadManager and
+ * registers it in fileRepository so it shows up in the Downloads screen.
+ * No share sheet / "choose a location" prompt — see comment above downloadFile().
  */
 
 import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 import { trackRecentFile, getMaterialFiles } from '../api/studentApi';
 import { downloadManager } from '../services/downloadManager';
@@ -207,34 +208,43 @@ export const openFile = async (file, material, navigation) => {
   );
 };
 
-// ── downloadFile — permanent save to device via share sheet ───────────────────
-export const downloadFile = async (file) => {
+// ── downloadFile — permanent save to device, no share-sheet prompt ────────────
+// IMPORTANT: this must go through downloadManager.downloadToDevice() (which
+// saves to documentDirectory/StudyShala/Downloads/ AND registers the file in
+// fileRepository) — NOT a one-off FileSystem.downloadAsync() call. Two bugs
+// this fixes:
+//   1. Previously this called Sharing.shareAsync() immediately after saving,
+//      which pops the OS share sheet and forces the user to pick a
+//      destination/app — that's not what tapping "Download" should do.
+//   2. Previously this never wrote anything to fileRepository, so even
+//      though the file was saved correctly on disk, it could never show up
+//      in the Downloads screen.
+// `material` is optional but should be passed whenever available so the
+// saved file is correctly associated with its subject/material for grouping
+// in the Downloads screen.
+export const downloadFile = async (file, material) => {
   const f = normalise(file);
 
   if (!f.downloadUrl) {
     Alert.alert('Unavailable', 'This file has no download link.');
     return;
   }
+
   try {
-    const safeName = (f.name || 'file').replace(/[^\w.\-() ]/g, '_');
-    const localUri = `${FileSystem.documentDirectory}StudyShala/Downloads/${safeName}`;
-
-    // Ensure Downloads dir exists
-    const dir = `${FileSystem.documentDirectory}StudyShala/Downloads/`;
-    const dirInfo = await FileSystem.getInfoAsync(dir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-    }
-
-    const { uri } = await FileSystem.downloadAsync(f.downloadUrl, localUri);
-
-    const canShare = await Sharing.isAvailableAsync();
-    if (canShare) {
-      await Sharing.shareAsync(uri);
-    } else {
-      Alert.alert('Downloaded', `Saved to ${uri}`);
-    }
-  } catch {
-    Alert.alert('Download failed', 'Could not download this file. Please try again.');
+    await downloadManager.downloadToDevice(
+      {
+        fileId:      f._id,
+        name:        f.name,
+        fileName:    f.name,
+        mimeType:    f.mimeType,
+        materialId:  material?._id || f.materialId,
+        previewUrl:  f.previewUrl,
+      },
+      f.downloadUrl,
+    );
+    // No share sheet — the file is now saved and will appear in the
+    // Downloads screen. Nothing further to do here.
+  } catch (e) {
+    Alert.alert('Download failed', e?.message || 'Could not download this file. Please try again.');
   }
 };

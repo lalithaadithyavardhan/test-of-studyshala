@@ -732,7 +732,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
 
   const handleFileLongPress = (file) => {
     showDialog(file.name, 'What would you like to do?', [
-      { text: 'Download', onPress: () => downloadFile(file) },
+      { text: 'Download', onPress: () => downloadFile(file, material) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -821,7 +821,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
       showToast('alert-circle-outline', C.error, 'No files selected');
       return;
     }
-    filesToDownload.forEach(f => downloadFile(f));
+    filesToDownload.forEach(f => downloadFile(f, material));
     showToast('cloud-download-outline', C.accent, `Downloading ${filesToDownload.length} file${filesToDownload.length !== 1 ? 's' : ''}…`);
     exitSelectionMode();
   };
