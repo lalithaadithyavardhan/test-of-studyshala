@@ -27,6 +27,14 @@ export const fileRepository = {
     return await storage.get(PREFIX + fileId);
   },
 
+  // ── getAll ────────────────────────────────────────────────────────────────
+  // Returns every stored file record, regardless of material. Used by
+  // DownloadsScreen to group real downloads by subject without needing a
+  // separate per-material query.
+  async getAll() {
+    return await storage.getAllByPrefix(PREFIX);
+  },
+
   async getByMaterial(materialId) {
     const fileIds = await storage.get(MAT_FILES_PREFIX + materialId) || [];
     const files = await Promise.all(fileIds.map(id => storage.get(PREFIX + id)));

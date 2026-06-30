@@ -111,6 +111,13 @@ export async function downloadOrReuseFile(file, targetDir, onProgress) {
       fileName: name,
       mimeType: file.mimeType || existing?.mimeType || '',
       materialId: file.materialId || existing?.materialId,
+      // Subject context — stored directly on the file record so screens like
+      // DownloadsScreen can group downloads by subject without needing a
+      // separate materialRepository lookup (which may not exist if the user
+      // never explicitly opened/saved that material elsewhere).
+      subjectName: file.subjectName || existing?.subjectName || null,
+      facultyName: file.facultyName || existing?.facultyName || null,
+      department:  file.department  || existing?.department  || null,
       downloaded: true,
       localPath: result.uri,
       // cachedAt is set ONCE on first download, never overwritten on re-download.
