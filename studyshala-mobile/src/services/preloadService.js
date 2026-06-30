@@ -1,8 +1,11 @@
+import * as FileSystem from 'expo-file-system';
 import { storage } from '../database/db';
 import { syncService } from './syncService';
+import { downloadOrReuseFile } from './fileDownloader';
 
 const PATTERN_PREFIX = 'preload:';
 const MIN_OPENS_FOR_PRELOAD = 3;
+const CACHE_DIR = FileSystem.cacheDirectory + 'StudyShala/Cache/';
 
 export const preloadService = {
 
@@ -54,10 +57,21 @@ export const preloadService = {
     for (const candidate of candidates) {
       try {
         const url = await downloadUrlFn(candidate.fileId);
-        const { downloadManager } = await import('./downloadManager');
-        const file = { fileId: candidate.fileId, name: candidate.fileId };
-        await downloadManager.openFile(file, url, null);
+        // Routed through the same shared downloader as everything else, so a
+        // file preloaded here and later opened from Starred/Saved/Dashboard
+        // reuses the same cached copy instead of downloading a duplicate.
+        await downloadOrReuseFile(
+          {
+            fileId: candidate.fileId,
+            name: candidate.fileId,
+            materialId: candidate.materialId,
+            downloadUrl: url,
+          },
+          CACHE_DIR,
+        );
       } catch (_) {}
     }
   },
 };
+
+export default preloadService;

@@ -242,14 +242,19 @@ export default function SavedMaterialsScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
   const [sort, setSort]               = useState('latest');
+  // true only when we're showing cached data because the server fetch failed
+  // (no internet) — matches the pattern already used in HistoryScreen.
+  const [isOffline, setIsOffline]     = useState(false);
   const searchRef  = useRef(null);
   const searchAnim = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
+    let hadCache = false;
     // Step 1 — show cached saved materials instantly
     try {
       const cached = await materialRepository.getAllSaved();
       if (cached.length) {
+        hadCache = true;
         // Shape cached entries to match server response shape
         const shaped = cached.map(m => ({
           _id:         m.materialId,
@@ -270,6 +275,7 @@ export default function SavedMaterialsScreen({ navigation }) {
       const { data } = await getSavedMaterials();
       const serverMaterials = data.materials || [];
       setMaterials(serverMaterials);
+      setIsOffline(false);
 
       // Step 3 — upsert each into local cache
       for (const mat of serverMaterials) {
@@ -286,7 +292,8 @@ export default function SavedMaterialsScreen({ navigation }) {
         });
       }
     } catch {
-      // Server failed — cached data already showing, stay silent
+      // Server failed — cached data already showing; tell the user it's stale
+      if (hadCache) setIsOffline(true);
     }
   }, []);
 
@@ -396,6 +403,12 @@ export default function SavedMaterialsScreen({ navigation }) {
               <Text style={s.headerTitle}>Saved Materials</Text>
               <Text style={s.headerSub}>{materials.length} material{materials.length !== 1 ? 's' : ''} saved</Text>
             </View>
+            {isOffline && (
+              <View style={s.offlinePill}>
+                <Ionicons name="cloud-offline-outline" size={11} color={C.textMuted} />
+                <Text style={s.offlinePillText}>Offline</Text>
+              </View>
+            )}
           </View>
 
           <View style={s.headerRight}>
@@ -519,6 +532,15 @@ const s = StyleSheet.create({
   headerTitle:  { fontSize: T.md, fontWeight: '700', color: C.textPrimary },
   headerSub:    { fontSize: T.xs, color: C.textMuted, marginTop: 1 },
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  // Offline indicator
+  offlinePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
+    borderRadius: R.full, paddingHorizontal: 8, paddingVertical: 3,
+    marginLeft: 6,
+  },
+  offlinePillText: { fontSize: 10, fontWeight: '600', color: C.textMuted },
 
   // Search
   searchWrap: {

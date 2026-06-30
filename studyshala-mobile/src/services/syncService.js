@@ -1,12 +1,19 @@
 import { materialRepository } from '../database/materialRepository';
 import { downloadManager } from './downloadManager';
 import client from '../api/client';
+import { API_BASE_URL } from '../config/config';
 
 export const syncService = {
 
+  // Pings YOUR backend's keep-alive endpoint instead of google.com.
+  // Pinging Google gives a false "online" reading on networks where Google is
+  // reachable but your backend isn't (or a false "offline" reading on
+  // networks — e.g. some enterprise/restricted connections — where Google is
+  // blocked but your backend is fine). The backend already exposes GET /ping
+  // (no DB call, used for Render keep-alive) which is the correct target.
   async isConnected() {
     try {
-      const response = await fetch('https://www.google.com', { method: 'HEAD' });
+      const response = await fetch(`${API_BASE_URL}/ping`, { method: 'GET' });
       return response.ok;
     } catch {
       return false;
@@ -70,3 +77,5 @@ export const syncService = {
     return await this.checkAllForUpdates();
   },
 };
+
+export default syncService;

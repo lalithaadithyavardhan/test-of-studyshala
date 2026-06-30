@@ -10,6 +10,20 @@ import * as Sharing from 'expo-sharing';
 import { fileRepository } from '../database/fileRepository';
 import { materialRepository } from '../database/materialRepository';
 
+// ── Downloads vs. auto-cache ─────────────────────────────────────────────────
+// fileRepository's `downloaded: true` flag is shared by TWO different
+// mechanisms that both end up calling fileRepository.upsert():
+//   1. downloadManager.downloadToDevice() / saveOffline() — a file the user
+//      DELIBERATELY downloaded, saved under documentDirectory/StudyShala/Downloads/
+//   2. openFile() (utils/fileActions.js, services/offlineSyncService.js) — a
+//      file that was simply OPENED/PREVIEWED, silently cached under
+//      cacheDirectory/StudyShala/Cache/ so it reopens instantly offline
+// Both set the same `downloaded` flag, so without filtering by path this
+// screen shows every file you've ever merely viewed as if you'd downloaded
+// it — which is the "I don't remember downloading 26 files" bug. The fix:
+// only count files whose localPath is actually inside the Downloads folder.
+const REAL_DOWNLOADS_DIR = FileSystem.documentDirectory + 'StudyShala/Downloads/';
+
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const C = {
   bg:          '#13120f',
@@ -77,8 +91,10 @@ export default function DownloadsScreen({ navigation }) {
       for (const mat of allMaterials) {
         const files = await fileRepository.getDownloadedByMaterial(mat.materialId);
         for (const file of files) {
-          // Verify file still exists on device
-          if (file.localPath) {
+          // Only count files that actually live in the Downloads folder —
+          // skip files that were only auto-cached from being opened/previewed
+          // (see REAL_DOWNLOADS_DIR comment above).
+          if (file.localPath && file.localPath.startsWith(REAL_DOWNLOADS_DIR)) {
             const info = await FileSystem.getInfoAsync(file.localPath);
             if (info.exists) {
               allFiles.push({ ...file, exists: true });

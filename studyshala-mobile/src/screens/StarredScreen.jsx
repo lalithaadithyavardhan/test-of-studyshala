@@ -340,11 +340,12 @@ export default function StarredScreen() {
   // ── Load ───────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     // Step 1 — load from local cache instantly
+    // NOTE: storage.getAllByPrefix() returns plain parsed objects, not
+    // {key, value} pairs — `entry` below IS the starred-file record.
     try {
-      const result = await storage.getAllByPrefix('starred:');
-      if (result?.length) {
-        const cached = result.map(entry => JSON.parse(entry.value));
-        setStarredFiles(cached);
+      const cached = await storage.getAllByPrefix('starred:');
+      if (cached?.length) {
+        setStarredFiles(cached.filter(Boolean));
         setLoading(false); // show cached content immediately, no spinner
       }
     } catch {}
@@ -358,13 +359,12 @@ export default function StarredScreen() {
       // Step 3 — sync to local cache
       // Clear stale keys first, then write fresh ones
       try {
-        const existing = await storage.getAllByPrefix('starred:');
-        for (const entry of (existing || [])) {
-          await storage.delete(entry.key);
-        }
+        await storage.deleteAllByPrefix('starred:');
       } catch {}
       for (const f of serverFiles) {
-        await storage.set(`starred:${f.fileId}`, JSON.stringify(f));
+        // storage.set() already JSON.stringifies internally — pass the plain
+        // object directly (no pre-stringify).
+        await storage.set(`starred:${f.fileId}`, f);
       }
     } catch {
       // Server failed — cached data already showing, stay silent
@@ -453,15 +453,17 @@ export default function StarredScreen() {
         console.log("Preview URL:", freshPreviewUrl);
         if (fresh?.previewUrl)  freshPreviewUrl  = fresh.previewUrl;
 
-        // Update local starred cache with fresh URLs so next open skips this step
+        // Update local starred cache with fresh URLs so next open skips this step.
+        // storage.get() already returns a parsed object (never a string), and
+        // storage.set() already stringifies internally — re-parsing/re-stringifying
+        // here was throwing silently and corrupting the cached entry.
         try {
           const existing = await storage.get(`starred:${fileId}`);
-          const parsed = existing ? JSON.parse(existing) : {};
-          await storage.set(`starred:${fileId}`, JSON.stringify({
-            ...parsed,
+          await storage.set(`starred:${fileId}`, {
+            ...(existing || {}),
             downloadUrl: freshDownloadUrl,
             previewUrl:  freshPreviewUrl,
-          }));
+          });
         } catch {}
       } catch {
         // No internet — openFile will use localPath from fileRepository if cached

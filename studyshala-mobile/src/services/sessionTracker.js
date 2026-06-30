@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { storage } from '../database/db';
 
 const SESSION_PREFIX = 'session:';
+const ACTIVE_PREFIX = 'session:active:';
 const uuidv4 = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
 export const sessionTracker = {
@@ -10,19 +11,32 @@ export const sessionTracker = {
 
   async startSession(fileId, materialId) {
     const sessionId = uuidv4();
-    this._activeSessions[fileId] = {
+    const sessionData = {
       sessionId,
       fileId,
       materialId,
       startTime: new Date().toISOString(),
       lastPage: 1,
     };
+    this._activeSessions[fileId] = sessionData;
+
+    // Persist immediately so a crash/kill mid-session doesn't lose the start
+    // time entirely. Stored under a separate "active:" key (not createdAt) so
+    // getWeeklyStats()/getMaterialStats() — which filter on createdAt — don't
+    // count an unfinished session as a completed one.
+    try {
+      await storage.set(ACTIVE_PREFIX + sessionId, sessionData);
+    } catch {}
+
     return sessionId;
   },
 
   updatePage(fileId, page) {
     if (this._activeSessions[fileId]) {
       this._activeSessions[fileId].lastPage = page;
+      // Best-effort persist of progress too, so a crash mid-read still keeps
+      // the furthest page reached.
+      storage.set(ACTIVE_PREFIX + this._activeSessions[fileId].sessionId, this._activeSessions[fileId]).catch(() => {});
     }
   },
 
@@ -47,6 +61,7 @@ export const sessionTracker = {
     };
 
     await storage.set(SESSION_PREFIX + session.sessionId, sessionData);
+    await storage.delete(ACTIVE_PREFIX + session.sessionId);
     await this.saveLastPage(fileId, session.lastPage);
     delete this._activeSessions[fileId];
   },
@@ -64,6 +79,8 @@ export const sessionTracker = {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const sessions = await storage.getAllByPrefix(SESSION_PREFIX);
+    // Only count completed sessions (have createdAt) — active: entries don't,
+    // so they're naturally excluded here.
     const recent = sessions.filter(s => s.createdAt && new Date(s.createdAt) > weekAgo);
     const totalMinutes = recent.reduce((sum, s) => sum + (s.totalMinutes || 0), 0);
     return { totalMinutes, sessions: recent.length };
@@ -71,7 +88,7 @@ export const sessionTracker = {
 
   async getMaterialStats(materialId) {
     const sessions = await storage.getAllByPrefix(SESSION_PREFIX);
-    const matSessions = sessions.filter(s => s.materialId === materialId);
+    const matSessions = sessions.filter(s => s.createdAt && s.materialId === materialId);
     const byFile = {};
     for (const s of matSessions) {
       if (!byFile[s.fileId]) byFile[s.fileId] = { fileId: s.fileId, totalMinutes: 0, furthestPage: 0 };
@@ -81,3 +98,5 @@ export const sessionTracker = {
     return Object.values(byFile);
   },
 };
+
+export default sessionTracker;

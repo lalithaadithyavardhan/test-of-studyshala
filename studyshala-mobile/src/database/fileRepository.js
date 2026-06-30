@@ -7,18 +7,19 @@ export const fileRepository = {
 
   async upsert(file) {
     const existing = await this.getById(file.fileId) || {};
-    const updated = {
+    await storage.set(PREFIX + file.fileId, {
       ...existing,
       ...file,
       updatedAt: new Date().toISOString(),
-    };
-    await storage.set(PREFIX + file.fileId, updated);
+    });
 
     // Track file under materialId for quick lookup
-    const matFiles = await storage.get(MAT_FILES_PREFIX + file.materialId) || [];
-    if (!matFiles.includes(file.fileId)) {
-      matFiles.push(file.fileId);
-      await storage.set(MAT_FILES_PREFIX + file.materialId, matFiles);
+    if (file.materialId) {
+      const matFiles = await storage.get(MAT_FILES_PREFIX + file.materialId) || [];
+      if (!matFiles.includes(file.fileId)) {
+        matFiles.push(file.fileId);
+        await storage.set(MAT_FILES_PREFIX + file.materialId, matFiles);
+      }
     }
   },
 
@@ -34,7 +35,14 @@ export const fileRepository = {
 
   async setDownloaded(fileId, localPath) {
     const f = await this.getById(fileId);
-    if (f) await storage.set(PREFIX + fileId, { ...f, downloaded: true, localPath, updatedAt: new Date().toISOString() });
+    if (f) {
+      await storage.set(PREFIX + fileId, {
+        ...f,
+        downloaded: !!localPath,
+        localPath,
+        updatedAt: new Date().toISOString(),
+      });
+    }
   },
 
   async updateLastOpened(fileId) {
@@ -67,11 +75,15 @@ export const fileRepository = {
     await storage.delete(PREFIX + fileId);
   },
 
-  // ── NEW: getExpiredFiles ──────────────────────────────────────────────────────
-  // Returns all individually-cached files (e.g. starred files not part of a saved
-  // material) whose cachedAt is older than `days` days.
+  // ── getExpiredFiles ────────────────────────────────────────────────────────
+  // Returns all individually-cached files (e.g. starred files not part of a
+  // saved material) whose cachedAt is older than `days` days.
   //
-  // Rules from the handoff:
+  // IMPORTANT: storage.getAllByPrefix() returns an array of ALREADY-PARSED
+  // plain objects — NOT {key, value} pairs. Each `file` below IS the stored
+  // record itself; never access `.value` or re-JSON.parse it.
+  //
+  // Rules:
   //  - Expiry counts from cachedAt (set once on first cache, never reset on re-open).
   //  - Only evicts files where the parent material is NOT savedOffline (permanent).
   //  - Days = -1 means "Never expire" → returns empty array.
@@ -83,18 +95,13 @@ export const fileRepository = {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
 
-    // Pull every file: key: file:<fileId>
-    const allEntries = await storage.getAllByPrefix(PREFIX);
-    if (!allEntries || !allEntries.length) return [];
+    const allFiles = await storage.getAllByPrefix(PREFIX);
+    if (!allFiles || !allFiles.length) return [];
 
     const expired = [];
-    for (const entry of allEntries) {
+    for (const file of allFiles) {
       try {
-        const file = typeof entry.value === 'string'
-          ? JSON.parse(entry.value)
-          : entry.value;
-
-        if (!file) continue;
+        if (!file || typeof file !== 'object') continue;
 
         // Only consider files that have a cachedAt timestamp and are marked downloaded
         if (!file.cachedAt || !file.downloaded) continue;
@@ -102,7 +109,6 @@ export const fileRepository = {
         const cachedDate = new Date(file.cachedAt);
         if (isNaN(cachedDate)) continue;
 
-        // Expired if cachedAt is older than the cutoff
         if (cachedDate < cutoff) {
           expired.push(file);
         }
@@ -114,3 +120,5 @@ export const fileRepository = {
     return expired;
   },
 };
+
+export default fileRepository;

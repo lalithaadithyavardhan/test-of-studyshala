@@ -18,6 +18,7 @@ import { Alert } from 'react-native';
 import { trackRecentFile, getMaterialFiles } from '../api/studentApi';
 import { downloadManager } from '../services/downloadManager';
 import { fileRepository } from '../database/fileRepository';
+import { storage } from '../database/db';
 
 const CACHE_DIR = FileSystem.cacheDirectory + 'StudyShala/Cache/';
 
@@ -59,14 +60,11 @@ export const openFile = async (file, material, navigation) => {
   }
 
   const f = normalise(file);
-  console.log("========== OPEN FILE ==========");
-  console.log(f);
+
   // ── Step 1: Check local disk first ──────────────────────────────────────────
   // fileRepository stores localPath once a file has been downloaded.
   const localRecord = await fileRepository.getById(f._id);
-  console.log("Local Record:", localRecord);
-  console.log("Fresh Download URL:", freshDownloadUrl);
-console.log("Fresh Preview URL:", freshPreviewUrl);
+
   if (localRecord?.localPath) {
     // Verify the file actually still exists on disk (OS may have evicted it)
     try {
@@ -112,16 +110,17 @@ console.log("Fresh Preview URL:", freshPreviewUrl);
       if (fresh?.downloadUrl) freshDownloadUrl = fresh.downloadUrl;
       if (fresh?.previewUrl)  freshPreviewUrl  = fresh.previewUrl;
 
-      // Also update the starred cache so next open uses fresh URLs
+      // Also update the starred cache so next open uses fresh URLs.
+      // NOTE: storage.set() already JSON.stringifies internally — pass the
+      // plain object, never JSON.stringify it yourself here.
       try {
-        const { storage } = require('../database/db');
         const existing = await storage.get(`starred:${f._id}`);
         if (existing) {
-          await storage.set(`starred:${f._id}`, JSON.stringify({
+          await storage.set(`starred:${f._id}`, {
             ...existing,
             downloadUrl: freshDownloadUrl,
             previewUrl:  freshPreviewUrl,
-          }));
+          });
         }
       } catch {}
     } catch {
@@ -131,8 +130,18 @@ console.log("Fresh Preview URL:", freshPreviewUrl);
 
   // b) Download with fresh URL
   if (freshDownloadUrl) {
-    // Navigate first — student sees the screen immediately
-    navigateToViewer(navigation, { ...f, isDownloading: true }, material);
+    // Navigate first — student sees the screen immediately.
+    // IMPORTANT: also pass the fresh previewUrl/downloadUrl through here.
+    // "Recently viewed" entries never carry a previewUrl/downloadUrl of
+    // their own (the recent-files record is just fileId/fileName/etc), so
+    // without this the viewer has nothing to render until the background
+    // download finishes — which is what caused the blank-screen bug when
+    // opening files from the Dashboard's "Recently viewed" list.
+    navigateToViewer(
+      navigation,
+      { ...f, previewUrl: freshPreviewUrl || f.previewUrl, downloadUrl: freshDownloadUrl, isDownloading: true },
+      material,
+    );
 
     // Track recent file fire-and-forget
     trackRecentFile({

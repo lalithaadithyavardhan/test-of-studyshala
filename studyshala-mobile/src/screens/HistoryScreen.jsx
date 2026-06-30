@@ -387,12 +387,12 @@ export default function HistoryScreen({ navigation }) {
     let hadCache = false;
 
     // Step 1 — instant local cache read
+    // NOTE: storage.getAllByPrefix() returns plain parsed objects, not
+    // {key, value} pairs — each item below IS the history record itself.
     try {
       const cached = await storage.getAllByPrefix('history:');
       if (cached?.length) {
-        const items = cached
-          .map((entry) => { try { return JSON.parse(entry.value); } catch { return null; } })
-          .filter(Boolean);
+        const items = cached.filter(Boolean);
         if (items.length) {
           hadCache = true;
           setHistoryMap(new Map(items.map((m) => [m._id, m])));
@@ -412,13 +412,12 @@ export default function HistoryScreen({ navigation }) {
 
       // Step 3 — sync to local cache (clear stale keys, write fresh ones)
       try {
-        const existing = await storage.getAllByPrefix('history:');
-        for (const entry of (existing || [])) {
-          await storage.delete(entry.key);
-        }
+        await storage.deleteAllByPrefix('history:');
       } catch {}
       for (const m of items) {
-        try { await storage.set(`history:${m._id}`, JSON.stringify(m)); } catch {}
+        // storage.set() already JSON.stringifies internally — pass the plain
+        // object, never pre-stringify it.
+        try { await storage.set(`history:${m._id}`, m); } catch {}
       }
     } catch {
       // Server unreachable — if we already showed cached data, fail silently
@@ -477,7 +476,7 @@ export default function HistoryScreen({ navigation }) {
           const updated = { ...item, isSaved: true };
           next.set(materialId, updated);
           // Keep offline cache in sync so "Saved" survives app restarts offline
-          storage.set(`history:${materialId}`, JSON.stringify(updated)).catch(() => {});
+          storage.set(`history:${materialId}`, updated).catch(() => {});
         }
         return next;
       });

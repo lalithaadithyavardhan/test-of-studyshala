@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { fileRepository } from '../database/fileRepository';
 import { materialRepository } from '../database/materialRepository';
+import { downloadOrReuseFile, ensureDir } from './fileDownloader';
 
 const OFFLINE_DIR = FileSystem.documentDirectory + 'StudyShala/Downloads/';
 const CACHE_DIR = FileSystem.cacheDirectory + 'StudyShala/Cache/';
@@ -8,49 +9,44 @@ const CACHE_DIR = FileSystem.cacheDirectory + 'StudyShala/Cache/';
 export const downloadManager = {
 
   async ensureDirectories() {
-    const offlineInfo = await FileSystem.getInfoAsync(OFFLINE_DIR);
-    if (!offlineInfo.exists) await FileSystem.makeDirectoryAsync(OFFLINE_DIR, { intermediates: true });
-
-    const cacheInfo = await FileSystem.getInfoAsync(CACHE_DIR);
-    if (!cacheInfo.exists) await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
+    await ensureDir(OFFLINE_DIR);
+    await ensureDir(CACHE_DIR);
   },
 
   async openFile(file, downloadUrl, onProgress) {
     await this.ensureDirectories();
-    const localPath = CACHE_DIR + file.fileId + '_' + file.name;
 
-    const info = await FileSystem.getInfoAsync(localPath);
-    if (info.exists) {
-      await fileRepository.updateLastOpened(file.fileId);
-      return localPath;
-    }
-
-    // Check cache size limit before downloading
+    // Check cache size limit before downloading — but only if we don't already
+    // have a reusable copy on disk (downloadOrReuseFile will skip the network
+    // call entirely in that case, so the size limit shouldn't block it).
     const { cacheManager } = await import('./cacheManager');
     const maxMB = await cacheManager.getMaxCacheSize();
     const cacheSize = await cacheManager.getCacheSize();
     const maxBytes = maxMB * 1024 * 1024;
-    if (cacheSize >= maxBytes) {
+
+    const fileId = file.fileId || file._id;
+    const existing = fileId ? await fileRepository.getById(fileId) : null;
+    const alreadyCached = existing?.localPath
+      ? (await FileSystem.getInfoAsync(existing.localPath).catch(() => ({}))).exists
+      : false;
+
+    if (!alreadyCached && cacheSize >= maxBytes) {
       throw new Error(`Cache full. Maximum cache size is ${maxMB} MB. Clear cache or increase limit in Storage Settings.`);
     }
 
-    return await this._download(file, downloadUrl, localPath, onProgress);
+    return await downloadOrReuseFile({ ...file, downloadUrl }, CACHE_DIR, onProgress);
   },
 
   async saveOffline(materialId, files, downloadUrlFn, onProgress) {
     await this.ensureDirectories();
     const materialDir = OFFLINE_DIR + materialId + '/';
-    const dirInfo = await FileSystem.getInfoAsync(materialDir);
-    if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(materialDir, { intermediates: true });
+    await ensureDir(materialDir);
 
     for (const file of files) {
-      const localPath = materialDir + file.fileId + '_' + file.name;
-      const info = await FileSystem.getInfoAsync(localPath);
-      if (!info.exists) {
-        const url = await downloadUrlFn(file.driveFileId);
-        await this._download(file, url, localPath, onProgress);
-      }
-      await fileRepository.setDownloaded(file.fileId, localPath);
+      const url = await downloadUrlFn(file.driveFileId);
+      // downloadOrReuseFile will reuse an existing Cache-dir copy (e.g. from a
+      // previous preview) instead of re-downloading it into Downloads.
+      await downloadOrReuseFile({ ...file, materialId, downloadUrl: url }, materialDir, onProgress);
     }
 
     await materialRepository.setSavedOffline(materialId, true);
@@ -61,13 +57,8 @@ export const downloadManager = {
   },
 
   async downloadToDevice(file, downloadUrl) {
-    const downloadsDir = OFFLINE_DIR;
-    const dirInfo = await FileSystem.getInfoAsync(downloadsDir);
-    if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
-
-    const localPath = downloadsDir + file.name;
-    await this._download(file, downloadUrl, localPath, null);
-    return localPath;
+    await ensureDir(OFFLINE_DIR);
+    return await downloadOrReuseFile({ ...file, downloadUrl }, OFFLINE_DIR, null);
   },
 
   async syncMaterial(materialId, serverVersion, files, downloadUrlFn, onProgress) {
@@ -76,49 +67,17 @@ export const downloadManager = {
 
     const existingFiles = await fileRepository.getByMaterial(materialId);
     const existingIds = new Set(existingFiles.map(f => f.fileId));
+    const materialDir = OFFLINE_DIR + materialId + '/';
 
     for (const file of files) {
       if (!existingIds.has(file.fileId)) {
         const url = await downloadUrlFn(file.driveFileId);
-        const materialDir = OFFLINE_DIR + materialId + '/';
-        const localPath = materialDir + file.fileId + '_' + file.name;
-        await this._download(file, url, localPath, onProgress);
-        await fileRepository.setDownloaded(file.fileId, localPath);
+        await downloadOrReuseFile({ ...file, materialId, downloadUrl: url }, materialDir, onProgress);
       }
     }
 
     await materialRepository.updateVersion(materialId, serverVersion);
     return { synced: true };
-  },
-
-  async _download(file, url, localPath, onProgress) {
-    try {
-      const downloadResumable = FileSystem.createDownloadResumable(
-        url,
-        localPath,
-        {},
-        (progress) => {
-          if (onProgress) {
-            const percent = Math.round(
-              (progress.totalBytesWritten / progress.totalBytesExpectedToWrite) * 100
-            );
-            onProgress(file.fileId, percent);
-          }
-        }
-      );
-
-      const result = await downloadResumable.downloadAsync();
-      const info = await FileSystem.getInfoAsync(result.uri);
-      if (!info.exists || info.size === 0) throw new Error('File corrupted or empty');
-
-      await fileRepository.upsert({ ...file, downloaded: true, localPath: result.uri });
-      return result.uri;
-
-    } catch (error) {
-      const info = await FileSystem.getInfoAsync(localPath);
-      if (info.exists) await FileSystem.deleteAsync(localPath, { idempotent: true });
-      throw error;
-    }
   },
 
   async deleteOfflineMaterial(materialId) {
@@ -152,3 +111,5 @@ export const downloadManager = {
     };
   },
 };
+
+export default downloadManager;

@@ -566,8 +566,10 @@ export default function MaterialAccessScreen({ route, navigation }) {
   const loadStarred = useCallback(async () => {
     // Step 1 — load starred IDs from local cache instantly
     try {
+      // NOTE: getAllByPrefix() returns plain parsed objects (the stored
+      // record itself), not {key, value} pairs — use the fileId field.
       const result = await storage.getAllByPrefix('starred:');
-      const cachedIds = (result || []).map(entry => entry.key.replace('starred:', ''));
+      const cachedIds = (result || []).map(entry => entry.fileId).filter(Boolean);
       if (cachedIds.length) setStarredIds(cachedIds);
     } catch {}
 
@@ -579,7 +581,9 @@ export default function MaterialAccessScreen({ route, navigation }) {
 
       // Step 3 — sync to local cache: write each starred fileId with full data
       for (const f of (data.starredFiles || [])) {
-        await storage.set(`starred:${f.fileId}`, JSON.stringify({
+        // storage.set() already JSON.stringifies internally — never wrap the
+        // object in JSON.stringify() here, that double-encodes it.
+        await storage.set(`starred:${f.fileId}`, {
           fileId: f.fileId,
           fileName: f.fileName,
           mimeType: f.mimeType,
@@ -589,7 +593,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
           downloadUrl: f.downloadUrl || null,
           starredAt: f.starredAt || null,
           cachedAt: Date.now(),
-        }));
+        });
       }
     } catch {}
   }, []);
@@ -642,7 +646,9 @@ export default function MaterialAccessScreen({ route, navigation }) {
         });
         setStarredIds(prev => [...prev, file._id]);
         // Save to local cache — include previewUrl + downloadUrl so StarredScreen can open offline
-        await storage.set(`starred:${file._id}`, JSON.stringify({
+        // storage.set() already JSON.stringifies internally — never wrap in
+        // JSON.stringify() here, that double-encodes it.
+        await storage.set(`starred:${file._id}`, {
           fileId: file._id,
           fileName: file.name,
           mimeType: file.mimeType,
@@ -652,7 +658,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
           downloadUrl: file.downloadUrl || null,
           starredAt: new Date().toISOString(),
           cachedAt: Date.now(),
-        }));
+        });
 
         offlineSyncService.cacheFile(file).catch(() => {});
       }

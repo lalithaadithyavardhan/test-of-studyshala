@@ -17,7 +17,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, Share, Platform,
-  Dimensions, Animated,
+  Dimensions, Animated, ActivityIndicator,
 } from 'react-native';
 
 // Support both old and new Clipboard API
@@ -30,7 +30,7 @@ try {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { getRecentFiles } from '../api/studentApi';
+import { getRecentFiles, getMaterialFiles } from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
 import SidebarDrawer from '../components/SidebarDrawer';
 import { API_BASE_URL } from '../config/config';
@@ -222,11 +222,13 @@ export default function StudentDashboard({ navigation }) {
 
   const loadRecent = useCallback(async () => {
     // Step 1 — instant local cache read (works with zero internet)
+    // NOTE: storage.getAllByPrefix() returns an array of PLAIN PARSED OBJECTS,
+    // not {key, value} pairs — each `entry` below IS the recent-file record,
+    // so we must not do entry.value / JSON.parse(entry.value) here.
     try {
       const cached = await storage.getAllByPrefix('recent:');
       if (cached?.length) {
         const items = cached
-          .map((entry) => { try { return JSON.parse(entry.value); } catch { return null; } })
           .filter(Boolean)
           .sort((a, b) => new Date(b.viewedAt || 0) - new Date(a.viewedAt || 0))
           .slice(0, RECENT_FILES_LIMIT);
@@ -242,13 +244,13 @@ export default function StudentDashboard({ navigation }) {
 
       // Step 3 — sync to local cache so the list survives going offline
       try {
-        const existing = await storage.getAllByPrefix('recent:');
-        for (const entry of (existing || [])) {
-          await storage.delete(entry.key);
-        }
+        await storage.deleteAllByPrefix('recent:');
       } catch {}
       for (const f of serverFiles) {
-        try { await storage.set(`recent:${f.fileId}`, JSON.stringify(f)); } catch {}
+        // storage.set() already JSON.stringifies internally — pass the plain
+        // object, never JSON.stringify it yourself (that double-encodes it
+        // and makes it unreadable on the next read, which was the bug here).
+        try { await storage.set(`recent:${f.fileId}`, f); } catch {}
       }
     } catch {
       // No internet — keep showing whatever cache gave us above, fail silently
@@ -298,10 +300,58 @@ export default function StudentDashboard({ navigation }) {
     setRefreshing(false);
   };
 
-  const handleRecentFilePress = (file) => {
+  const [openingFileId, setOpeningFileId] = useState(null);
+
+  // ── Open a "recently viewed" file ────────────────────────────────────────
+  // NOTE: the recent-files record only ever contains
+  // {fileId, fileName, mimeType, materialId, subjectName, viewedAt} — it
+  // never carries a previewUrl/downloadUrl (those aren't part of what the
+  // server stores for recent files, and even if cached they expire after a
+  // few hours). So, same as StarredScreen.handleOpen(), we fetch a fresh
+  // download/preview URL from getMaterialFiles() FIRST and attach it to the
+  // file object before calling openFile() — passing a file with no URL at
+  // all is what caused the blank-screen bug.
+  const handleRecentFilePress = async (file) => {
+    const fileId     = file.fileId;
+    const materialId = file.materialId;
+    setOpeningFileId(fileId);
+
+    let freshDownloadUrl = file.downloadUrl || null;
+    let freshPreviewUrl  = file.previewUrl  || null;
+
+    if (materialId) {
+      try {
+        const { data } = await getMaterialFiles(materialId);
+        const allFiles = [
+          ...(data.files || []),
+          ...(data.subFolders || []).flatMap(sf => sf.files || []),
+        ];
+        const fresh = allFiles.find(
+          sf =>
+            String(sf._id) === String(fileId) ||
+            String(sf.fileId) === String(fileId)
+        );
+        if (fresh?.downloadUrl) freshDownloadUrl = fresh.downloadUrl;
+        if (fresh?.previewUrl)  freshPreviewUrl  = fresh.previewUrl;
+      } catch {
+        // No internet / access issue — openFile() will fall back to
+        // fileRepository's localPath if this file was cached before.
+      }
+    }
+
+    setOpeningFileId(null);
+
     openFile(
-      { ...file, _id: file.fileId, name: file.fileName },
-      { _id: file.materialId, subjectName: file.subjectName },
+      {
+        _id:         fileId,
+        fileId:      fileId,
+        name:        file.fileName,
+        fileName:    file.fileName,
+        mimeType:    file.mimeType,
+        previewUrl:  freshPreviewUrl,
+        downloadUrl: freshDownloadUrl,
+      },
+      { _id: materialId, subjectName: file.subjectName },
       navigation,
     );
 
@@ -315,7 +365,7 @@ export default function StudentDashboard({ navigation }) {
       const deduped = prev.filter((f) => f.fileId !== file.fileId);
       return [entry, ...deduped].slice(0, RECENT_FILES_LIMIT);
     });
-    storage.set(`recent:${file.fileId}`, JSON.stringify(entry)).catch(() => {});
+    storage.set(`recent:${file.fileId}`, entry).catch(() => {});
   };
 
   const firstName = user?.name?.split(' ')[0] || 'Student';
@@ -491,13 +541,18 @@ export default function StudentDashboard({ navigation }) {
                   style={styles.fileRow}
                   onPress={() => handleRecentFilePress(file)}
                   activeOpacity={0.8}
+                  disabled={openingFileId === file.fileId}
                 >
                   <View style={styles.fileIco}>
-                    <Ionicons
-                      name={getFileIcon(file.mimeType)}
-                      size={16}
-                      color={file.mimeType?.includes('pdf') ? C.accent : C.secondary}
-                    />
+                    {openingFileId === file.fileId ? (
+                      <ActivityIndicator size="small" color={C.accent} />
+                    ) : (
+                      <Ionicons
+                        name={getFileIcon(file.mimeType)}
+                        size={16}
+                        color={file.mimeType?.includes('pdf') ? C.accent : C.secondary}
+                      />
+                    )}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.fileName} numberOfLines={1}>{file.fileName}</Text>

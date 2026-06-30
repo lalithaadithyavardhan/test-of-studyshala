@@ -18,71 +18,20 @@
  *  - savedOffline: false → Cache dir, evicted after expiry days
  *  - cachedAt is set ONCE on first download. Never reset on re-open.
  *  - lastOpened is updated on each open — does NOT affect eviction.
+ *
+ * NOTE: actual file downloading + path-building now goes through
+ * fileDownloader.downloadOrReuseFile(), which is also used by downloadManager
+ * and preloadService. This guarantees the same fileId always resolves to the
+ * same sanitized local path everywhere, and reuses an existing cached copy
+ * instead of silently downloading duplicates.
  */
-
 import * as FileSystem from 'expo-file-system';
 import { fileRepository } from '../database/fileRepository';
 import { materialRepository } from '../database/materialRepository';
 import { cacheManager } from './cacheManager';
+import { downloadOrReuseFile, ensureDir } from './fileDownloader';
 
-const CACHE_DIR     = FileSystem.cacheDirectory     + 'StudyShala/Cache/';
-const DOWNLOADS_DIR = FileSystem.documentDirectory  + 'StudyShala/Downloads/';
-
-// ── Internal helpers ──────────────────────────────────────────────────────────
-
-async function ensureDir(dir) {
-  const info = await FileSystem.getInfoAsync(dir);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-  }
-}
-
-// Sanitise filename so it's safe as a path component
-function safeName(name = 'file') {
-  return name.replace(/[^\w.\-() ]/g, '_');
-}
-
-/**
- * Core download helper.
- * Downloads a file to `localPath`, then upserts the result into fileRepository.
- * Returns the local URI on success, or null on failure.
- *
- * @param {object} fileObj   — must have fileId, name/fileName, mimeType, materialId, downloadUrl
- * @param {string} localPath — full local URI to save to
- */
-async function _downloadToPath(fileObj, localPath) {
-  const id      = fileObj.fileId || fileObj._id;
-  const name    = fileObj.name   || fileObj.fileName || 'file';
-  const matId   = fileObj.materialId;
-  const dlUrl   = fileObj.downloadUrl;
-
-  if (!dlUrl) return null;
-
-  const downloadResumable = FileSystem.createDownloadResumable(dlUrl, localPath, {});
-  const result = await downloadResumable.downloadAsync();
-
-  if (!result?.uri) return null;
-
-  // Persist metadata — cachedAt is only set if not already set (first-cache rule)
-  const existing  = await fileRepository.getById(id);
-  const cachedAt  = existing?.cachedAt || new Date().toISOString();
-
-  await fileRepository.upsert({
-    fileId:      id,
-    name:        name,
-    fileName:    name,
-    mimeType:    fileObj.mimeType || '',
-    materialId:  matId,
-    downloaded:  true,
-    localPath:   result.uri,
-    cachedAt,                                    // Set once, never overwritten
-    lastOpened:  existing?.lastOpened || null,   // Preserve last-opened
-    previewUrl:  fileObj.previewUrl  || existing?.previewUrl  || null,
-    downloadUrl: fileObj.downloadUrl || existing?.downloadUrl || null,
-  });
-
-  return result.uri;
-}
+const CACHE_DIR = FileSystem.cacheDirectory + 'StudyShala/Cache/';
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -92,30 +41,17 @@ export const offlineSyncService = {
    * cacheFile(file)
    * ──────────────
    * Called when a student stars a single file.
-   * Downloads that one file to Cache dir in the background.
+   * Downloads that one file to Cache dir in the background (or reuses an
+   * existing copy if the file was already cached/downloaded elsewhere).
    *
    * file shape: { _id OR fileId, name OR fileName, mimeType, materialId, downloadUrl, previewUrl }
    */
   async cacheFile(file) {
-    const id   = file.fileId || file._id;
-    const name = file.name   || file.fileName || 'file';
-
+    const id = file.fileId || file._id;
     if (!id || !file.downloadUrl) return;
 
-    // Check if already on disk — avoid re-downloading
-    const existing = await fileRepository.getById(id);
-    if (existing?.localPath) {
-      const diskInfo = await FileSystem.getInfoAsync(existing.localPath).catch(() => ({}));
-      if (diskInfo.exists) return; // Already cached — nothing to do
-    }
-
     await ensureDir(CACHE_DIR);
-    const localPath = `${CACHE_DIR}${id}_${safeName(name)}`;
-
-    await _downloadToPath(
-      { ...file, fileId: id, name },
-      localPath,
-    );
+    await downloadOrReuseFile({ ...file, fileId: id }, CACHE_DIR).catch(() => {});
   },
 
   /**
@@ -124,10 +60,6 @@ export const offlineSyncService = {
    * Called when a student bookmarks (saves) a material.
    * Downloads ALL files for that material to the Cache dir in the background.
    * Files are downloaded one-by-one to avoid overwhelming the network.
-   *
-   * @param {string} materialId
-   * @param {Array}  files      — array of file objects from the server response
-   * @param {object} material   — material metadata (for materialRepository)
    */
   async cacheMaterial(materialId, files, material) {
     if (!materialId || !Array.isArray(files) || !files.length) return;
@@ -136,23 +68,10 @@ export const offlineSyncService = {
 
     for (const file of files) {
       try {
-        const id   = file._id || file.fileId;
-        const name = file.name || file.fileName || 'file';
-
+        const id = file._id || file.fileId;
         if (!id || !file.downloadUrl) continue;
 
-        // Skip if already on disk
-        const existing = await fileRepository.getById(id);
-        if (existing?.localPath) {
-          const diskInfo = await FileSystem.getInfoAsync(existing.localPath).catch(() => ({}));
-          if (diskInfo.exists) continue;
-        }
-
-        const localPath = `${CACHE_DIR}${id}_${safeName(name)}`;
-        await _downloadToPath(
-          { ...file, fileId: id, name, materialId },
-          localPath,
-        );
+        await downloadOrReuseFile({ ...file, fileId: id, materialId }, CACHE_DIR);
       } catch {
         // One file failed — continue with the rest
       }
@@ -166,7 +85,7 @@ export const offlineSyncService = {
    * Checks all saved materials for version changes and downloads new/changed files.
    *
    * @param {Array}    savedMaterials     — from materialRepository.getAllSaved()
-   * @param {Function} getMaterialFilesFn — API function: (materialId) => Promise<{ data }>
+   * @param {Function} getMaterialFilesFn — API function: (materialId) => Promise<AxiosResponse<{ material, files, subFolders }>>
    */
   async backgroundSync(savedMaterials, getMaterialFilesFn) {
     if (!Array.isArray(savedMaterials) || !savedMaterials.length) return;
@@ -176,7 +95,7 @@ export const offlineSyncService = {
         const { data } = await getMaterialFilesFn(mat.materialId);
 
         const serverVersion = data?.material?.version;
-        const localVersion  = mat.version;
+        const localVersion = mat.version;
 
         // Flatten all files from server (files + subfolder files)
         const serverFiles = [
@@ -184,7 +103,6 @@ export const offlineSyncService = {
           ...(data.subFolders || []).flatMap(sf => sf.files || []),
         ];
 
-        // If version changed OR we have files not yet cached, download them
         const versionChanged = serverVersion && serverVersion !== localVersion;
 
         for (const file of serverFiles) {
@@ -194,7 +112,6 @@ export const offlineSyncService = {
 
             const existing = await fileRepository.getById(id);
 
-            // Download if: version changed OR file not yet on disk
             let needsDownload = versionChanged;
             if (!needsDownload) {
               if (!existing?.localPath) {
@@ -206,18 +123,12 @@ export const offlineSyncService = {
             }
 
             if (needsDownload) {
-              await ensureDir(CACHE_DIR);
-              const name      = file.name || file.fileName || 'file';
-              const localPath = `${CACHE_DIR}${id}_${safeName(name)}`;
-              await _downloadToPath(
-                { ...file, fileId: id, name, materialId: mat.materialId },
-                localPath,
-              );
+              await downloadOrReuseFile({ ...file, fileId: id, materialId: mat.materialId }, CACHE_DIR);
             } else if (existing && versionChanged) {
               // File exists on disk but version changed — update URLs in DB
               await fileRepository.upsert({
                 ...existing,
-                previewUrl:  file.previewUrl  || existing.previewUrl,
+                previewUrl: file.previewUrl || existing.previewUrl,
                 downloadUrl: file.downloadUrl || existing.downloadUrl,
               });
             }
@@ -226,7 +137,6 @@ export const offlineSyncService = {
           }
         }
 
-        // Update material version in local DB if it changed
         if (versionChanged) {
           await materialRepository.upsert({
             ...mat,
@@ -245,8 +155,6 @@ export const offlineSyncService = {
    * Removes files from disk and fileRepository whose cachedAt is older than
    * the user's configured expiry setting (from cacheManager).
    *
-   * Called by cacheManager.runCleanup() and on app startup.
-   *
    * Rules:
    *  - Only evicts files where the parent material is NOT savedOffline (permanent)
    *  - Days = -1 → never evict (user chose "Never" expiry)
@@ -256,11 +164,9 @@ export const offlineSyncService = {
     const days = await cacheManager.getCacheDays();
     if (days === -1) return; // Never expire
 
-    // Get expired file records from fileRepository
     const expiredFiles = await fileRepository.getExpiredFiles(days);
     if (!expiredFiles.length) return;
 
-    // Load all saved-offline material IDs for protection check
     let savedMaterialIds = new Set();
     try {
       const saved = await materialRepository.getAllSaved();
@@ -269,10 +175,8 @@ export const offlineSyncService = {
 
     for (const file of expiredFiles) {
       try {
-        // Protect files whose material is permanently saved
         if (file.materialId && savedMaterialIds.has(file.materialId)) continue;
 
-        // Delete from disk
         if (file.localPath) {
           const diskInfo = await FileSystem.getInfoAsync(file.localPath).catch(() => ({}));
           if (diskInfo.exists) {
@@ -280,12 +184,11 @@ export const offlineSyncService = {
           }
         }
 
-        // Update fileRepository — mark as not downloaded, clear localPath
         await fileRepository.upsert({
           ...file,
           downloaded: false,
-          localPath:  null,
-          cachedAt:   null, // Reset so it gets a fresh cachedAt on next download
+          localPath: null,
+          cachedAt: null, // Reset so it gets a fresh cachedAt on next download
         });
       } catch {
         // One file eviction failed — continue
@@ -293,3 +196,5 @@ export const offlineSyncService = {
     }
   },
 };
+
+export default offlineSyncService;
