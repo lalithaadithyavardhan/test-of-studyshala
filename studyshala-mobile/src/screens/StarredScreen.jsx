@@ -22,10 +22,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import SidebarDrawer from '../components/SidebarDrawer';
-import { getStarredFiles, unstarFile } from '../api/studentApi';
+import { getStarredFiles, unstarFile, getMaterialFiles } from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { storage } from '../database/db';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const C = {
@@ -98,7 +99,7 @@ function formatStarredAt(dateStr) {
 }
 
 // ─── FileCard ─────────────────────────────────────────────────────────────────
-const FileCard = React.memo(function FileCard({ item, onOpen, onUnstar, unstarring }) {
+const FileCard = React.memo(function FileCard({ item, onOpen, onUnstar, unstarring, opening }) {
   const ico       = fileIconStyle(item.mimeType);
   const fileType  = getFileType(item.mimeType).toUpperCase();
   const starredLabel = formatStarredAt(item.starredAt);
@@ -164,9 +165,17 @@ const FileCard = React.memo(function FileCard({ item, onOpen, onUnstar, unstarri
       </View>
 
       {/* ── Open file button ── */}
-      <TouchableOpacity style={fc.openBtn} onPress={() => onOpen(item)} activeOpacity={0.82}>
-        <Ionicons name="open-outline" size={14} color={C.white} />
-        <Text style={fc.openBtnText}>Open file</Text>
+      <TouchableOpacity
+        style={[fc.openBtn, opening && fc.openBtnLoading]}
+        onPress={() => !opening && onOpen(item)}
+        activeOpacity={0.82}
+        disabled={opening}
+      >
+        {opening
+          ? <ActivityIndicator size={14} color={C.white} />
+          : <Ionicons name="open-outline" size={14} color={C.white} />
+        }
+        <Text style={fc.openBtnText}>{opening ? 'Loading…' : 'Open file'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -299,6 +308,9 @@ const fc = StyleSheet.create({
     borderRadius: R.lg,
     backgroundColor: C.accent,
   },
+  openBtnLoading: {
+    opacity: 0.75,
+  },
   openBtnText: {
     fontSize: T.sm,
     fontWeight: '700',
@@ -320,22 +332,48 @@ export default function StarredScreen() {
   const [sort, setSort]                 = useState('latest');
   const [typeFilter, setTypeFilter]     = useState('all');
   const [unstarringIds, setUnstarringIds] = useState(new Set());
+  const [openingId, setOpeningId]         = useState(null);
 
   const searchRef  = useRef(null);
   const searchAnim = useRef(new Animated.Value(0)).current;
 
   // ── Load ───────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
+    // Step 1 — load from local cache instantly
+    try {
+      const result = await storage.getAllByPrefix('starred:');
+      if (result?.length) {
+        const cached = result.map(entry => JSON.parse(entry.value));
+        setStarredFiles(cached);
+        setLoading(false); // show cached content immediately, no spinner
+      }
+    } catch {}
+
+    // Step 2 — fetch from server in background
     try {
       const { data } = await getStarredFiles();
-      setStarredFiles(data.starredFiles || []);
+      const serverFiles = data.starredFiles || [];
+      setStarredFiles(serverFiles);
+
+      // Step 3 — sync to local cache
+      // Clear stale keys first, then write fresh ones
+      try {
+        const existing = await storage.getAllByPrefix('starred:');
+        for (const entry of (existing || [])) {
+          await storage.delete(entry.key);
+        }
+      } catch {}
+      for (const f of serverFiles) {
+        await storage.set(`starred:${f.fileId}`, JSON.stringify(f));
+      }
     } catch {
-      Alert.alert('Error', 'Failed to load starred files.');
+      // Server failed — cached data already showing, stay silent
     }
   }, []);
 
   useEffect(() => {
-    (async () => { setLoading(true); await load(); setLoading(false); })();
+    setLoading(true);
+    load().finally(() => setLoading(false));
   }, [load]);
 
   const onRefresh = useCallback(async () => {
@@ -362,6 +400,8 @@ export default function StarredScreen() {
     try {
       await unstarFile(id);
       setStarredFiles((prev) => prev.filter((f) => (f.fileId || f._id) !== id));
+      // Remove from local cache so it's gone offline too
+      await storage.delete(`starred:${id}`);
     } catch {
       Alert.alert('Error', 'Failed to unstar file. Please try again.');
     } finally {
@@ -372,16 +412,75 @@ export default function StarredScreen() {
   }, []);
 
   // ── Open file ──────────────────────────────────────────────────────────────
-  const handleOpen = useCallback((file) => {
+  // The server's getStarredFiles API does not return downloadUrl / previewUrl.
+  // Those URLs also expire after a few hours even when cached.
+  // So before calling openFile(), we always fetch a fresh downloadUrl from
+  // getMaterialFiles(). This is fast (~200ms) and guarantees the download works.
+  // If internet is unavailable, we fall back to whatever is cached on disk
+  // (fileRepository localPath) — openFile handles that automatically.
+  const handleOpen = useCallback(async (file) => {
+    const fileId     = file.fileId || file._id;
+    const materialId = file.materialId;
+    console.log("========== STARRED ==========");
+    console.log("File ID:", file.fileId);
+    console.log("Material ID:", materialId);
+    console.log("File:", file);
+    setOpeningId(fileId);
+
+    let freshDownloadUrl = file.downloadUrl || null;
+    let freshPreviewUrl  = file.previewUrl  || null;
+
+    // Always try to get fresh URLs — cached ones may be expired or missing
+    if (materialId) {
+      try {
+        const { data } = await getMaterialFiles(materialId);
+        console.log("Material API Response:", data);
+        const allFiles = [
+          ...(data.files || []),
+          ...(data.subFolders || []).flatMap(sf => sf.files || []),
+        ];
+        console.log("All Files:", allFiles);
+        const fresh = allFiles.find(
+          sf =>
+               String(sf._id) === String(fileId) ||
+               String(sf.fileId) === String(fileId) ||
+               String(sf.id) === String(fileId)
+        );
+
+        console.log("Matched File:", fresh);
+        if (fresh?.downloadUrl) freshDownloadUrl = fresh.downloadUrl;
+        console.log("Download URL:", freshDownloadUrl);
+        console.log("Preview URL:", freshPreviewUrl);
+        if (fresh?.previewUrl)  freshPreviewUrl  = fresh.previewUrl;
+
+        // Update local starred cache with fresh URLs so next open skips this step
+        try {
+          const existing = await storage.get(`starred:${fileId}`);
+          const parsed = existing ? JSON.parse(existing) : {};
+          await storage.set(`starred:${fileId}`, JSON.stringify({
+            ...parsed,
+            downloadUrl: freshDownloadUrl,
+            previewUrl:  freshPreviewUrl,
+          }));
+        } catch {}
+      } catch {
+        // No internet — openFile will use localPath from fileRepository if cached
+      }
+    }
+
+    setOpeningId(null);
+
     openFile(
       {
-        _id: file.fileId,
-        name: file.fileName,
-        mimeType: file.mimeType,
-        previewUrl: file.previewUrl,
-        downloadUrl: file.downloadUrl,
+        _id:         fileId,
+        fileId:      fileId,
+        name:        file.fileName || file.name,
+        fileName:    file.fileName || file.name,
+        mimeType:    file.mimeType,
+        previewUrl:  freshPreviewUrl,
+        downloadUrl: freshDownloadUrl,
       },
-      { _id: file.materialId, subjectName: file.subjectName },
+      { _id: materialId, subjectName: file.subjectName },
       navigation,
     );
   }, [navigation]);
@@ -414,8 +513,9 @@ export default function StarredScreen() {
       onOpen={handleOpen}
       onUnstar={handleUnstar}
       unstarring={unstarringIds.has(item.fileId || item._id)}
+      opening={openingId === (item.fileId || item._id)}
     />
-  ), [handleOpen, handleUnstar, unstarringIds]);
+  ), [handleOpen, handleUnstar, unstarringIds, openingId]);
 
   const keyExtractor = useCallback((item) => item.fileId || item._id, []);
 

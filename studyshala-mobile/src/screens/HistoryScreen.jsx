@@ -26,6 +26,10 @@ import { Ionicons } from '@expo/vector-icons';
 import SidebarDrawer from '../components/SidebarDrawer';
 import { getAccessHistory, getMaterialFiles, saveMaterial } from '../api/studentApi';
 import { useAuth } from '../context/AuthContext';
+// ── Offline cache (same pattern as StarredScreen) ──────────────────────────────
+// Lets Access History show instantly from local cache with zero internet,
+// then silently refresh from the server in the background when online.
+import { storage } from '../database/db';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const C = {
@@ -362,18 +366,68 @@ export default function HistoryScreen({ navigation }) {
   const [saveFilter, setSaveFilter]     = useState('all');
   const [savingIds, setSavingIds]       = useState(new Set());
 
+  // ── Offline support (new, additive) ───────────────────────────────────────
+  // true only when we are currently showing cached data because the network
+  // call failed (no internet). Cleared automatically the moment a server
+  // fetch succeeds again — no manual toggling needed anywhere else.
+  const [isOffline, setIsOffline] = useState(false);
+
   const searchRef  = useRef(null);
   const searchAnim = useRef(new Animated.Value(0)).current;
 
   // ── Load ───────────────────────────────────────────────────────────────────
+  // Offline-first (same pattern as StarredScreen):
+  //   1. Instantly show whatever is cached on disk — works with zero internet,
+  //      even right after a fresh (already-logged-in) app launch.
+  //   2. In the background, fetch the latest from the server.
+  //   3. On success: replace the list with fresh data + re-sync the cache.
+  //   4. On failure (offline): keep showing cached data, mark isOffline=true,
+  //      and only show the old hard "Error" alert if there was no cache at all.
   const load = useCallback(async () => {
+    let hadCache = false;
+
+    // Step 1 — instant local cache read
+    try {
+      const cached = await storage.getAllByPrefix('history:');
+      if (cached?.length) {
+        const items = cached
+          .map((entry) => { try { return JSON.parse(entry.value); } catch { return null; } })
+          .filter(Boolean);
+        if (items.length) {
+          hadCache = true;
+          setHistoryMap(new Map(items.map((m) => [m._id, m])));
+          setHistoryOrder(items.map((m) => m._id));
+          setLoading(false); // show cached content immediately, no spinner
+        }
+      }
+    } catch {}
+
+    // Step 2 — fetch fresh data from server
     try {
       const { data } = await getAccessHistory();
       const items = data.history || [];
       setHistoryMap(new Map(items.map((m) => [m._id, m])));
       setHistoryOrder(items.map((m) => m._id));
+      setIsOffline(false);
+
+      // Step 3 — sync to local cache (clear stale keys, write fresh ones)
+      try {
+        const existing = await storage.getAllByPrefix('history:');
+        for (const entry of (existing || [])) {
+          await storage.delete(entry.key);
+        }
+      } catch {}
+      for (const m of items) {
+        try { await storage.set(`history:${m._id}`, JSON.stringify(m)); } catch {}
+      }
     } catch {
-      Alert.alert('Error', 'Failed to load access history.');
+      // Server unreachable — if we already showed cached data, fail silently
+      // (this is the expected "no internet, already logged in" case).
+      if (hadCache) {
+        setIsOffline(true);
+      } else {
+        Alert.alert('Error', 'Failed to load access history.');
+      }
     }
   }, []);
 
@@ -419,7 +473,12 @@ export default function HistoryScreen({ navigation }) {
       setHistoryMap((prev) => {
         const next = new Map(prev);
         const item = next.get(materialId);
-        if (item) next.set(materialId, { ...item, isSaved: true });
+        if (item) {
+          const updated = { ...item, isSaved: true };
+          next.set(materialId, updated);
+          // Keep offline cache in sync so "Saved" survives app restarts offline
+          storage.set(`history:${materialId}`, JSON.stringify(updated)).catch(() => {});
+        }
         return next;
       });
     } catch (e) {
@@ -493,6 +552,12 @@ export default function HistoryScreen({ navigation }) {
               <Text style={s.headerTitle}>Access History</Text>
               <Text style={s.headerSub}>{history.length} material{history.length !== 1 ? 's' : ''} viewed</Text>
             </View>
+            {isOffline && (
+              <View style={s.offlinePill}>
+                <Ionicons name="cloud-offline-outline" size={11} color={C.textMuted} />
+                <Text style={s.offlinePillText}>Offline</Text>
+              </View>
+            )}
           </View>
 
           <View style={s.headerRight}>
@@ -644,6 +709,15 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: T.md, fontWeight: '700', color: C.textPrimary },
   headerSub:   { fontSize: T.xs, color: C.textMuted, marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  // Offline indicator (new, additive)
+  offlinePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
+    borderRadius: R.full, paddingHorizontal: 8, paddingVertical: 3,
+    marginLeft: 6,
+  },
+  offlinePillText: { fontSize: 10, fontWeight: '600', color: C.textMuted },
 
   // Search
   searchWrap: {

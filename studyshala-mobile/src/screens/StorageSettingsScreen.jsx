@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { downloadManager } from '../services/downloadManager';
 import { cacheManager } from '../services/cacheManager';
 
-// ── Theme ────────────────────────────────────────────────────────────────────
 const C = {
   bg:          '#13120f',
   surface:     '#1e1c19',
@@ -21,7 +20,6 @@ const C = {
   textSec:     '#b1ada1',
   textMuted:   '#6b6760',
   danger:      '#f87171',
-  dangerBg:    'rgba(248,113,113,0.09)',
   success:     '#4ade80',
 };
 
@@ -33,37 +31,30 @@ const formatBytes = (bytes) => {
 };
 
 const CACHE_OPTIONS = [
-  { label: '30 Days',  value: 30  },
-  { label: '60 Days',  value: 60  },
-  { label: '90 Days',  value: 90  },
-  { label: 'Never',    value: -1  },
+  { label: '30 Days', value: 30  },
+  { label: '60 Days', value: 60  },
+  { label: '90 Days', value: 90  },
+  { label: 'Never',   value: -1  },
 ];
 
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function StorageSettingsScreen({ navigation }) {
-  const [stats,       setStats]       = useState({ offlineSize: 0, cacheSize: 0, freeStorage: 0 });
-  const [cacheDays,   setCacheDays]   = useState(90);
-  const [maxCacheMB,  setMaxCacheMB]  = useState(1024);
+  const [stats,         setStats]         = useState({ offlineSize: 0, cacheSize: 0, freeStorage: 0 });
+  const [cacheDays,     setCacheDays]     = useState(90);
+  const [maxCacheMB,    setMaxCacheMB]    = useState(1024);
   const [maxCacheInput, setMaxCacheInput] = useState('1024');
-  const [wifiOnly,    setWifiOnly]    = useState(true);
-  const [autoSync,    setAutoSync]    = useState(true);
 
   useEffect(() => { loadAll(); }, []);
 
   const loadAll = async () => {
-    const [s, days, maxMB, wifi, sync] = await Promise.all([
+    const [s, days, maxMB] = await Promise.all([
       downloadManager.getStorageStats(),
       cacheManager.getCacheDays(),
       cacheManager.getMaxCacheSize(),
-      cacheManager.getWifiOnly(),
-      cacheManager.getAutoSync(),
     ]);
     setStats(s);
     setCacheDays(days);
     setMaxCacheMB(maxMB);
     setMaxCacheInput(String(maxMB));
-    setWifiOnly(wifi);
-    setAutoSync(sync);
   };
 
   const handleCacheDaysChange = async (val) => {
@@ -81,16 +72,6 @@ export default function StorageSettingsScreen({ navigation }) {
     setMaxCacheMB(mb);
     await cacheManager.setMaxCacheSize(mb);
     Alert.alert('Saved', `Max cache size set to ${mb} MB.`);
-  };
-
-  const handleWifiToggle = async (val) => {
-    setWifiOnly(val);
-    await cacheManager.setWifiOnly(val);
-  };
-
-  const handleAutoSyncToggle = async (val) => {
-    setAutoSync(val);
-    await cacheManager.setAutoSync(val);
   };
 
   const handleClearCache = () => {
@@ -127,33 +108,38 @@ export default function StorageSettingsScreen({ navigation }) {
         </View>
         <View>
           <Text style={s.headerTitle}>Storage Settings</Text>
-          <Text style={s.headerSub}>Manage cache, downloads & sync</Text>
+          <Text style={s.headerSub}>Manage cache & downloads</Text>
         </View>
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
-        {/* ── Storage Usage ── */}
+        {/* Storage Usage */}
         <Text style={s.sectionTitle}>Storage Usage</Text>
         <View style={s.card}>
-          <Row label="Offline Saved" value={formatBytes(stats.offlineSize)} icon="cloud-done-outline" color={C.success} />
-          <Row label="Cache Used" value={formatBytes(stats.cacheSize)} icon="albums-outline" color={C.accent} />
-          <Row label="Free Storage" value={formatBytes(stats.freeStorage)} icon="phone-portrait-outline" color={C.textSec} last />
+          <Row label="Offline Saved"  value={formatBytes(stats.offlineSize)} icon="cloud-done-outline"      color={C.success} />
+          <Row label="Cache Used"     value={formatBytes(stats.cacheSize)}   icon="albums-outline"           color={C.accent}  />
+          <Row label="Free Storage"   value={formatBytes(stats.freeStorage)} icon="phone-portrait-outline"   color={C.textSec} last />
         </View>
 
-        {/* Cache usage bar */}
+        {/* Cache bar */}
         <View style={s.card}>
           <View style={s.barRow}>
-            <Text style={s.barLabel}>Cache {formatBytes(stats.cacheSize)} / {maxCacheMB >= 1024 ? (maxCacheMB/1024).toFixed(1)+' GB' : maxCacheMB+' MB'}</Text>
+            <Text style={s.barLabel}>
+              Cache {formatBytes(stats.cacheSize)} / {maxCacheMB >= 1024 ? (maxCacheMB / 1024).toFixed(1) + ' GB' : maxCacheMB + ' MB'}
+            </Text>
             <Text style={s.barPercent}>{usedPercent}%</Text>
           </View>
           <View style={s.barTrack}>
-            <View style={[s.barFill, { width: `${usedPercent}%`, backgroundColor: usedPercent > 80 ? C.danger : C.accent }]} />
+            <View style={[s.barFill, {
+              width: `${usedPercent}%`,
+              backgroundColor: usedPercent > 80 ? C.danger : C.accent,
+            }]} />
           </View>
           <Text style={s.storagePath}>📁 StudyShala/Cache  ·  StudyShala/Downloads</Text>
         </View>
 
-        {/* ── Max Cache Size ── */}
+        {/* Max Cache Size */}
         <Text style={s.sectionTitle}>Max Cache Size</Text>
         <View style={s.card}>
           <Text style={s.inputLabel}>Set limit in MB (default: 1024 MB = 1 GB)</Text>
@@ -175,7 +161,7 @@ export default function StorageSettingsScreen({ navigation }) {
           <Text style={s.inputHint}>Minimum 100 MB · Files exceeding this limit won't be cached</Text>
         </View>
 
-        {/* ── Auto Delete Cache ── */}
+        {/* Auto Delete Cache */}
         <Text style={s.sectionTitle}>Auto Delete Cache</Text>
         <View style={s.card}>
           {CACHE_OPTIONS.map((opt, i) => (
@@ -184,7 +170,9 @@ export default function StorageSettingsScreen({ navigation }) {
               style={[s.optionRow, i === CACHE_OPTIONS.length - 1 && { borderBottomWidth: 0 }]}
               onPress={() => handleCacheDaysChange(opt.value)}
             >
-              <Text style={[s.optionLabel, cacheDays === opt.value && { color: C.accent }]}>{opt.label}</Text>
+              <Text style={[s.optionLabel, cacheDays === opt.value && { color: C.accent }]}>
+                {opt.label}
+              </Text>
               <View style={[s.radio, cacheDays === opt.value && s.radioSelected]}>
                 {cacheDays === opt.value && <View style={s.radioDot} />}
               </View>
@@ -192,42 +180,7 @@ export default function StorageSettingsScreen({ navigation }) {
           ))}
         </View>
 
-        {/* ── Download Settings ── */}
-        <Text style={s.sectionTitle}>Download Settings</Text>
-        <View style={s.card}>
-          <View style={s.switchRow}>
-            <View style={s.switchInfo}>
-              <Ionicons name="wifi-outline" size={16} color={C.accent} />
-              <View>
-                <Text style={s.switchLabel}>WiFi Only Downloads</Text>
-                <Text style={s.switchSub}>Save data by downloading on WiFi only</Text>
-              </View>
-            </View>
-            <Switch
-              value={wifiOnly}
-              onValueChange={handleWifiToggle}
-              trackColor={{ false: C.elevated, true: C.accentBg }}
-              thumbColor={wifiOnly ? C.accent : C.textMuted}
-            />
-          </View>
-          <View style={[s.switchRow, { borderBottomWidth: 0 }]}>
-            <View style={s.switchInfo}>
-              <Ionicons name="sync-outline" size={16} color={C.accent} />
-              <View>
-                <Text style={s.switchLabel}>Auto Sync</Text>
-                <Text style={s.switchSub}>Check for updates when app opens</Text>
-              </View>
-            </View>
-            <Switch
-              value={autoSync}
-              onValueChange={handleAutoSyncToggle}
-              trackColor={{ false: C.elevated, true: C.accentBg }}
-              thumbColor={autoSync ? C.accent : C.textMuted}
-            />
-          </View>
-        </View>
-
-        {/* ── Manage ── */}
+        {/* Manage */}
         <Text style={s.sectionTitle}>Manage</Text>
         <View style={s.card}>
           <TouchableOpacity style={s.dangerBtn} onPress={handleClearCache}>
@@ -242,7 +195,6 @@ export default function StorageSettingsScreen({ navigation }) {
   );
 }
 
-// ── Row component ─────────────────────────────────────────────────────────────
 function Row({ label, value, icon, color, last }) {
   return (
     <View style={[s.row, last && { borderBottomWidth: 0 }]}>
@@ -255,7 +207,6 @@ function Row({ label, value, icon, color, last }) {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: C.bg },
   scroll:  { flex: 1 },
@@ -306,7 +257,7 @@ const s = StyleSheet.create({
     height: 6, backgroundColor: C.elevated,
     borderRadius: 3, overflow: 'hidden', marginBottom: 10,
   },
-  barFill:   { height: 6, borderRadius: 3 },
+  barFill:     { height: 6, borderRadius: 3 },
   storagePath: { fontSize: 11, color: C.textMuted, paddingBottom: 14, fontWeight: '500' },
 
   inputLabel: { fontSize: 12, color: C.textMuted, paddingTop: 14, marginBottom: 8 },
@@ -335,15 +286,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   radioSelected: { borderColor: C.accent },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.accent },
-
-  switchRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: C.border,
-  },
-  switchInfo:  { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  switchLabel: { fontSize: 14, color: C.textPrimary, fontWeight: '600' },
-  switchSub:   { fontSize: 11, color: C.textMuted, marginTop: 2 },
+  radioDot:      { width: 10, height: 10, borderRadius: 5, backgroundColor: C.accent },
 
   dangerBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

@@ -17,11 +17,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Animated, Pressable, Platform, Modal,
-  ScrollView, TextInput, Linking, Alert as RNAlert,
+  Animated, Pressable, Modal, ScrollView, Platform, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AboutModal from './AboutModal';
+import FeedbackModal from './FeedbackModal';
 
 // ─── Theme — identical to FacultyDashboardScreen ─────────────────────────────
 const C = {
@@ -59,6 +60,7 @@ const STUDENT_LINKS = [
   { key: 'History',        label: 'History',       icon: 'time-outline' },
   { key: '__divider__',     label: 'SETTINGS',          icon: null },
   { key: 'StorageSettings', label: 'Storage Settings',  icon: 'server-outline' },
+  { key: 'Downloads', label: 'Downloads', icon: 'arrow-down-circle-outline' },
 ];
 
 const FACULTY_LINKS = [
@@ -73,13 +75,10 @@ export default function SidebarDrawer({
   visible, onClose, navigation, role = 'student', user, onLogout, onRoleSwitch, onProfileSave,
 }) {
   const translateX  = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
-  const overlayAnim = useRef(new Animated.Value(0)).current;
   const [showLogout,   setShowLogout]   = useState(false);
   const [showAbout,    setShowAbout]    = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showProfile,  setShowProfile]  = useState(false);
-  const [fbText,       setFbText]       = useState('');
-  const [fbSending,    setFbSending]    = useState(false);
 
   // Editable profile fields (student only)
   const [editName,     setEditName]     = useState('');
@@ -104,47 +103,14 @@ export default function SidebarDrawer({
     }, 900);
   }, []);
 
-  const DEV_GITHUB = 'https://github.com/lalithaadithyavardhan';
-  const DEV_EMAIL  = 'adithyasai533@gmail.com';
-
-  const openGitHub = useCallback(() => {
-    Linking.openURL(DEV_GITHUB).catch(() =>
-      RNAlert.alert('Could not open', 'Check your internet connection and try again.')
-    );
-  }, []);
-
-  const openMail = useCallback((subject = '', body = '') => {
-    const uri = `mailto:${DEV_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(uri).catch(() =>
-      RNAlert.alert('No mail app found', 'Please email us at ' + DEV_EMAIL)
-    );
-  }, []);
-
-  const sendFeedback = useCallback(() => {
-    if (!fbText.trim()) return;
-    setFbSending(true);
-    // Small artificial delay so the spinner is visible, then open mail
-    setTimeout(() => {
-      openMail('StudyShala Feedback', fbText.trim());
-      setFbSending(false);
-      setFbText('');
-      setShowFeedback(false);
-    }, 500);
-  }, [fbText, openMail]);
+  // Feedback and About handled by FeedbackModal and AboutModal components
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(translateX, {
-        toValue: visible ? 0 : -SIDEBAR_WIDTH,
-        duration: 280,
-        useNativeDriver: true,
-      }),
-      Animated.timing(overlayAnim, {
-        toValue: visible ? 1 : 0,
-        duration: 240,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.timing(translateX, {
+      toValue: visible ? 0 : -SIDEBAR_WIDTH,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
   }, [visible]);
 
   const firstName    = user?.name?.split(' ')[0] || (role === 'faculty' ? 'Faculty' : 'Student');
@@ -163,16 +129,17 @@ export default function SidebarDrawer({
   };
 
   return (
-    <>
-      {/* ── Overlay ────────────────────────────────────────────────────────── */}
-      <Animated.View
-        pointerEvents={visible ? 'auto' : 'none'}
-        style={[s.overlay, { opacity: overlayAnim }]}
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      {/* ── Overlay ── */}
+      <Pressable style={s.overlay} onPress={onClose} />
 
-      {/* ── Drawer ─────────────────────────────────────────────────────────── */}
+      {/* ── Drawer ── */}
       <Animated.View style={[s.drawer, { transform: [{ translateX }] }]}>
         <SafeAreaView style={s.inner} edges={['top', 'bottom']}>
 
@@ -192,8 +159,12 @@ export default function SidebarDrawer({
             </TouchableOpacity>
           </View>
 
+
+
+
+
           {/* ── User identity card ────────────────────────────────────────── */}
-          <TouchableOpacity
+         {/* <TouchableOpacity
             style={[s.userCard, { borderColor: roleBorder, backgroundColor: roleBg }]}
             onPress={role === 'student' ? openProfileEdit : undefined}
             activeOpacity={role === 'student' ? 0.75 : 1}
@@ -218,7 +189,11 @@ export default function SidebarDrawer({
             ) : (
               <View style={s.onlineDot} />
             )}
-          </TouchableOpacity>
+          </TouchableOpacity> */}
+
+
+
+
 
           {/* ── Nav links ─────────────────────────────────────────────────── */}
           <View style={s.nav}>
@@ -456,237 +431,12 @@ export default function SidebarDrawer({
         </Pressable>
       </Modal>
 
-      {/* ── About modal ────────────────────────────────────────────────────── */}
-      <Modal
-        transparent
-        animationType="slide"
-        visible={showAbout}
-        onRequestClose={() => setShowAbout(false)}
-        statusBarTranslucent
-      >
-        <Pressable style={s.aboutBackdrop} onPress={() => setShowAbout(false)}>
-          <Pressable style={s.aboutCard} onPress={() => {}}>
-            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+      {/* ── About modal ── */}
+      <AboutModal visible={showAbout} onClose={() => setShowAbout(false)} />
 
-              {/* Handle bar */}
-              <View style={s.aboutHandle} />
-
-              {/* ── Brand ── */}
-              <View style={s.aboutBrandRow}>
-                <View style={[s.aboutBrandMark, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-                  <Text style={s.aboutBrandMarkText}>S</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.aboutAppName}>StudyShala</Text>
-                  <Text style={s.aboutTagline}>A material-sharing platform for students & faculty.</Text>
-                </View>
-              </View>
-
-              {/* What it is / how it helps */}
-              <Text style={s.aboutBio}>
-                StudyShala lets faculty upload study materials — PDFs, slides, docs — and share them with students via a simple access code. Students can save, star, and revisit materials anytime, making it easy to stay organised without chasing WhatsApp groups or emails.
-              </Text>
-
-              <View style={s.aboutDivider} />
-
-              {/* ── Tech stack ── */}
-              <Text style={s.aboutSectionLabel}>BUILT WITH</Text>
-              <View style={s.aboutFeatureGrid}>
-                {[
-                  { icon: 'logo-react',          text: 'React Native + Expo' },
-                  { icon: 'server-outline',       text: 'Node.js / Express backend' },
-                  { icon: 'cloud-outline',        text: 'Google Drive API for storage' },
-                  { icon: 'flame-outline',        text: 'Firebase Authentication' },
-                ].map((f) => (
-                  <View key={f.text} style={s.aboutFeatureItem}>
-                    <View style={[s.aboutFeatureIcon, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-                      <Ionicons name={f.icon} size={13} color={C.accent} />
-                    </View>
-                    <Text style={s.aboutFeatureText}>{f.text}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={s.aboutDivider} />
-
-              {/* ── Developer card ── */}
-              <Text style={s.aboutSectionLabel}>DEVELOPER</Text>
-              <View style={s.devCard}>
-
-                {/* Avatar + name */}
-                <View style={s.devTopRow}>
-                  <View style={s.devAvatar}>
-                    <Text style={s.devAvatarText}>A</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.devName}>Borra Adithya</Text>
-                    <Text style={s.devSubTitle}>lalithaadithyavardhan</Text>
-                    <Text style={s.devRole}>Student · Full-stack Developer</Text>
-                  </View>
-                </View>
-
-                {/* GitHub banner — Follow + Open */}
-                <View style={s.devGithubBanner}>
-                  <View style={s.devBannerLeft}>
-                    <View style={s.devBannerIconBox}>
-                      <Ionicons name="logo-github" size={20} color={C.textPrimary} />
-                    </View>
-                    <View>
-                      <Text style={s.devBannerHandle}>lalithaadithyavardhan</Text>
-                      <Text style={s.devBannerMeta}>github.com</Text>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    <TouchableOpacity style={s.devFollowBtn} onPress={openGitHub} activeOpacity={0.8}>
-                      <Ionicons name="person-add-outline" size={12} color={C.bg} />
-                      <Text style={s.devFollowBtnText}>Follow</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[s.devFollowBtn, { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border }]}
-                      onPress={openGitHub}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="open-outline" size={12} color={C.textPrimary} />
-                      <Text style={[s.devFollowBtnText, { color: C.textPrimary }]}>Open</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Email / Contact banner */}
-                <View style={[s.devGithubBanner, { borderColor: C.accentBorder, backgroundColor: C.accentBg, marginTop: 8 }]}>
-                  <View style={s.devBannerLeft}>
-                    <View style={[s.devBannerIconBox, { backgroundColor: 'rgba(222,115,86,0.15)', borderColor: C.accentBorder }]}>
-                      <Ionicons name="mail" size={18} color={C.accent} />
-                    </View>
-                    <View>
-                      <Text style={[s.devBannerHandle, { color: C.accent }]}>adithyasai533</Text>
-                      <Text style={s.devBannerMeta}>@gmail.com</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={[s.devFollowBtn, s.devContactBtn]}
-                    onPress={() => openMail('Hello — StudyShala', '')}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="mail-outline" size={12} color={C.accent} />
-                    <Text style={[s.devFollowBtnText, { color: C.accent }]}>Contact</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Footer line */}
-              <Text style={s.aboutFooterLine}>
-                © {new Date().getFullYear()} StudyShala · Built by Borra Adithya
-              </Text>
-
-              {/* Close */}
-              <TouchableOpacity
-                style={s.aboutCloseBtn}
-                onPress={() => setShowAbout(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.aboutCloseBtnText}>Close</Text>
-              </TouchableOpacity>
-
-              <View style={{ height: 8 }} />
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ── Feedback modal ──────────────────────────────────────────────────── */}
-      <Modal
-        transparent
-        animationType="slide"
-        visible={showFeedback}
-        onRequestClose={() => setShowFeedback(false)}
-        statusBarTranslucent
-      >
-        <Pressable style={s.aboutBackdrop} onPress={() => setShowFeedback(false)}>
-          <Pressable style={s.aboutCard} onPress={() => {}}>
-
-            {/* Handle */}
-            <View style={s.aboutHandle} />
-
-            {/* Header */}
-            <View style={s.fbHeaderRow}>
-              <View style={[s.fbIconBox, { backgroundColor: C.accentBg, borderColor: C.accentBorder }]}>
-                <Ionicons name="chatbox-ellipses" size={20} color={C.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.fbTitle}>Give Feedback</Text>
-                <Text style={s.fbSub}>Your thoughts help make StudyShala better</Text>
-              </View>
-            </View>
-
-            <View style={s.aboutDivider} />
-
-            {/* Quick-pick chips */}
-            <Text style={s.fbChipLabel}>What's this about?</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.fbChipRow}
-            >
-              {['Bug report', 'Feature request', 'UI/UX', 'Performance', 'Other'].map((chip) => (
-                <TouchableOpacity
-                  key={chip}
-                  style={s.fbChip}
-                  onPress={() => setFbText((t) => t ? t : chip + ': ')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={s.fbChipText}>{chip}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Text area */}
-            <TextInput
-              style={s.fbInput}
-              placeholder="Describe your feedback…"
-              placeholderTextColor={C.textMuted}
-              value={fbText}
-              onChangeText={setFbText}
-              multiline
-              numberOfLines={5}
-              textAlignVertical="top"
-              returnKeyType="default"
-            />
-
-            {/* Recipient note */}
-            <View style={s.fbRecipientRow}>
-              <Ionicons name="mail-outline" size={12} color={C.textMuted} />
-              <Text style={s.fbRecipientText}>Sends to adithyasai533@gmail.com</Text>
-            </View>
-
-            {/* Action buttons */}
-            <View style={s.fbBtnRow}>
-              <TouchableOpacity
-                style={[s.fbBtn, s.fbBtnCancel]}
-                onPress={() => { setShowFeedback(false); setFbText(''); }}
-                activeOpacity={0.8}
-              >
-                <Text style={s.fbBtnCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.fbBtn, s.fbBtnSend, (!fbText.trim() || fbSending) && s.fbBtnDisabled]}
-                onPress={sendFeedback}
-                disabled={!fbText.trim() || fbSending}
-                activeOpacity={0.8}
-              >
-                {fbSending
-                  ? <Ionicons name="hourglass-outline" size={14} color={C.white} />
-                  : <Ionicons name="send" size={14} color={C.white} />
-                }
-                <Text style={s.fbBtnSendText}>{fbSending ? 'Opening…' : 'Send feedback'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ height: 8 }} />
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </>
+      {/* ── Feedback modal ── */}
+      <FeedbackModal visible={showFeedback} onClose={() => setShowFeedback(false)} />
+    </Modal>
   );
 }
 
@@ -694,9 +444,9 @@ export default function SidebarDrawer({
 const s = StyleSheet.create({
 
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0, bottom: 0, left: 0, right: 0,
     backgroundColor: C.overlay,
-    zIndex: 20,
   },
 
   drawer: {
@@ -704,7 +454,6 @@ const s = StyleSheet.create({
     top: 0, bottom: 0, left: 0,
     width: SIDEBAR_WIDTH,
     backgroundColor: C.bg,
-    zIndex: 21,
     borderRightWidth: 1,
     borderRightColor: C.border,
     shadowColor: '#000',

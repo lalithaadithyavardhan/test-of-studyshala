@@ -21,8 +21,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import SidebarDrawer from '../components/SidebarDrawer';
-import { getSavedMaterials, removeSavedMaterial, getMaterialFiles } from '../api/studentApi';
+import { getSavedMaterials, removeSavedMaterial } from '../api/studentApi';
 import { useAuth } from '../context/AuthContext';
+import { materialRepository } from '../database/materialRepository';
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 const C = {
@@ -245,16 +246,53 @@ export default function SavedMaterialsScreen({ navigation }) {
   const searchAnim = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
+    // Step 1 — show cached saved materials instantly
+    try {
+      const cached = await materialRepository.getAllSaved();
+      if (cached.length) {
+        // Shape cached entries to match server response shape
+        const shaped = cached.map(m => ({
+          _id:         m.materialId,
+          subjectName: m.subject,
+          facultyName: m.facultyName,
+          department:  m.department,
+          semester:    m.semester,
+          accessCode:  m.accessCode,
+          savedAt:     m.savedAt,
+        }));
+        setMaterials(shaped);
+        setLoading(false); // show immediately, no spinner
+      }
+    } catch {}
+
+    // Step 2 — fetch from server in background
     try {
       const { data } = await getSavedMaterials();
-      setMaterials(data.materials || []);
+      const serverMaterials = data.materials || [];
+      setMaterials(serverMaterials);
+
+      // Step 3 — upsert each into local cache
+      for (const mat of serverMaterials) {
+        await materialRepository.upsert({
+          materialId:  mat._id,
+          subject:     mat.subjectName,
+          facultyName: mat.facultyName,
+          department:  mat.department,
+          semester:    mat.semester,
+          accessCode:  mat.accessCode,
+          version:     mat.version || 1,
+          savedOffline: true,
+          savedAt:     mat.savedAt || mat.createdAt,
+        });
+      }
     } catch {
-      Alert.alert('Error', 'Failed to load saved materials.');
+      // Server failed — cached data already showing, stay silent
     }
   }, []);
 
   useEffect(() => {
-    (async () => { setLoading(true); await load(); setLoading(false); })();
+    setLoading(true);
+    load().finally(() => setLoading(false));
   }, [load]);
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
@@ -270,15 +308,25 @@ export default function SavedMaterialsScreen({ navigation }) {
   };
 
   const handleOpen = async (material) => {
+    // Step 1 — navigate immediately with whatever data we have from the list
+    // MaterialAccessScreen will load its own files with its own cache-first logic
+    const parentNav = navigation.getParent() || navigation;
+    parentNav.navigate('MaterialAccess', { material });
+
+    // Step 2 — update lastOpened in local cache so HistoryScreen reflects this visit
     try {
-      const { data } = await getMaterialFiles(material._id);
-      const parentNav = navigation.getParent() || navigation;
-      parentNav.navigate('MaterialAccess', {
-        material: { ...material, ...data.material, files: data.files, subFolders: data.subFolders },
+      await materialRepository.upsert({
+        materialId:  material._id,
+        subject:     material.subjectName,
+        facultyName: material.facultyName,
+        department:  material.department,
+        semester:    material.semester,
+        accessCode:  material.accessCode,
+        version:     material.version || 1,
+        savedOffline: true,
+        lastOpened:  new Date().toISOString(),
       });
-    } catch (e) {
-      Alert.alert('Access denied', e.response?.data?.message || 'Could not open this material.');
-    }
+    } catch {}
   };
 
   const handleRemove = (material) => {
@@ -290,6 +338,17 @@ export default function SavedMaterialsScreen({ navigation }) {
           try {
             await removeSavedMaterial(material._id);
             setMaterials((prev) => prev.filter((m) => m._id !== material._id));
+            // Update local cache — mark as not saved offline
+            await materialRepository.upsert({
+              materialId:   material._id,
+              subject:      material.subjectName,
+              facultyName:  material.facultyName,
+              department:   material.department,
+              semester:     material.semester,
+              accessCode:   material.accessCode,
+              version:      material.version || 1,
+              savedOffline: false,
+            });
           } catch {
             Alert.alert('Error', 'Failed to remove material.');
           }

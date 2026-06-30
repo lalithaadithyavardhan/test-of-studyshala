@@ -11,9 +11,19 @@
  *  - Audio (mp3/m4a/wav/ogg)          → HTML5 <audio> WebView
  *  - Text / HTML / unknown            → WebView
  *
- * All WebView instances inject:
- *   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
- * to enable proper pinch-to-zoom on every content type (PDF, Office, images, etc.)
+ * OFFLINE CACHE FIX (this version):
+ *  The previous "offline" build fed the raw app-private `file://...cache/...`
+ *  path straight into <WebView>. On Android, WebView runs in its own process
+ *  and is NOT allowed to read files out of your app's private storage via
+ *  file://, even though your own JS/native code can — this is what produced
+ *  `net::ERR_ACCESS_DENIED` for every cached file.
+ *
+ *  Fix: on Android, cached file:// paths are converted to a content:// URI
+ *  via FileSystem.getContentUriAsync() (uses Android's FileProvider under the
+ *  hood) before being passed to WebView. iOS WKWebView has no such
+ *  restriction, so file:// is used as-is there. Everything else (the proven
+ *  remote-URL viewing path, unchanged from the working old version) is left
+ *  untouched.
  *
  * Header behaviour:
  *  - Auto-hides after 3 s of inactivity (animated slide-up)
@@ -44,7 +54,7 @@ import {
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue, useAnimatedStyle,
-  withSpring, withTiming, runOnJS,
+  withSpring, runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -78,8 +88,6 @@ const HEADER_H     = 60;   // px, excluding safe-area top
 const AUTO_HIDE_MS = 3000; // ms before header auto-hides
 
 // ─── Shared pinch-zoom viewport injection ─────────────────────────────────────
-// Inject this into EVERY WebView so all content (PDF, Office, images, video,
-// audio) respects the user's pinch-to-zoom gesture regardless of native settings.
 const PINCH_ZOOM_INJECTED_JS = `
 (function() {
   var meta = document.createElement('meta');
@@ -136,26 +144,15 @@ function buildViewUrl(file, _type) {
  * FileSystem.downloadAsync() happily downloads that HTML, writes it as .jpg,
  * and MediaLibrary then rejects the corrupt file — this is the primary reason
  * image downloads silently fail.
- *
- * Priority:
- *  1. file.downloadUrl — use it if it is already a non-Drive direct link.
- *  2. Extract the Drive file ID from any Drive URL shape and build the
- *     uc?export=download&confirm=t form.
- *     confirm=t skips the virus-scan interstitial that returns HTML for large files.
- *  3. Fall back to whatever URL is available (works for non-Drive hosts).
  */
 function buildImageDownloadUrl(file) {
   const candidates = [file.downloadUrl, file.previewUrl].filter(Boolean);
 
   for (const url of candidates) {
-    // Non-Drive URL — use as-is; it should be a direct link
     if (!url.includes('drive.google.com') && !url.includes('docs.google.com')) {
       return url;
     }
 
-    // Extract file ID from any common Drive URL shape:
-    //   /file/d/FILE_ID/view  |  /file/d/FILE_ID/preview
-    //   id=FILE_ID            |  /open?id=FILE_ID
     let fileId = null;
     const pathMatch  = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (pathMatch)  fileId = pathMatch[1];
@@ -170,9 +167,57 @@ function buildImageDownloadUrl(file) {
     }
   }
 
-  // Unrecognised shape — return first available and let it try
   return candidates[0] || '';
 }
+
+/**
+ * Resolve a cached app-private path into a URI that WebView is actually
+ * allowed to load.
+ *
+ *  - Android: WebView cannot read file:// paths under the app's private
+ *    storage (this is what caused ERR_ACCESS_DENIED). Convert to a
+ *    content:// URI via FileSystem.getContentUriAsync(), which uses
+ *    Android's FileProvider under the hood and IS readable by WebView.
+ *  - iOS: WKWebView can read file:// from the app sandbox directly, so the
+ *    path is returned unchanged.
+ *
+ * Returns null if resolution fails, so callers can fall back to the remote
+ * URL instead of feeding WebView a guaranteed-broken URI.
+ */
+async function resolveLocalUriForWebView(rawPath) {
+  if (!rawPath) return null;
+  const normalized = rawPath.startsWith('file://') ? rawPath : `file://${rawPath}`;
+
+  if (Platform.OS !== 'android') {
+    return normalized; // iOS: file:// works fine
+  }
+
+  if (!FileSystem || typeof FileSystem.getContentUriAsync !== 'function') {
+    console.log('[FVS] getContentUriAsync unavailable — cannot safely load cached file on Android');
+    return null;
+  }
+
+  try {
+    // IMPORTANT: FileSystem.downloadAsync()/createDownloadResumable() return
+    // result.uri already URL-encoded (e.g. spaces become %20). That's correct
+    // for a file:// URI, but getContentUriAsync() expects a literal filesystem
+    // path — passing the encoded form makes it look for a file that doesn't
+    // exist (one literally named "...%20..."), which surfaces as a confusing
+    // "isn't writable" IOException. Decoding here fixes it for every file
+    // type uniformly (this was never a rendering issue, just a wrong path).
+    const pathWithoutScheme = decodeURIComponent(normalized.replace('file://', ''));
+    const contentUri = await FileSystem.getContentUriAsync(pathWithoutScheme);
+    console.log('[FVS] resolveLocalUriForWebView: content:// =', contentUri);
+    return contentUri;
+  } catch (e) {
+    console.log('[FVS] resolveLocalUriForWebView ERROR:', e?.message);
+    return null;
+  }
+}
+
+// ─── Local cache repository ──────────────────────────────────────────────────
+let fileRepository = null;
+try { fileRepository = require('../database/fileRepository').fileRepository; } catch (_) {}
 
 // ─── Optional expo packages (static imports — Metro needs literal strings) ────
 let FileSystem   = null;
@@ -180,10 +225,6 @@ let MediaLibrary = null;
 let Sharing      = null;
 try { FileSystem   = require('expo-file-system');   } catch (_) {}
 try {
-  // expo-media-library bundles as an ES module. Under Metro, require() may return
-  // the module namespace object where named exports live directly on `m`, while
-  // `m.default` is the "default export" object that sometimes lacks them.
-  // We merge both so whichever shape the installed version uses, we get the functions.
   const m = require('expo-media-library');
   const base = (m && m.default) ? m.default : m;
   MediaLibrary = Object.assign({}, base, {
@@ -192,8 +233,6 @@ try {
     saveToLibraryAsync      : m.saveToLibraryAsync       ?? base.saveToLibraryAsync,
     createAssetAsync        : m.createAssetAsync         ?? base.createAssetAsync,
   });
-  console.log('[MediaLibrary] requestPermissionsAsync:', typeof MediaLibrary.requestPermissionsAsync);
-  console.log('[MediaLibrary] saveToLibraryAsync:     ', typeof MediaLibrary.saveToLibraryAsync);
 } catch (e) { console.log('[MediaLibrary] require error:', e); }
 try { Sharing      = require('expo-sharing');       } catch (_) {}
 
@@ -209,7 +248,6 @@ function MenuSheet({ visible, onClose, onShare, onSave, onBrowser }) {
     }).start();
   }, [visible]);
 
-  // Keep rendered so the slide-out animation plays before unmounting
   const actions = [
     { icon: 'share-outline',    label: 'Share link',      onPress: onShare   },
     { icon: 'download-outline', label: 'Save to device',  onPress: onSave    },
@@ -268,22 +306,7 @@ const ms = StyleSheet.create({
 });
 
 // ─── Image Viewer — Gesture Handler + Reanimated pinch / pan / double-tap ────
-/**
- * Replaces the old PanResponder-based zoom with react-native-gesture-handler
- * Gestures + react-native-reanimated Animated values.
- *
- * Gestures:
- *  - Pinch  → scale (clamped 1–5×; bounces back to 1 on over-pinch-out)
- *  - Pan    → free translate while zoomed; reset to centre when scale = 1
- *  - Double-tap → toggle between 1× and 2.5×
- *  - Single tap → forward to header toggle (only when not panning)
- *
- * The WebView carries the auth-cookie session, so we keep it as the image
- * renderer. GestureHandlerRootView wraps the whole tree so gestures compose
- * correctly on both iOS and Android.
- */
 function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
-  // ── Reanimated shared values ──────────────────────────────────────────────
   const scale      = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const tx         = useSharedValue(0);
@@ -291,7 +314,6 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
   const savedTx    = useSharedValue(0);
   const savedTy    = useSharedValue(0);
 
-  // ── Animated style applied to the WebView container ──────────────────────
   const animStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: tx.value },
@@ -300,7 +322,6 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
     ],
   }));
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   const SPRING = { damping: 20, stiffness: 200 };
 
   const resetZoom = () => {
@@ -313,7 +334,6 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
     savedTy.value    = 0;
   };
 
-  // ── Pinch gesture ─────────────────────────────────────────────────────────
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
       'worklet';
@@ -322,7 +342,6 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
     .onEnd(() => {
       'worklet';
       if (scale.value < 1) {
-        // Bounce back
         scale.value   = withSpring(1, SPRING);
         tx.value      = withSpring(0, SPRING);
         ty.value      = withSpring(0, SPRING);
@@ -332,12 +351,11 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
       savedScale.value = scale.value;
     });
 
-  // ── Pan gesture ───────────────────────────────────────────────────────────
   const panGesture = Gesture.Pan()
     .averageTouches(true)
     .onUpdate((e) => {
       'worklet';
-      if (scale.value <= 1.01) return; // no pan at 1×
+      if (scale.value <= 1.01) return;
       tx.value = savedTx.value + e.translationX;
       ty.value = savedTy.value + e.translationY;
     })
@@ -350,14 +368,12 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
         savedTy.value = 0;
         return;
       }
-      // Momentum decay
       tx.value      = withSpring(tx.value + e.velocityX * 0.08, SPRING);
       ty.value      = withSpring(ty.value + e.velocityY * 0.08, SPRING);
       savedTx.value = tx.value;
       savedTy.value = ty.value;
     });
 
-  // ── Double-tap gesture ────────────────────────────────────────────────────
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDuration(250)
@@ -371,7 +387,6 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
       }
     });
 
-  // ── Single-tap gesture (header toggle) ────────────────────────────────────
   const singleTap = Gesture.Tap()
     .numberOfTaps(1)
     .maxDuration(250)
@@ -381,13 +396,11 @@ function ImageViewer({ uri, onTap, onLoadEnd, onError }) {
       if (scale.value <= 1.05) runOnJS(onTap)();
     });
 
-  // ── Compose: pinch + pan run simultaneously; taps are exclusive ───────────
   const composed = Gesture.Simultaneous(
     Gesture.Exclusive(doubleTap, singleTap),
     Gesture.Simultaneous(pinchGesture, panGesture),
   );
 
-  // ── Injected JS: strip Google Drive chrome ────────────────────────────────
   const injectedJS = `
 (function() {
   var s = document.createElement('style');
@@ -411,6 +424,8 @@ true;
             domStorageEnabled
             sharedCookiesEnabled
             thirdPartyCookiesEnabled
+            allowFileAccess
+            allowUniversalAccessFromFileURLs
             scalesPageToFit={false}
             scrollEnabled={false}
             showsVerticalScrollIndicator={false}
@@ -428,7 +443,6 @@ true;
         </Reanimated.View>
       </GestureDetector>
 
-      {/* ── Floating toolbar: reset ── */}
       <View style={iv.toolbar} pointerEvents="box-none">
         <TouchableOpacity
           style={iv.btn}
@@ -446,7 +460,6 @@ true;
         </TouchableOpacity>
       </View>
 
-      {/* Gesture hint */}
       <Text style={iv.hint}>Pinch to zoom · Double-tap to fit</Text>
     </GestureHandlerRootView>
   );
@@ -483,20 +496,11 @@ const iv = StyleSheet.create({
 });
 
 // ─── Video Viewer (HTML5 <video> in WebView) ──────────────────────────────────
-/**
- * Renders video/audio in a proper HTML5 <video> or <audio> element inside a WebView.
- *
- * Fallback to WebView-based previewUrl (e.g. Google Drive embed) for remote sources
- * that require auth headers, since RN's native Video component cannot handle them.
- *
- * <meta name="viewport"> injection enables pinch-to-zoom on the video frame itself.
- */
 function MediaViewer({ uri, type, onTap }) {
   const { width: screenW, height: screenH } = Dimensions.get('window');
 
   let html;
   if (type === 'audio') {
-    // Audio — waveform UI with native controls
     html = `
       <!DOCTYPE html>
       <html>
@@ -531,7 +535,6 @@ function MediaViewer({ uri, type, onTap }) {
       </html>
     `;
   } else {
-    // Video — full-bleed HTML5 player with pinch-zoom
     html = `
       <!DOCTYPE html>
       <html>
@@ -585,6 +588,8 @@ function MediaViewer({ uri, type, onTap }) {
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
           allowsFullscreenVideo
+          allowFileAccess
+          allowUniversalAccessFromFileURLs
           showsVerticalScrollIndicator={false}
           showsHorizontalScrollIndicator={false}
           onLoadEnd={() => {}}
@@ -624,12 +629,11 @@ export default function FileViewerScreen({ route, navigation }) {
   const [error,         setError]         = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
-  const [saveStatus,    setSaveStatus]    = useState(''); // '', 'saving', 'saved', 'error'
+  const [saveStatus,    setSaveStatus]    = useState('');
 
   const headerAnim   = useRef(new Animated.Value(1)).current;
   const hideTimerRef = useRef(null);
 
-  // Keep latest values in refs to avoid stale closures in timer callbacks
   const loadingRef  = useRef(loading);
   const errorRef    = useRef(error);
   const menuOpenRef = useRef(menuOpen);
@@ -638,7 +642,33 @@ export default function FileViewerScreen({ route, navigation }) {
   useEffect(() => { menuOpenRef.current = menuOpen; }, [menuOpen]);
 
   const fileType = getFileType(file ?? {});
-  const viewUrl  = buildViewUrl(file ?? {}, fileType);
+
+  // ── Offline cache state ───────────────────────────────────────────────────
+  // rawLocalPath: whatever fileRepository / route param gives us (app-private file://)
+  // resolvedLocalUri: the WebView-safe URI derived from rawLocalPath (content:// on
+  //   Android, file:// on iOS). null until resolved or if resolution fails.
+  const [rawLocalPath,     setRawLocalPath]     = useState(file?.localPath || null);
+  const [resolvedLocalUri, setResolvedLocalUri] = useState(null);
+  const pollTimerRef = useRef(null);
+
+  // Whenever rawLocalPath changes, resolve it to a URI WebView can actually load.
+  useEffect(() => {
+    let cancelled = false;
+    if (!rawLocalPath) {
+      setResolvedLocalUri(null);
+      return;
+    }
+    (async () => {
+      const resolved = await resolveLocalUriForWebView(rawLocalPath);
+      if (!cancelled) setResolvedLocalUri(resolved);
+    })();
+    return () => { cancelled = true; };
+  }, [rawLocalPath]);
+
+  // viewUrl: prefer the resolved cached URI; if cache resolution hasn't
+  // finished yet OR failed, fall back to the proven remote previewUrl —
+  // never feed WebView a raw app-private file:// path.
+  const viewUrl = resolvedLocalUri || buildViewUrl(file ?? {}, fileType);
   const isLoading = loading;
 
   // ── Header show / hide ────────────────────────────────────────────────────
@@ -652,7 +682,6 @@ export default function FileViewerScreen({ route, navigation }) {
     Animated.timing(headerAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
     clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
-      // Read current values from refs — no stale-closure risk
       if (!loadingRef.current && !errorRef.current && !menuOpenRef.current) {
         hideHeader();
       }
@@ -672,13 +701,11 @@ export default function FileViewerScreen({ route, navigation }) {
     });
   }, [headerAnim, showHeader]);
 
-  // Start auto-hide once content finishes loading
   useEffect(() => {
     if (!loading && !error) showHeader();
     return () => clearTimeout(hideTimerRef.current);
   }, [loading, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep header visible while menu is open
   useEffect(() => {
     if (menuOpen) {
       clearTimeout(hideTimerRef.current);
@@ -686,9 +713,48 @@ export default function FileViewerScreen({ route, navigation }) {
     }
   }, [menuOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Check fileRepository on mount + poll if download is in progress ───────
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkCache = async () => {
+      try {
+        if (file?._id && fileRepository) {
+          const rec = await fileRepository.getById(file._id);
+          if (rec?.localPath && rec?.downloaded && !cancelled) {
+            setRawLocalPath(rec.localPath);
+          }
+          await fileRepository.updateLastOpened(file._id);
+        }
+      } catch (e) {
+        console.log('[FVS] checkCache ERROR:', e?.message);
+      }
+    };
+    checkCache();
+
+    if (file?.isDownloading && !file?.localPath && file?._id && fileRepository) {
+      const poll = async () => {
+        if (cancelled) return;
+        try {
+          const rec = await fileRepository.getById(file._id);
+          if (rec?.localPath && rec?.downloaded) {
+            if (!cancelled) setRawLocalPath(rec.localPath);
+            return;
+          }
+        } catch (_) {}
+        if (!cancelled) pollTimerRef.current = setTimeout(poll, 1500);
+      };
+      pollTimerRef.current = setTimeout(poll, 1500);
+    }
+
+    return () => {
+      cancelled = true;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  // ── Shared: download file to local cache ─────────────────────────────────
   const downloadToCache = async () => {
     if (!FileSystem) throw new Error('expo-file-system not available');
     const url = file?.downloadUrl || file?.previewUrl;
@@ -701,7 +767,6 @@ export default function FileViewerScreen({ route, navigation }) {
     return result.uri;
   };
 
-  // ── Share the actual file (not a link) ────────────────────────────────────
   const handleShare = async () => {
     try {
       if (Sharing) {
@@ -709,7 +774,6 @@ export default function FileViewerScreen({ route, navigation }) {
         const canShare  = await Sharing.isAvailableAsync();
         if (canShare) { await Sharing.shareAsync(localUri, { mimeType: file?.mimeType || '*/*', dialogTitle: file?.name || 'Share file' }); return; }
       }
-      // Fallback: share the URL as text if expo-sharing unavailable
       await Share.share({ message: `${file?.name ?? 'File'}\n${file?.downloadUrl ?? file?.previewUrl ?? ''}` });
     } catch (e) {
       await Share.share({ message: `${file?.name ?? 'File'}\n${file?.downloadUrl ?? file?.previewUrl ?? ''}` });
@@ -721,22 +785,18 @@ export default function FileViewerScreen({ route, navigation }) {
     if (url) Linking.openURL(url).catch(() => {});
   };
 
-  // ── Save to device (silently — no share sheet) ────────────────────────────
   const handleSave = async () => {
-    // ── IMAGE: in-app download with progress + real error reporting ───────────
     const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     const ext = (file?.name || '').split('.').pop().toLowerCase();
     const isImage = fileType === 'image' && IMAGE_EXTS.includes(ext);
 
     if (isImage) {
-      // Guard: expo-file-system required
       if (!FileSystem) {
         setSaveStatus('error:expo-file-system not installed');
         setTimeout(() => setSaveStatus(''), 3500);
         return;
       }
 
-      // Bug fix #1: use a direct-download URL, not the HTML viewer/preview URL
       const url = buildImageDownloadUrl(file);
       if (!url) {
         setSaveStatus('error:No download URL available');
@@ -749,7 +809,6 @@ export default function FileViewerScreen({ route, navigation }) {
       const localUri = FileSystem.cacheDirectory + fileName;
 
       try {
-        // createDownloadResumable gives us byte-level progress callbacks
         const task = FileSystem.createDownloadResumable(
           url,
           localUri,
@@ -766,8 +825,6 @@ export default function FileViewerScreen({ route, navigation }) {
 
         const result = await task.downloadAsync();
 
-        // Bug fix #2: a non-200 (e.g. 403 from Drive, or HTML redirect page)
-        // must be caught here rather than silently saved as a corrupt file
         if (!result) throw new Error('Download returned no result');
         if (result.status !== 200) {
           throw new Error(`Server returned HTTP ${result.status} — check the download URL`);
@@ -775,23 +832,14 @@ export default function FileViewerScreen({ route, navigation }) {
 
         setSaveStatus('downloading:100');
 
-        // ── MediaLibrary: debug + permission + save ──────────────────────────
         if (!MediaLibrary) {
           throw new Error('expo-media-library not installed');
         }
 
-        console.log('[MediaLibrary] object keys:', Object.keys(MediaLibrary));
-        console.log('[MediaLibrary] requestPermissionsAsync:', typeof MediaLibrary.requestPermissionsAsync);
-        console.log('[MediaLibrary] saveToLibraryAsync:     ', typeof MediaLibrary.saveToLibraryAsync);
-
-        // expo-media-library ≥ 15 (Expo SDK 49+): requestPermissionsAsync exists.
-        // Older versions used MediaLibrary.getPermissionsAsync + requestPermissionsAsync
-        // under different shapes. We probe and use whatever is available.
         let perm;
         if (typeof MediaLibrary.requestPermissionsAsync === 'function') {
           perm = await MediaLibrary.requestPermissionsAsync();
         } else if (typeof MediaLibrary.getPermissionsAsync === 'function') {
-          // Try read-only first; if not granted, we cannot proceed without the function
           perm = await MediaLibrary.getPermissionsAsync();
           if (perm.status !== 'granted') {
             throw new Error(
@@ -813,8 +861,6 @@ export default function FileViewerScreen({ route, navigation }) {
           throw new Error(`Permission not granted (status: ${perm.status})`);
         }
 
-        // saveToLibraryAsync is the standard API; createAssetAsync is the lower-level
-        // equivalent and is always present — use it as fallback.
         if (typeof MediaLibrary.saveToLibraryAsync === 'function') {
           await MediaLibrary.saveToLibraryAsync(result.uri);
         } else if (typeof MediaLibrary.createAssetAsync === 'function') {
@@ -827,7 +873,6 @@ export default function FileViewerScreen({ route, navigation }) {
         setTimeout(() => setSaveStatus(''), 2500);
 
       } catch (err) {
-        // Bug fix #4: surface the real error message instead of a silent "Failed"
         const msg = err?.message || String(err) || 'Unknown error';
         setSaveStatus(`error:${msg}`);
         setTimeout(() => setSaveStatus(''), 4000);
@@ -835,12 +880,10 @@ export default function FileViewerScreen({ route, navigation }) {
       return;
     }
 
-    // ── ALL OTHER FILE TYPES: original behaviour, untouched ──────────────────
     setSaveStatus('saving');
     try {
       const localUri = await downloadToCache();
 
-      // Images & videos → Media Library (Camera Roll / Gallery)
       if ((fileType === 'image' || fileType === 'video') && MediaLibrary) {
         const perm = await MediaLibrary.requestPermissionsAsync();
         if (perm.status === 'granted') {
@@ -850,7 +893,6 @@ export default function FileViewerScreen({ route, navigation }) {
         }
       }
 
-      // Audio & other files → share-as-save (best we can do without Storage permission)
       if (Sharing) {
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
@@ -860,7 +902,6 @@ export default function FileViewerScreen({ route, navigation }) {
         }
       }
 
-      // Last resort: open in browser so the browser can download it
       Linking.openURL(file?.downloadUrl || file?.previewUrl || '').catch(() => {});
       setSaveStatus('saved');
     } catch (_) {
@@ -880,7 +921,19 @@ export default function FileViewerScreen({ route, navigation }) {
           uri={viewUrl}
           onTap={toggleHeader}
           onLoadEnd={() => setLoading(false)}
-          onError={() => { setLoading(false); setError(true); }}
+          onError={() => {
+            // If a resolved cached URI just failed, drop back to the remote
+            // URL instead of showing a hard error — the user still gets to
+            // view the file as long as they're online.
+            if (resolvedLocalUri) {
+              console.log('[FVS] cached image failed to load — falling back to remote URL');
+              setResolvedLocalUri(null);
+              setRawLocalPath(null);
+              return;
+            }
+            setLoading(false);
+            setError(true);
+          }}
         />
       );
     }
@@ -889,15 +942,20 @@ export default function FileViewerScreen({ route, navigation }) {
       return <MediaViewer uri={viewUrl} type={fileType} onTap={toggleHeader} />;
     }
 
-    // PDF / Office / Text / WebView — WebView with injected pinch-zoom viewport.
-    // On Android, scalesPageToFit="true" only does initial-fit; injecting the
-    // <meta viewport> above gives real pinch-to-zoom. On iOS WKWebView this is
-    // also the reliable path for PDFs and Office docs.
     return (
       <WebView
         source={{ uri: viewUrl }}
         onLoadEnd={() => setLoading(false)}
-        onError={() => { setLoading(false); setError(true); }}
+        onError={() => {
+          if (resolvedLocalUri) {
+            console.log('[FVS] cached doc failed to load — falling back to remote URL');
+            setResolvedLocalUri(null);
+            setRawLocalPath(null);
+            return;
+          }
+          setLoading(false);
+          setError(true);
+        }}
         style={s.webview}
         javaScriptEnabled
         domStorageEnabled
@@ -905,6 +963,8 @@ export default function FileViewerScreen({ route, navigation }) {
         mediaPlaybackRequiresUserAction={false}
         startInLoadingState={false}
         allowsFullscreenVideo
+        allowFileAccess
+        allowUniversalAccessFromFileURLs
         scalesPageToFit={Platform.OS === 'android'}
         setSupportMultipleWindows={false}
         injectedJavaScript={PINCH_ZOOM_INJECTED_JS}
@@ -929,11 +989,9 @@ export default function FileViewerScreen({ route, navigation }) {
     <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor={C.surface} />
 
-      {/* ── Full-screen content ── */}
       <View style={[s.content, { paddingTop: insets.top }]}>
         {renderContent()}
 
-        {/* Loading overlay */}
         {isLoading && !error && (
           <View style={s.loadingOverlay}>
             <View style={s.loadingCard}>
@@ -944,7 +1002,6 @@ export default function FileViewerScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Error state */}
         {error && (
           <View style={s.errorWrap}>
             <View style={s.errorCard}>
@@ -968,7 +1025,6 @@ export default function FileViewerScreen({ route, navigation }) {
         )}
       </View>
 
-      {/* ── Floating header ── */}
       <Animated.View
         style={[
           s.headerWrap,

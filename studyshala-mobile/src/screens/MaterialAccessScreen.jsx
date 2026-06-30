@@ -16,6 +16,10 @@ import {
 } from '../api/studentApi';
 import { downloadFile } from '../utils/fileActions';
 import { useAuth } from '../context/AuthContext';
+import { materialRepository } from '../database/materialRepository';
+import { storage } from '../database/db';
+
+import { offlineSyncService } from '../services/offlineSyncService';
 
 // ── Theme — identical to SavedMaterialsScreen ─────────────────────────────────
 const C = {
@@ -521,22 +525,72 @@ export default function MaterialAccessScreen({ route, navigation }) {
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const loadFiles = useCallback(async () => {
-    setLoading(true);
+    // Step 1 — show cached files instantly, no spinner
+    try {
+      const cachedRaw = await AsyncStorage.getItem(`files:${initialMaterial._id}`);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached.files?.length || cached.subFolders?.length) {
+          setFiles(cached.files || []);
+          setSubFolders(cached.subFolders || []);
+          setLoading(false);
+        }
+      }
+    } catch {}
+
+    // Step 2 — fetch from server in background
     try {
       const { data } = await getMaterialFiles(initialMaterial._id);
       setMaterial({ ...initialMaterial, ...data.material });
       setFiles(data.files || []);
       setSubFolders(data.subFolders || []);
       if (data.material?.isSaved !== undefined) setIsSaved(!!data.material.isSaved);
+
+      // Step 3 — persist fresh data to local cache
+      await AsyncStorage.setItem(
+        `files:${initialMaterial._id}`,
+        JSON.stringify({ files: data.files || [], subFolders: data.subFolders || [] }),
+      );
     } catch (e) {
-      showDialog('Error', e.response?.data?.message || 'Failed to load files.', [{ text: 'OK', style: 'cancel' }]);
+      // Server failed — cached data already showing, stay silent
+      // Only show error if the screen is completely empty
+      setFiles(prev => {
+        if (prev.length === 0) {
+          showDialog('Error', e.response?.data?.message || 'Failed to load files.', [{ text: 'OK', style: 'cancel' }]);
+        }
+        return prev;
+      });
     } finally { setLoading(false); }
   }, [initialMaterial]);
 
   const loadStarred = useCallback(async () => {
+    // Step 1 — load starred IDs from local cache instantly
+    try {
+      const result = await storage.getAllByPrefix('starred:');
+      const cachedIds = (result || []).map(entry => entry.key.replace('starred:', ''));
+      if (cachedIds.length) setStarredIds(cachedIds);
+    } catch {}
+
+    // Step 2 — fetch from server in background
     try {
       const { data } = await getStarredFiles();
-      setStarredIds((data.starredFiles || []).map(s => s.fileId));
+      const serverIds = (data.starredFiles || []).map(s => s.fileId);
+      setStarredIds(serverIds);
+
+      // Step 3 — sync to local cache: write each starred fileId with full data
+      for (const f of (data.starredFiles || [])) {
+        await storage.set(`starred:${f.fileId}`, JSON.stringify({
+          fileId: f.fileId,
+          fileName: f.fileName,
+          mimeType: f.mimeType,
+          materialId: f.materialId,
+          subjectName: f.subjectName,
+          previewUrl: f.previewUrl || null,
+          downloadUrl: f.downloadUrl || null,
+          starredAt: f.starredAt || null,
+          cachedAt: Date.now(),
+        }));
+      }
     } catch {}
   }, []);
 
@@ -579,12 +633,28 @@ export default function MaterialAccessScreen({ route, navigation }) {
       if (already) {
         await unstarFile(file._id);
         setStarredIds(prev => prev.filter(id => id !== file._id));
+        // Remove from local cache
+        await storage.delete(`starred:${file._id}`);
       } else {
         await starFile({
           fileId: file._id, fileName: file.name, mimeType: file.mimeType,
           materialId: material._id, subjectName: material.subjectName,
         });
         setStarredIds(prev => [...prev, file._id]);
+        // Save to local cache — include previewUrl + downloadUrl so StarredScreen can open offline
+        await storage.set(`starred:${file._id}`, JSON.stringify({
+          fileId: file._id,
+          fileName: file.name,
+          mimeType: file.mimeType,
+          materialId: material._id,
+          subjectName: material.subjectName,
+          previewUrl: file.previewUrl || null,
+          downloadUrl: file.downloadUrl || null,
+          starredAt: new Date().toISOString(),
+          cachedAt: Date.now(),
+        }));
+
+        offlineSyncService.cacheFile(file).catch(() => {});
       }
     } catch {
       showDialog('Error', 'Failed to update star.', [{ text: 'OK', style: 'cancel' }]);
@@ -598,10 +668,34 @@ export default function MaterialAccessScreen({ route, navigation }) {
         await removeSavedMaterial(material._id);
         setIsSaved(false);
         showToast('bookmark-outline', C.textSec, 'Removed from saved', material.subjectName);
+        // Update local cache — mark as not saved offline
+        await materialRepository.upsert({
+          materialId: material._id,
+          subject: material.subjectName,
+          facultyName: material.facultyName,
+          department: material.department,
+          semester: material.semester,
+          accessCode: material.accessCode,
+          version: material.version || 1,
+          savedOffline: false,
+        });
       } else {
         await saveMaterial(material._id);
         setIsSaved(true);
         showToast('bookmark', C.accent, 'Saved to library', material.subjectName);
+        // Upsert into materialRepository so SavedMaterialsScreen shows it offline
+        await materialRepository.upsert({
+          materialId: material._id,
+          subject: material.subjectName,
+          facultyName: material.facultyName,
+          department: material.department,
+          semester: material.semester,
+          accessCode: material.accessCode,
+          version: material.version || 1,
+          savedOffline: true,
+        });
+        // Download all files to Cache dir in background so material works offline
+        offlineSyncService.cacheMaterial(material._id, files, material).catch(() => {});
       }
     } catch (e) {
       showDialog('Error', e.response?.data?.message || 'Failed to update.', [{ text: 'OK', style: 'cancel' }]);
@@ -614,6 +708,19 @@ export default function MaterialAccessScreen({ route, navigation }) {
       const deduped = prev.filter(f => f._id !== file._id);
       return [{ _id: file._id, name: file.name, mimeType: file.mimeType }, ...deduped].slice(0, MAX_RECENT);
     });
+    // Update lastOpened in materialRepository so HistoryScreen reflects this visit
+    try {
+      await materialRepository.upsert({
+        materialId: material._id,
+        subject: material.subjectName,
+        facultyName: material.facultyName,
+        department: material.department,
+        semester: material.semester,
+        accessCode: material.accessCode,
+        version: material.version || 1,
+        lastOpened: new Date().toISOString(),
+      });
+    } catch {}
     navigation.navigate('FileViewer', { file, material });
   };
 
@@ -674,6 +781,19 @@ export default function MaterialAccessScreen({ route, navigation }) {
       const deduped = prev.filter(f => f._id !== file._id);
       return [{ _id: file._id, name: file.name, mimeType: file.mimeType }, ...deduped].slice(0, MAX_RECENT);
     });
+    // Update lastOpened in materialRepository so HistoryScreen reflects this visit
+    try {
+      await materialRepository.upsert({
+        materialId: material._id,
+        subject: material.subjectName,
+        facultyName: material.facultyName,
+        department: material.department,
+        semester: material.semester,
+        accessCode: material.accessCode,
+        version: material.version || 1,
+        lastOpened: new Date().toISOString(),
+      });
+    } catch {}
     navigation.navigate('FileViewer', { file, material });
   };
 

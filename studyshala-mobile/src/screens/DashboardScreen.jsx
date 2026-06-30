@@ -34,6 +34,10 @@ import { getRecentFiles } from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
 import SidebarDrawer from '../components/SidebarDrawer';
 import { API_BASE_URL } from '../config/config';
+// ── Offline cache (same pattern as StarredScreen / HistoryScreen) ─────────────
+// Lets "Recently viewed" show instantly from local cache with zero internet,
+// then silently refresh from the server in the background when online.
+import { storage } from '../database/db';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THEME — warm dark palette from HTML mockup
@@ -88,10 +92,10 @@ const { width } = Dimensions.get('window');
 // DATA
 // ─────────────────────────────────────────────────────────────────────────────
 const WORKSPACE = [
-  { key: 'SavedMaterials', label: 'Saved',        icon: 'bookmark-outline', count: '12 items' },
-  { key: 'Starred',        label: 'Starred',       icon: 'star-outline',     count: '4 items'  },
-  { key: 'History',        label: 'History',       icon: 'time-outline',     count: 'Last 7d'  },
-  { key: 'AllMaterials',   label: 'All Materials', icon: 'folder-outline',   count: '2 subs'   },
+  { key: 'SavedMaterials', label: 'Saved',        icon: 'bookmark-outline', count: 'Subjects' },
+  { key: 'Starred',        label: 'Starred',       icon: 'star-outline',     count: 'Files'  },
+  { key: 'History',        label: 'History',       icon: 'time-outline',     count: 'Access codes'  },
+  { key: 'Downloads',   label: 'Downloads', icon: 'arrow-down-circle-outline',   count: 'Subjects & Files'   },
 ];
 
 const TRUST_PILLS = ['No ads', 'Free forever', 'Drive backed', 'Instant access'];
@@ -103,6 +107,10 @@ const HOW_STEPS = [
 ];
 
 const SUBJECT_ICONS = ['book-outline', 'code-slash-outline', 'calculator-outline', 'flask-outline'];
+
+// "Recently viewed" shows at least this many files, and is the cap for the
+// offline cache below — both the list slice and the cache trim use this.
+const RECENT_FILES_LIMIT = 10;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOOKS
@@ -213,10 +221,38 @@ export default function StudentDashboard({ navigation }) {
   
 
   const loadRecent = useCallback(async () => {
+    // Step 1 — instant local cache read (works with zero internet)
+    try {
+      const cached = await storage.getAllByPrefix('recent:');
+      if (cached?.length) {
+        const items = cached
+          .map((entry) => { try { return JSON.parse(entry.value); } catch { return null; } })
+          .filter(Boolean)
+          .sort((a, b) => new Date(b.viewedAt || 0) - new Date(a.viewedAt || 0))
+          .slice(0, RECENT_FILES_LIMIT);
+        if (items.length) setRecentFiles(items);
+      }
+    } catch {}
+
+    // Step 2 — fetch fresh data from server in the background
     try {
       const { data } = await getRecentFiles();
-      setRecentFiles(data.recentFiles || []);
-    } catch {}
+      const serverFiles = (data.recentFiles || []).slice(0, RECENT_FILES_LIMIT);
+      setRecentFiles(serverFiles);
+
+      // Step 3 — sync to local cache so the list survives going offline
+      try {
+        const existing = await storage.getAllByPrefix('recent:');
+        for (const entry of (existing || [])) {
+          await storage.delete(entry.key);
+        }
+      } catch {}
+      for (const f of serverFiles) {
+        try { await storage.set(`recent:${f.fileId}`, JSON.stringify(f)); } catch {}
+      }
+    } catch {
+      // No internet — keep showing whatever cache gave us above, fail silently
+    }
   }, []);
 
   const loadStats = useCallback(async () => {
@@ -262,12 +298,25 @@ export default function StudentDashboard({ navigation }) {
     setRefreshing(false);
   };
 
-  const handleRecentFilePress = (file) =>
+  const handleRecentFilePress = (file) => {
     openFile(
       { ...file, _id: file.fileId, name: file.fileName },
       { _id: file.materialId, subjectName: file.subjectName },
       navigation,
     );
+
+    // Optimistic "recently viewed" update — bump this file to the top locally
+    // right away. This is what makes the list correct offline too: the
+    // server-side trackRecentFile() call inside openFile()/fileActions may
+    // silently fail with no internet, but the user still just viewed the
+    // file, so it should still show up here immediately.
+    const entry = { ...file, viewedAt: new Date().toISOString() };
+    setRecentFiles((prev) => {
+      const deduped = prev.filter((f) => f.fileId !== file.fileId);
+      return [entry, ...deduped].slice(0, RECENT_FILES_LIMIT);
+    });
+    storage.set(`recent:${file.fileId}`, JSON.stringify(entry)).catch(() => {});
+  };
 
   const firstName = user?.name?.split(' ')[0] || 'Student';
   const initial   = firstName.charAt(0).toUpperCase();
@@ -306,12 +355,19 @@ export default function StudentDashboard({ navigation }) {
               <View style={styles.avatarOnline} />
             </View>
 
-            <View style={styles.nameBlock}>
+            {/*<View style={styles.nameBlock}>
               <Text style={styles.headerName}>{firstName}</Text>
               <Text style={styles.headerSub}>
                 {user?.department || 'CSE'} · {user?.semester ? `Sem ${user.semester}` : 'Student'}
               </Text>
-            </View>
+            </View>*/}
+
+            {/* Spacer — pushes headerRight (notification button) to the right
+                edge of the screen. Added because nameBlock above (which used
+                to provide this via flex:1) is commented out. Safe to remove
+                this spacer if/when nameBlock is restored, since nameBlock's
+                own flex:1 will take over that job again. */}
+            <View style={{ flex: 1 }} />
 
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.iconPill} activeOpacity={0.8}>
@@ -321,7 +377,7 @@ export default function StudentDashboard({ navigation }) {
           </View>
 
           {/* ── Live stats ── */}
-          <Section delay={50}>
+          {/*<Section delay={50}>
             <SectionLabel>Live stats</SectionLabel>
             <View style={styles.statsRow}>
               {[
@@ -359,7 +415,7 @@ export default function StudentDashboard({ navigation }) {
                 </View>
               ))}
             </View>
-          </Section>
+          </Section>*/}
 
           {/* ── Enter code banner ── */}
           <Section delay={100}>
@@ -404,20 +460,20 @@ export default function StudentDashboard({ navigation }) {
           </Section>
 
           {/* ── How it works ── */}
-          <Section delay={250}>
+        {/*  <Section delay={250}>
             <SectionLabel>Guide</SectionLabel>
             <HowItWorks />
-          </Section>
+          </Section>                */}
 
           {/* ── Trust pills ── */}
-          <Section delay={300}>
+           {/* <Section delay={300}>
             <View style={styles.trustRow}>
               {TRUST_PILLS.map((p) => <TrustPill key={p}>{p}</TrustPill>)}
             </View>
-          </Section>
+          </Section>        */}
 
-          <Divider style={{ marginTop: 4, marginBottom: 8 }} />
-
+           {/*<Divider style={{ marginTop: 4, marginBottom: 8 }} />*/}
+         
           {/* ── Recently viewed ── */}
           <Section delay={350}>
             <SectionLabel>Recently viewed</SectionLabel>
@@ -429,7 +485,7 @@ export default function StudentDashboard({ navigation }) {
                 <Text style={styles.emptyDesc}>Files you open will appear here for quick access.</Text>
               </View>
             ) : (
-              recentFiles.slice(0, 3).map((file) => (
+              recentFiles.slice(0, RECENT_FILES_LIMIT).map((file) => (
                 <TouchableOpacity
                   key={file.fileId}
                   style={styles.fileRow}

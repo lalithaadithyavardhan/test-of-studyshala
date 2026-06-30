@@ -66,4 +66,51 @@ export const fileRepository = {
     }
     await storage.delete(PREFIX + fileId);
   },
+
+  // ── NEW: getExpiredFiles ──────────────────────────────────────────────────────
+  // Returns all individually-cached files (e.g. starred files not part of a saved
+  // material) whose cachedAt is older than `days` days.
+  //
+  // Rules from the handoff:
+  //  - Expiry counts from cachedAt (set once on first cache, never reset on re-open).
+  //  - Only evicts files where the parent material is NOT savedOffline (permanent).
+  //  - Days = -1 means "Never expire" → returns empty array.
+  //
+  // Called by offlineSyncService.evictExpiredCache() and cacheManager.runCleanup().
+  async getExpiredFiles(days) {
+    if (days === -1) return []; // Never expire setting
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+
+    // Pull every file: key: file:<fileId>
+    const allEntries = await storage.getAllByPrefix(PREFIX);
+    if (!allEntries || !allEntries.length) return [];
+
+    const expired = [];
+    for (const entry of allEntries) {
+      try {
+        const file = typeof entry.value === 'string'
+          ? JSON.parse(entry.value)
+          : entry.value;
+
+        if (!file) continue;
+
+        // Only consider files that have a cachedAt timestamp and are marked downloaded
+        if (!file.cachedAt || !file.downloaded) continue;
+
+        const cachedDate = new Date(file.cachedAt);
+        if (isNaN(cachedDate)) continue;
+
+        // Expired if cachedAt is older than the cutoff
+        if (cachedDate < cutoff) {
+          expired.push(file);
+        }
+      } catch {
+        // Corrupt entry — skip silently
+      }
+    }
+
+    return expired;
+  },
 };
