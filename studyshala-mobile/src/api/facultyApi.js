@@ -13,6 +13,8 @@ import api from './client';
 
 export const getFolders = () => api.get('/faculty/folders');
 
+export const getFacultyStats = () => api.get('/faculty/stats');
+
 export const createFolder = ({ department, semester, subjectName, facultyName, messageToStudents }) =>
   api.post('/faculty/folders', { department, semester, subjectName, facultyName, messageToStudents });
 

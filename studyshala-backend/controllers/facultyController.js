@@ -478,6 +478,99 @@ const downloadFile = async (req, res) => {
   }
 };
 
+
+// ── Faculty dashboard stats ───────────────────────────────────────────────────
+// Returns:
+//   studentsThisWeek  — unique students who accessed ANY of this faculty's
+//                       materials in the last 7 days (from User.accessHistory)
+//   weeklyActivity    — per-day access count for the last 7 days (Mon–Sun order)
+//   totalViews        — sum of accessCount across all active folders
+//
+// Uses User.accessHistory because that's where every student access is already
+// recorded (in validateAccessCode). No new schema fields needed.
+
+const getFacultyStats = async (req, res) => {
+  try {
+    // All active folder IDs belonging to this faculty
+    const folders = await Folder.find({ facultyId: req.user._id, active: true }, '_id accessCount');
+    const folderIds = folders.map(f => f._id);
+
+    const totalViews = folders.reduce((sum, f) => sum + (f.accessCount || 0), 0);
+
+    if (folderIds.length === 0) {
+      return res.json({
+        studentsThisWeek: 0,
+        totalViews,
+        weeklyActivity: buildEmptyWeek(),
+      });
+    }
+
+    // Window: start of day 6 days ago → now (covers last 7 calendar days)
+    const now   = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    weekAgo.setHours(0, 0, 0, 0);
+
+    // Find all users who have an accessHistory entry for one of these folders
+    // within the last 7 days. Each user counts once per day per material, but
+    // since we only record FIRST access ever (in validateAccessCode), the
+    // accessedAt tells us exactly when a student first unlocked a material.
+    // For "students this week" we count distinct users; for the bar chart we
+    // count accesses per day (each new access-code unlock = 1 access event).
+    const users = await User.find(
+      {
+        'accessHistory': {
+          $elemMatch: {
+            materialId: { $in: folderIds },
+            accessedAt: { $gte: weekAgo },
+          },
+        },
+      },
+      'accessHistory'
+    );
+
+    // Build a map: dayLabel → count, and collect unique student IDs this week
+    const dayMap   = buildEmptyWeekMap();   // { 'Mon': 0, 'Tue': 0, ... }
+    const uniqueStudentsThisWeek = new Set();
+
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const folderIdStrs = new Set(folderIds.map(id => id.toString()));
+
+    for (const user of users) {
+      for (const entry of user.accessHistory) {
+        if (!folderIdStrs.has(entry.materialId.toString())) continue;
+        const at = new Date(entry.accessedAt);
+        if (at < weekAgo) continue;
+        const dayLabel = DAY_NAMES[at.getDay()];
+        dayMap[dayLabel] = (dayMap[dayLabel] || 0) + 1;
+        uniqueStudentsThisWeek.add(user._id.toString());
+      }
+    }
+
+    // Convert map → ordered array Mon–Sun for the chart
+    const weeklyActivity = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({
+      day,
+      value: dayMap[day] || 0,
+    }));
+
+    res.json({
+      studentsThisWeek: uniqueStudentsThisWeek.size,
+      totalViews,
+      weeklyActivity,
+    });
+  } catch (err) {
+    logger.error(`getFacultyStats: ${err.message}`);
+    res.status(500).json({ message: 'Failed to fetch stats' });
+  }
+};
+
+const buildEmptyWeekMap = () => ({
+  Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0,
+});
+
+const buildEmptyWeek = () =>
+  ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => ({ day, value: 0 }));
+
 module.exports = {
   getFolders,
   createFolder,
@@ -489,5 +582,6 @@ module.exports = {
   deleteFile,
   deleteFolder,
   getFolderDetails,
-  downloadFile
+  downloadFile,
+  getFacultyStats,
 };

@@ -22,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { getFolders, deleteFolder } from '../api/facultyApi';
+import { getFolders, deleteFolder, getFacultyStats } from '../api/facultyApi';
 import SidebarDrawer from '../components/SidebarDrawer';
 
 // Support both new @react-native-clipboard/clipboard and deprecated RN core Clipboard
@@ -85,14 +85,15 @@ const { width } = Dimensions.get('window');
 // ─────────────────────────────────────────────────────────────────────────────
 const TRUST_PILLS = ['No ads', 'Free forever', 'Drive backed', 'Instant access'];
 
-const WEEKLY_DATA = [
-  { day: 'Mon', value: 30 },
-  { day: 'Tue', value: 55 },
-  { day: 'Wed', value: 40 },
-  { day: 'Thu', value: 70 },
-  { day: 'Fri', value: 85 },
-  { day: 'Sat', value: 100 },
-  { day: 'Sun', value: 20 },
+// Weekly data is loaded from the server — this is just the initial/loading state
+const EMPTY_WEEK = [
+  { day: 'Mon', value: 0 },
+  { day: 'Tue', value: 0 },
+  { day: 'Wed', value: 0 },
+  { day: 'Thu', value: 0 },
+  { day: 'Fri', value: 0 },
+  { day: 'Sat', value: 0 },
+  { day: 'Sun', value: 0 },
 ];
 
 const MOCK_MATERIALS = [
@@ -142,8 +143,8 @@ const TrustPill = ({ children }) => (
 );
 
 /** Weekly activity bar chart */
-const WeeklyChart = () => {
-  const maxVal = Math.max(...WEEKLY_DATA.map(d => d.value));
+const WeeklyChart = ({ data = EMPTY_WEEK }) => {
+  const maxVal = Math.max(...data.map(d => d.value), 1); // avoid /0 when all zero
   const today  = new Date().getDay(); // 0=Sun
 
   return (
@@ -153,7 +154,7 @@ const WeeklyChart = () => {
         <Text style={styles.chartPeriod}>Last 7 days</Text>
       </View>
       <View style={styles.chartBars}>
-        {WEEKLY_DATA.map((item, i) => {
+        {data.map((item, i) => {
           const barH    = (item.value / maxVal) * 40;
           const dayIdx  = (i + 1) % 7;
           const isToday = dayIdx === today;
@@ -161,7 +162,7 @@ const WeeklyChart = () => {
             <View key={item.day} style={styles.chartBarWrap}>
               <View style={{ height: 40, justifyContent: 'flex-end', width: '100%' }}>
                 <View style={[styles.chartBar, {
-                  height: barH,
+                  height: Math.max(barH, item.value > 0 ? 3 : 0),
                   backgroundColor: isToday ? C.accent : C.accentBg,
                   borderColor:     isToday ? C.accent : C.accentBorder,
                 }]} />
@@ -272,10 +273,15 @@ const HowItWorks = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function FacultyDashboard({ navigation }) {
   const { user, logout } = useAuth();
-  const [materials,   setMaterials]   = useState(MOCK_MATERIALS);
-  const [loading,     setLoading]     = useState(true);
-  const [refreshing,  setRefreshing]  = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [materials,      setMaterials]      = useState(MOCK_MATERIALS);
+  const [loading,        setLoading]        = useState(true);
+  const [refreshing,     setRefreshing]     = useState(false);
+  const [sidebarOpen,    setSidebarOpen]    = useState(false);
+  const [dashboardStats, setDashboardStats] = useState({
+    studentsThisWeek: null,   // null = still loading
+    totalViews:       null,
+    weeklyActivity:   EMPTY_WEEK,
+  });
 
   const load = useCallback(async () => {
     try {
@@ -284,13 +290,27 @@ export default function FacultyDashboard({ navigation }) {
     } catch {}
   }, []);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const { data } = await getFacultyStats();
+      setDashboardStats({
+        studentsThisWeek: data.studentsThisWeek ?? 0,
+        totalViews:       data.totalViews       ?? 0,
+        weeklyActivity:   data.weeklyActivity?.length ? data.weeklyActivity : EMPTY_WEEK,
+      });
+    } catch {
+      // Stats are non-critical — leave as null so UI shows '--' gracefully
+    }
+  }, []);
+
   useEffect(() => {
     (async () => { setLoading(true); await load(); setLoading(false); })();
-  }, [load]);
+    loadStats(); // non-blocking, loads in parallel
+  }, [load, loadStats]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await Promise.all([load(), loadStats()]);
     setRefreshing(false);
   };
 
@@ -317,12 +337,14 @@ export default function FacultyDashboard({ navigation }) {
 
   const totalFiles    = materials.reduce((s, m) => s + (Array.isArray(m.files) ? m.files.length : (m.fileCount || m.files || 0)), 0);
   const totalSections = materials.reduce((s, m) => s + (Array.isArray(m.subFolders) ? m.subFolders.length : (m.sections || 0)), 0);
-  const totalViews    = materials.reduce((s, m) => s + (m.views || m.viewCount || 0), 0);
+  // totalViews comes from dashboardStats (server-side sum of accessCount) — more
+  // accurate than summing the folder list since folders load independently.
+  const totalViews    = dashboardStats.totalViews !== null
+    ? dashboardStats.totalViews
+    : materials.reduce((s, m) => s + (m.accessCount || m.views || m.viewCount || 0), 0);
 
   const firstName = user?.name?.split(' ')[0] || 'Faculty';
   const initial   = firstName.charAt(0).toUpperCase();
-
-  const sparkData = [8, 14, 10, 20, 16, 22, 18];
 
   // Material card accent — alternate between accent and secondary
   const matAccent = (colorIdx) => colorIdx % 2 === 0
@@ -383,12 +405,14 @@ export default function FacultyDashboard({ navigation }) {
           {/* ── Hero stat card ── */}
           <Section delay={50}>
             <TouchableOpacity style={styles.heroCard} activeOpacity={0.9} onPress={() => navigation.navigate('Analytics')}>
-              <Text style={styles.heroNum}>47</Text>
+              <Text style={styles.heroNum}>
+                {dashboardStats.studentsThisWeek === null ? '—' : dashboardStats.studentsThisWeek}
+              </Text>
               <Text style={styles.heroLabel}>Students accessing your materials this week</Text>
-              {/* Sparkline */}
+              {/* Sparkline — derived from real weekly activity data */}
               <View style={styles.sparkline}>
-                {sparkData.map((h, i) => (
-                  <View key={i} style={[styles.sparkBar, { height: h * 1.1 }]} />
+                {dashboardStats.weeklyActivity.map((d, i) => (
+                  <View key={i} style={[styles.sparkBar, { height: Math.max((d.value / Math.max(...dashboardStats.weeklyActivity.map(x => x.value), 1)) * 24, d.value > 0 ? 3 : 1) }]} />
                 ))}
               </View>
             </TouchableOpacity>
@@ -417,7 +441,7 @@ export default function FacultyDashboard({ navigation }) {
 
           {/* ── Weekly chart ── */}
           <Section delay={150}>
-            <WeeklyChart />
+            <WeeklyChart data={dashboardStats.weeklyActivity} />
           </Section>
 
           {/* ── Create new material ── */}

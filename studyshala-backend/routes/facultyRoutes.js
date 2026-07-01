@@ -18,6 +18,7 @@ router.use(authenticate);
 router.use(isFaculty);
 
 // Materials
+router.get('/stats',                                          facultyController.getFacultyStats);
 router.get('/folders',                                        facultyController.getFolders);
 router.post('/folders',                                       facultyController.createFolder);
 router.get('/folders/:id',                                    facultyController.getFolderDetails);
