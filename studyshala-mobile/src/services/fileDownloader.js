@@ -22,6 +22,7 @@
  */
 import * as FileSystem from 'expo-file-system';
 import { fileRepository } from '../database/fileRepository';
+import { storageLocationService } from './storageLocationService';
 
 // Sanitise filename so it's safe as a path component — single canonical version.
 export function safeName(name = 'file') {
@@ -45,9 +46,16 @@ export async function ensureDir(dir) {
  * @param {object} file - { fileId|_id, name|fileName, mimeType, materialId, downloadUrl, previewUrl }
  * @param {string} targetDir - directory the file should end up in (must end with '/')
  * @param {function} [onProgress] - (fileId, percent) => void
+ * @param {object} [opts]
+ * @param {boolean} [opts.mirrorToExternal=false] - if true and the student has
+ *   chosen a custom download folder (see storageLocationService), also copies
+ *   this file there. Only ever pass true for REAL downloads (downloadManager),
+ *   never for background preview-caching (offlineSyncService) — auto-cached
+ *   preview files should never clutter a folder the student picked.
  * @returns {Promise<string|null>} local URI, or null if there's nothing to download
  */
-export async function downloadOrReuseFile(file, targetDir, onProgress) {
+export async function downloadOrReuseFile(file, targetDir, onProgress, opts = {}) {
+  const { mirrorToExternal = false } = opts;
   const fileId = file.fileId || file._id;
   const name = file.name || file.fileName || 'file';
   const downloadUrl = file.downloadUrl;
@@ -57,10 +65,27 @@ export async function downloadOrReuseFile(file, targetDir, onProgress) {
   await ensureDir(targetDir);
   const targetPath = buildLocalPath(targetDir, fileId, name);
 
+  // Best-effort mirror into the student's chosen external folder (Android
+  // only, no-op if not configured). Only mirrors once per file — re-saves
+  // won't pile up duplicate copies in the external folder. Never throws.
+  const maybeMirror = async (existingRecord) => {
+    if (!mirrorToExternal) return;
+    if (existingRecord?.externalUri) return; // already mirrored once
+    const externalUri = await storageLocationService.mirrorToExternalIfConfigured(
+      targetPath,
+      safeName(name),
+      file.mimeType || existingRecord?.mimeType || '',
+    );
+    if (externalUri) {
+      try { await fileRepository.upsert({ fileId, externalUri }); } catch {}
+    }
+  };
+
   // 1. Already sitting at the exact target path? Nothing to do.
   const targetInfo = await FileSystem.getInfoAsync(targetPath).catch(() => ({}));
   if (targetInfo.exists) {
     await fileRepository.setDownloaded(fileId, targetPath);
+    await maybeMirror(await fileRepository.getById(fileId));
     return targetPath;
   }
 
@@ -74,6 +99,7 @@ export async function downloadOrReuseFile(file, targetDir, onProgress) {
       try {
         await FileSystem.copyAsync({ from: existing.localPath, to: targetPath });
         await fileRepository.setDownloaded(fileId, targetPath);
+        await maybeMirror(existing);
         return targetPath;
       } catch {
         // Copy failed (e.g. source got evicted mid-check) — fall through to download.
@@ -126,6 +152,8 @@ export async function downloadOrReuseFile(file, targetDir, onProgress) {
       previewUrl: file.previewUrl || existing?.previewUrl || null,
       downloadUrl: file.downloadUrl || existing?.downloadUrl || null,
     });
+
+    await maybeMirror(existing);
 
     return result.uri;
   } catch (error) {

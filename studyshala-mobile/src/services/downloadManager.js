@@ -46,7 +46,7 @@ export const downloadManager = {
       const url = await downloadUrlFn(file.driveFileId);
       // downloadOrReuseFile will reuse an existing Cache-dir copy (e.g. from a
       // previous preview) instead of re-downloading it into Downloads.
-      await downloadOrReuseFile({ ...file, materialId, downloadUrl: url }, materialDir, onProgress);
+      await downloadOrReuseFile({ ...file, materialId, downloadUrl: url }, materialDir, onProgress, { mirrorToExternal: true });
     }
 
     await materialRepository.setSavedOffline(materialId, true);
@@ -58,7 +58,7 @@ export const downloadManager = {
 
   async downloadToDevice(file, downloadUrl) {
     await ensureDir(OFFLINE_DIR);
-    return await downloadOrReuseFile({ ...file, downloadUrl }, OFFLINE_DIR, null);
+    return await downloadOrReuseFile({ ...file, downloadUrl }, OFFLINE_DIR, null, { mirrorToExternal: true });
   },
 
   async syncMaterial(materialId, serverVersion, files, downloadUrlFn, onProgress) {
@@ -72,7 +72,7 @@ export const downloadManager = {
     for (const file of files) {
       if (!existingIds.has(file.fileId)) {
         const url = await downloadUrlFn(file.driveFileId);
-        await downloadOrReuseFile({ ...file, materialId, downloadUrl: url }, materialDir, onProgress);
+        await downloadOrReuseFile({ ...file, materialId, downloadUrl: url }, materialDir, onProgress, { mirrorToExternal: true });
       }
     }
 

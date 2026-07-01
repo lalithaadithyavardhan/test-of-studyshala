@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { downloadManager } from '../services/downloadManager';
 import { cacheManager } from '../services/cacheManager';
+import { storageLocationService } from '../services/storageLocationService';
 
 const C = {
   bg:          '#13120f',
@@ -42,19 +43,68 @@ export default function StorageSettingsScreen({ navigation }) {
   const [cacheDays,     setCacheDays]     = useState(90);
   const [maxCacheMB,    setMaxCacheMB]    = useState(1024);
   const [maxCacheInput, setMaxCacheInput] = useState('1024');
+  const [downloadMode,  setDownloadMode]  = useState('internal');
+  const [downloadLabel, setDownloadLabel] = useState('Internal Storage');
+  const [locationBusy,  setLocationBusy]  = useState(false);
+  const pickerSupported = storageLocationService.isExternalPickerSupported();
 
   useEffect(() => { loadAll(); }, []);
 
   const loadAll = async () => {
-    const [s, days, maxMB] = await Promise.all([
+    const [s, days, maxMB, mode, label] = await Promise.all([
       downloadManager.getStorageStats(),
       cacheManager.getCacheDays(),
       cacheManager.getMaxCacheSize(),
+      storageLocationService.getMode(),
+      storageLocationService.getLabel(),
     ]);
     setStats(s);
     setCacheDays(days);
     setMaxCacheMB(maxMB);
     setMaxCacheInput(String(maxMB));
+    setDownloadMode(mode);
+    setDownloadLabel(label);
+  };
+
+  const handleChooseFolder = async () => {
+    setLocationBusy(true);
+    try {
+      const result = await storageLocationService.chooseExternalFolder();
+      if (result.success) {
+        setDownloadMode('external');
+        setDownloadLabel(result.label);
+        Alert.alert('Folder set', `New downloads will also be saved to "${result.label}".`);
+      } else if (result.reason === 'not_supported') {
+        Alert.alert('Not available', "Choosing a custom folder isn't supported on this device.");
+      } else if (result.reason !== 'denied') {
+        Alert.alert("Couldn't set folder", result.message || 'Please try again.');
+      }
+    } finally {
+      setLocationBusy(false);
+    }
+  };
+
+  const handleResetToInternal = () => {
+    Alert.alert(
+      'Reset to Internal Storage?',
+      "New downloads will go back to the app's internal folder only. Files already mirrored to your custom folder stay there.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset', style: 'destructive',
+          onPress: async () => {
+            setLocationBusy(true);
+            try {
+              await storageLocationService.resetToInternal();
+              setDownloadMode('internal');
+              setDownloadLabel('Internal Storage');
+            } finally {
+              setLocationBusy(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleCacheDaysChange = async (val) => {
@@ -138,6 +188,46 @@ export default function StorageSettingsScreen({ navigation }) {
           </View>
           <Text style={s.storagePath}>📁 StudyShala/Cache  ·  StudyShala/Downloads</Text>
         </View>
+
+        {/* Download Location */}
+        <Text style={s.sectionTitle}>Download Location</Text>
+        <View style={s.card}>
+          <Row label="Current Folder" value={downloadLabel} icon="folder-outline" color={C.accent} last={!pickerSupported} />
+          {pickerSupported && (
+            <Text style={s.inputHint}>
+              Downloads always stay safely inside the app too — this just also copies them to a folder you pick, so they show up in your device's file manager.
+            </Text>
+          )}
+        </View>
+
+        {pickerSupported ? (
+          <View style={s.card}>
+            <TouchableOpacity
+              style={s.dangerBtn}
+              onPress={handleChooseFolder}
+              disabled={locationBusy}
+            >
+              <Ionicons name="folder-open-outline" size={16} color={C.accent} />
+              <Text style={[s.dangerBtnText, { color: C.accent }]}>
+                {downloadMode === 'external' ? 'Change Folder' : 'Choose a Folder'}
+              </Text>
+            </TouchableOpacity>
+            {downloadMode === 'external' && (
+              <TouchableOpacity
+                style={[s.dangerBtn, { borderTopWidth: 1, borderTopColor: C.border }]}
+                onPress={handleResetToInternal}
+                disabled={locationBusy}
+              >
+                <Ionicons name="refresh-outline" size={16} color={C.danger} />
+                <Text style={s.dangerBtnText}>Reset to Internal Storage</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <Text style={s.inputHint}>
+            On iPhone, apps can't save files outside their own private storage — that's an Apple restriction, not a missing feature. Your downloads stay safely inside StudyShala and always work offline.
+          </Text>
+        )}
 
         {/* Max Cache Size */}
         <Text style={s.sectionTitle}>Max Cache Size</Text>
