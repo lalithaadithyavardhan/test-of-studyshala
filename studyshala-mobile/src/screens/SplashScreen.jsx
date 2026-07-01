@@ -1,10 +1,23 @@
 /**
  * screens/SplashScreen.jsx — StudyShala Dark Theme
- * Dark base #0f0f0f · Accent #e87c3a
+ *
+ *   Background  #13120f  warm dark (not cold black)
+ *   Surface     #1e1c19  warm card surface
+ *   Border      #2e2c28  normal border
+ *   BorderSub   #2a2724  subtle divider
+ *   Accent      #DE7356  Claude Peach / terra-cotta (primary)
+ *   Secondary   #B1ADA1  Cloudy warm stone (secondary / faculty role)
+ *   TextPrimary #e8e4de  warm white
+ *   TextSec     #b1ada1  warm gray
+ *   TextMuted   #6b6760  readable dim
+ *
+ * NOTE: these hex values live in ../components/theme.js (the C object).
+ * This file only *references* C.bg / C.accent / etc — send me theme.js
+ * if you want it edited directly so these actually resolve to the values above.
  */
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ActivityIndicator, Animated,
+  View, Text, StyleSheet, ActivityIndicator, Animated, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, R, T } from '../components/theme';
@@ -27,7 +40,11 @@ export default function SplashScreen() {
         {/* ── Logo block ── */}
         <View style={s.logoWrap}>
           <View style={s.logoBox}>
-            <Text style={s.logoLetter}>S</Text>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={s.logoImage}
+              resizeMode="cover"
+            />
           </View>
           {/* Accent dot cluster — mirrors the app's accent palette */}
           <View style={[s.dot, s.dot1]} />
@@ -65,11 +82,11 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: C.border,
+    overflow: 'hidden',
   },
-  logoLetter: {
-    fontSize: T.xxl + 8,   // 32px
-    fontWeight: '800',
-    color: C.accent,
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
 
   // Decorative corner dots
