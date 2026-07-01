@@ -5,7 +5,7 @@
     "scheme": "studyshala",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon-1024.png",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#F4F6FB"
@@ -30,6 +30,7 @@
     "android": {
       "package": "com.studyshala.mobile",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#F4F6FB"
       },
       "permissions": [
