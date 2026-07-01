@@ -403,6 +403,9 @@ export default function FacultyDashboard({ navigation }) {
           </View>
 
           {/* ── Hero stat card ── */}
+          {/*
+          
+          
           <Section delay={50}>
             <TouchableOpacity style={styles.heroCard} activeOpacity={0.9} onPress={() => navigation.navigate('Analytics')}>
               <Text style={styles.heroNum}>
@@ -410,15 +413,31 @@ export default function FacultyDashboard({ navigation }) {
               </Text>
               <Text style={styles.heroLabel}>Students accessing your materials this week</Text>
               {/* Sparkline — derived from real weekly activity data */}
-              <View style={styles.sparkline}>
+             {/*
+             
+             
+             
+             <View style={styles.sparkline}>
                 {dashboardStats.weeklyActivity.map((d, i) => (
                   <View key={i} style={[styles.sparkBar, { height: Math.max((d.value / Math.max(...dashboardStats.weeklyActivity.map(x => x.value), 1)) * 24, d.value > 0 ? 3 : 1) }]} />
                 ))}
               </View>
             </TouchableOpacity>
           </Section>
+          
+          
+          
+          
+          */}
 
-          {/* ── Stats grid ── */}
+         {/* {/* ── Stats grid ── */}
+
+
+
+          {/*
+          
+          
+          
           <Section delay={100}>
             <SectionLabel>Your stats</SectionLabel>
             <View style={styles.statsGrid}>
@@ -439,10 +458,25 @@ export default function FacultyDashboard({ navigation }) {
             </View>
           </Section>
 
+
+
+          */}
+
+
+
+
           {/* ── Weekly chart ── */}
-          <Section delay={150}>
+
+
+
+          
+         {/* <Section delay={150}>
             <WeeklyChart data={dashboardStats.weeklyActivity} />
           </Section>
+          */}
+
+
+
 
           {/* ── Create new material ── */}
           <Section delay={200}>
