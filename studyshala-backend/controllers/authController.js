@@ -36,10 +36,10 @@ const googleCallback = async (req, res) => {
     const state = req.query.state || '';
     const isMobile = state.includes('mobile');
 
-    // Decide where to redirect based on the platform
-    const baseRedirectUrl = isMobile 
-      ? 'studyshala://auth-callback' 
-      : (process.env.FRONTEND_URL || 'http://localhost:3000');
+    // Mobile uses a deep-link scheme; web uses the /auth-callback route
+    const baseRedirectUrl = isMobile
+      ? 'studyshala://auth-callback'
+      : `${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth-callback`;
 
     const redirectUrl = `${baseRedirectUrl}?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
 
@@ -47,8 +47,8 @@ const googleCallback = async (req, res) => {
   } catch (error) {
     logger.error(`Google callback error: ${error.message}`);
     const state = req.query.state || '';
-    const fallbackURL = state.includes('mobile') 
-      ? 'studyshala://auth-callback' 
+    const fallbackURL = state.includes('mobile')
+      ? 'studyshala://auth-callback'
       : (process.env.FRONTEND_URL || 'http://localhost:3000');
     res.redirect(`${fallbackURL}/login?error=auth_failed`);
   }
