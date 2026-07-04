@@ -1,3 +1,14 @@
+/**
+ * database/fileRepository.js — StudyShala
+ * =========================================
+ * Single-tier offline model: a file is either saved (localPath is set and
+ * points at a real file on disk) or it isn't. There is no separate "cache"
+ * concept, no expiry, no eviction — that entire tier has been removed.
+ *
+ * `downloaded` is kept only as a convenience boolean that always mirrors
+ * `!!localPath`; the actual source of truth for "is this available offline"
+ * is always `localPath`.
+ */
 import { storage } from './db';
 
 const PREFIX = 'file:';
@@ -28,9 +39,8 @@ export const fileRepository = {
   },
 
   // ── getAll ────────────────────────────────────────────────────────────────
-  // Returns every stored file record, regardless of material. Used by
-  // DownloadsScreen to group real downloads by subject without needing a
-  // separate per-material query.
+  // Returns every stored file record, regardless of material. Used by the
+  // Saved Materials screen to show storage totals without a per-material query.
   async getAll() {
     return await storage.getAllByPrefix(PREFIX);
   },
@@ -41,6 +51,10 @@ export const fileRepository = {
     return files.filter(Boolean);
   },
 
+  // ── setDownloaded ─────────────────────────────────────────────────────────
+  // Called once a file's bytes are confirmed on disk at `localPath`. This is
+  // the ONLY thing that makes a file "available offline" — there is no other
+  // path to that state.
   async setDownloaded(fileId, localPath) {
     const f = await this.getById(fileId);
     if (f) {
@@ -48,6 +62,7 @@ export const fileRepository = {
         ...f,
         downloaded: !!localPath,
         localPath,
+        downloadedAt: f.downloadedAt || (localPath ? new Date().toISOString() : null),
         updatedAt: new Date().toISOString(),
       });
     }
@@ -58,9 +73,32 @@ export const fileRepository = {
     if (f) await storage.set(PREFIX + fileId, { ...f, lastOpened: new Date().toISOString() });
   },
 
+  // ── isAvailableOffline ────────────────────────────────────────────────────
+  // The single check every screen should use before trying to open a file
+  // without internet. True local-file existence is verified by the caller
+  // (via FileSystem.getInfoAsync) since this repository doesn't touch the
+  // filesystem — this just tells you whether we THINK it's saved.
+  async isAvailableOffline(fileId) {
+    const f = await this.getById(fileId);
+    return !!(f?.localPath);
+  },
+
   async getDownloadedByMaterial(materialId) {
     const files = await this.getByMaterial(materialId);
     return files.filter(f => f.downloaded);
+  },
+
+  // ── isMaterialFullyDownloaded ────────────────────────────────────────────
+  // The single source of truth for the "verified offline" badge on the
+  // Saved Materials screen. Deliberately independent of any server/
+  // materialRepository "savedOffline" flag — those can drift (a material
+  // can be marked saved server-side or in materialRepository without every
+  // file actually having downloaded successfully on THIS device). This
+  // checks only what we actually have local records for.
+  async isMaterialFullyDownloaded(materialId) {
+    const files = await this.getByMaterial(materialId);
+    if (!files.length) return false;
+    return files.every(f => f.downloaded && !!f.localPath);
   },
 
   async getTotalSize(materialId) {
@@ -81,51 +119,6 @@ export const fileRepository = {
       await storage.set(MAT_FILES_PREFIX + f.materialId, matFiles.filter(id => id !== fileId));
     }
     await storage.delete(PREFIX + fileId);
-  },
-
-  // ── getExpiredFiles ────────────────────────────────────────────────────────
-  // Returns all individually-cached files (e.g. starred files not part of a
-  // saved material) whose cachedAt is older than `days` days.
-  //
-  // IMPORTANT: storage.getAllByPrefix() returns an array of ALREADY-PARSED
-  // plain objects — NOT {key, value} pairs. Each `file` below IS the stored
-  // record itself; never access `.value` or re-JSON.parse it.
-  //
-  // Rules:
-  //  - Expiry counts from cachedAt (set once on first cache, never reset on re-open).
-  //  - Only evicts files where the parent material is NOT savedOffline (permanent).
-  //  - Days = -1 means "Never expire" → returns empty array.
-  //
-  // Called by offlineSyncService.evictExpiredCache() and cacheManager.runCleanup().
-  async getExpiredFiles(days) {
-    if (days === -1) return []; // Never expire setting
-
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-
-    const allFiles = await storage.getAllByPrefix(PREFIX);
-    if (!allFiles || !allFiles.length) return [];
-
-    const expired = [];
-    for (const file of allFiles) {
-      try {
-        if (!file || typeof file !== 'object') continue;
-
-        // Only consider files that have a cachedAt timestamp and are marked downloaded
-        if (!file.cachedAt || !file.downloaded) continue;
-
-        const cachedDate = new Date(file.cachedAt);
-        if (isNaN(cachedDate)) continue;
-
-        if (cachedDate < cutoff) {
-          expired.push(file);
-        }
-      } catch {
-        // Corrupt entry — skip silently
-      }
-    }
-
-    return expired;
   },
 };
 

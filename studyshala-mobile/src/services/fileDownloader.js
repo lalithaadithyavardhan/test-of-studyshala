@@ -1,24 +1,23 @@
 /**
  * services/fileDownloader.js — StudyShala
  * =========================================
- * Single source of truth for "where does a downloaded file live, and have we
- * already got it" — used by downloadManager.js, offlineSyncService.js and
- * preloadService.js.
+ * Single source of truth for "where does a saved file live, and have we
+ * already got it" — used by downloadManager.js. This is the ONLY place that
+ * actually writes a file to disk anywhere in the app.
  *
  * Why this file exists:
- * Before this fix, downloadManager and offlineSyncService each built their own
- * local file path independently — one sanitized the filename, the other didn't.
- * For files with special characters in their names, that meant the SAME file
- * opened from two different screens (e.g. Dashboard "recently viewed" vs.
- * Starred) computed two DIFFERENT local paths, so both "already exists?" checks
- * came back false and the file got downloaded twice — an orphaned duplicate
- * copy nobody tracked or ever cleaned up.
+ * Different callers used to build local paths independently — one sanitized
+ * the filename, one didn't. For files with special characters in their
+ * names, the SAME file opened from two different screens computed two
+ * DIFFERENT local paths, so "already exists?" checks came back false and the
+ * file got downloaded twice — an orphaned duplicate nobody tracked or cleaned
+ * up. This module fixes that by:
  *
- * This module fixes that by:
  *   1. Using ONE canonical, sanitized path-building function everywhere.
  *   2. Before downloading, checking fileRepository for an existing localPath
- *      for this fileId (regardless of which directory it's in) and reusing it
- *      via a fast local copy instead of re-downloading from the network.
+ *      for this fileId and reusing it via a fast local copy instead of
+ *      re-downloading from the network — this is what guarantees "one
+ *      physical copy of every file on disk."
  */
 import * as FileSystem from 'expo-file-system';
 import { fileRepository } from '../database/fileRepository';
@@ -41,7 +40,8 @@ export async function ensureDir(dir) {
 }
 
 /**
- * Central download-or-reuse helper.
+ * Central download-or-reuse helper. Every file the app ever saves for
+ * offline use goes through this function, and only this function.
  *
  * @param {object} file - { fileId|_id, name|fileName, mimeType, materialId, downloadUrl, previewUrl }
  * @param {string} targetDir - directory the file should end up in (must end with '/')
@@ -49,9 +49,8 @@ export async function ensureDir(dir) {
  * @param {object} [opts]
  * @param {boolean} [opts.mirrorToExternal=false] - if true and the student has
  *   chosen a custom download folder (see storageLocationService), also copies
- *   this file there. Only ever pass true for REAL downloads (downloadManager),
- *   never for background preview-caching (offlineSyncService) — auto-cached
- *   preview files should never clutter a folder the student picked.
+ *   this file there. Only mirrors once per file — re-saves won't pile up
+ *   duplicate copies in the external folder. Never throws.
  * @returns {Promise<string|null>} local URI, or null if there's nothing to download
  */
 export async function downloadOrReuseFile(file, targetDir, onProgress, opts = {}) {
@@ -65,9 +64,6 @@ export async function downloadOrReuseFile(file, targetDir, onProgress, opts = {}
   await ensureDir(targetDir);
   const targetPath = buildLocalPath(targetDir, fileId, name);
 
-  // Best-effort mirror into the student's chosen external folder (Android
-  // only, no-op if not configured). Only mirrors once per file — re-saves
-  // won't pile up duplicate copies in the external folder. Never throws.
   const maybeMirror = async (existingRecord) => {
     if (!mirrorToExternal) return;
     if (existingRecord?.externalUri) return; // already mirrored once
@@ -89,9 +85,10 @@ export async function downloadOrReuseFile(file, targetDir, onProgress, opts = {}
     return targetPath;
   }
 
-  // 2. Is there already a cached copy elsewhere (any directory) for this fileId?
+  // 2. Is there already a saved copy elsewhere on disk for this fileId?
   //    Reuse it via a local copy instead of re-downloading — this is what
-  //    prevents the duplicate-download issue described above.
+  //    guarantees a file is never fetched from the network twice and never
+  //    exists as more than one physical copy.
   const existing = await fileRepository.getById(fileId);
   if (existing?.localPath && existing.localPath !== targetPath) {
     const existingInfo = await FileSystem.getInfoAsync(existing.localPath).catch(() => ({}));
@@ -102,7 +99,7 @@ export async function downloadOrReuseFile(file, targetDir, onProgress, opts = {}
         await maybeMirror(existing);
         return targetPath;
       } catch {
-        // Copy failed (e.g. source got evicted mid-check) — fall through to download.
+        // Copy failed (e.g. source got removed mid-check) — fall through to download.
       }
     }
   }
@@ -137,17 +134,16 @@ export async function downloadOrReuseFile(file, targetDir, onProgress, opts = {}
       fileName: name,
       mimeType: file.mimeType || existing?.mimeType || '',
       materialId: file.materialId || existing?.materialId,
-      // Subject context — stored directly on the file record so screens like
-      // DownloadsScreen can group downloads by subject without needing a
-      // separate materialRepository lookup (which may not exist if the user
-      // never explicitly opened/saved that material elsewhere).
+      // Subject context — stored directly on the file record so the Saved
+      // Materials screen can group by subject without an extra lookup.
       subjectName: file.subjectName || existing?.subjectName || null,
       facultyName: file.facultyName || existing?.facultyName || null,
       department:  file.department  || existing?.department  || null,
+      size: info.size || file.size || existing?.size || 0,
       downloaded: true,
       localPath: result.uri,
-      // cachedAt is set ONCE on first download, never overwritten on re-download.
-      cachedAt: existing?.cachedAt || new Date().toISOString(),
+      // downloadedAt is set ONCE on first save, never overwritten on re-download.
+      downloadedAt: existing?.downloadedAt || new Date().toISOString(),
       lastOpened: existing?.lastOpened || null,
       previewUrl: file.previewUrl || existing?.previewUrl || null,
       downloadUrl: file.downloadUrl || existing?.downloadUrl || null,

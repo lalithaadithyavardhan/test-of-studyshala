@@ -60,7 +60,7 @@ const STUDENT_LINKS = [
   { key: 'History',        label: 'History',       icon: 'time-outline' },
   { key: '__divider__',     label: 'SETTINGS',          icon: null },
   { key: 'StorageSettings', label: 'Storage Settings',  icon: 'server-outline' },
-  { key: 'Downloads', label: 'Downloads', icon: 'arrow-down-circle-outline' },
+
 ];
 
 const FACULTY_LINKS = [

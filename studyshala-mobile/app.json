@@ -10,10 +10,14 @@
     "splash": {
       "backgroundColor": "#F4F6FB"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "plugins": [
       "expo-dev-client",
-      ["@react-native-google-signin/google-signin"],
+      [
+        "@react-native-google-signin/google-signin"
+      ],
       [
         "expo-media-library",
         {
@@ -21,7 +25,8 @@
           "savePhotosPermission": "Allow StudyShala to save photos to your gallery.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true,
@@ -46,6 +51,9 @@
       "eas": {
         "projectId": "619c965c-9af6-4aad-9133-c246eeac0eca"
       }
+    },
+    "android": {
+      "allowBackup": false
     }
   }
 }

@@ -11,6 +11,8 @@
  *  - Inline FileCard — fully on-theme, no purple/teal leakage from FileListItem
  *  - Unstar with optimistic removal
  *  - Open file via existing openFile utility
+ *  - Offline-first: cache loaded instantly, server fetched in background
+ *  - Graceful degradation: distinct loading / offline / empty / error states
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -22,7 +24,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import SidebarDrawer from '../components/SidebarDrawer';
-import { getStarredFiles, unstarFile, getMaterialFiles } from '../api/studentApi';
+import { getStarredFiles, unstarFile } from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
@@ -43,40 +45,42 @@ const C = {
   textSec:      '#b1ada1',
   textMuted:    '#6b6760',
   white:        '#ffffff',
+  danger:       '#f87171',
+  warning:      '#fbbf24',
 };
 const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 16, full: 999 };
 const T = { xs: 10, sm: 12, base: 13, md: 14, lg: 16, xl: 18 };
 
 // ─── Sort config ──────────────────────────────────────────────────────────────
 const SORTS = [
-  { key: 'latest', label: 'Latest first', icon: 'time-outline'      },
+  { key: 'latest', label: 'Latest first', icon: 'time-outline'       },
   { key: 'oldest', label: 'Oldest first', icon: 'hourglass-outline'  },
-  { key: 'name',   label: 'Name A–Z',     icon: 'text-outline'       },
+  { key: 'name',   label: 'Name A–Z',    icon: 'text-outline'       },
 ];
 
 // ─── File-type filter config ──────────────────────────────────────────────────
 const TYPE_FILTERS = [
-  { key: 'all',   label: 'All',   icon: 'apps-outline'          },
-  { key: 'pdf',   label: 'PDF',   icon: 'document-text-outline' },
-  { key: 'video', label: 'Video', icon: 'videocam-outline'      },
-  { key: 'image', label: 'Image', icon: 'image-outline'         },
-  { key: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline' },
+  { key: 'all',   label: 'All',   icon: 'apps-outline'                   },
+  { key: 'pdf',   label: 'PDF',   icon: 'document-text-outline'          },
+  { key: 'video', label: 'Video', icon: 'videocam-outline'              },
+  { key: 'image', label: 'Image', icon: 'image-outline'                 },
+  { key: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline'  },
 ];
 
 // ─── File type helpers ────────────────────────────────────────────────────────
 function getFileType(mimeType = '') {
   const m = mimeType.toLowerCase();
-  if (m.includes('pdf'))                                         return 'pdf';
+  if (m.includes('pdf'))                                                      return 'pdf';
   if (m.startsWith('video/') || m.includes('mp4') || m.includes('mkv') || m.includes('webm')) return 'video';
-  if (m.startsWith('image/'))                                    return 'image';
+  if (m.startsWith('image/'))                                                 return 'image';
   return 'other';
 }
 
 const FILE_ICON = {
-  pdf:   { icon: 'document-text',  bg: 'rgba(222,115,86,0.14)',  color: '#DE7356' },
-  video: { icon: 'videocam',       bg: 'rgba(177,173,161,0.12)', color: '#b1ada1' },
-  image: { icon: 'image',          bg: 'rgba(177,173,161,0.10)', color: '#9a9690' },
-  other: { icon: 'document',       bg: 'rgba(177,173,161,0.08)', color: '#6b6760' },
+  pdf:   { icon: 'document-text', bg: 'rgba(222,115,86,0.14)',  color: '#DE7356' },
+  video: { icon: 'videocam',      bg: 'rgba(177,173,161,0.12)', color: '#b1ada1' },
+  image: { icon: 'image',         bg: 'rgba(177,173,161,0.10)', color: '#9a9690' },
+  other: { icon: 'document',      bg: 'rgba(177,173,161,0.08)', color: '#6b6760' },
 };
 
 function fileIconStyle(mimeType) {
@@ -131,7 +135,7 @@ const FileCard = React.memo(function FileCard({ item, onOpen, onUnstar, unstarri
           </View>
         </View>
 
-        {/* Unstar button — solid star, tap to remove */}
+        {/* Unstar button */}
         <TouchableOpacity
           style={[fc.starBtn, unstarring && fc.starBtnDisabled]}
           onPress={() => !unstarring && onUnstar(item)}
@@ -256,7 +260,7 @@ const fc = StyleSheet.create({
     color: C.accent,
   },
 
-  // Star button — same 30×30 slot as SavedScreen bookmark
+  // Star button
   starBtn: {
     width: 30,
     height: 30,
@@ -322,65 +326,115 @@ const fc = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function StarredScreen() {
   const navigation                      = useNavigation();
-  const { user, logout }                = useAuth();
-  const [starredFiles, setStarredFiles] = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [refreshing, setRefreshing]     = useState(false);
-  const [sidebarOpen, setSidebarOpen]   = useState(false);
-  const [searchQuery, setSearchQuery]   = useState('');
+  const { user, logout }               = useAuth();
+
+  const [starredFiles,  setStarredFiles]  = useState([]);
+  const [loading,      setLoading]        = useState(true);
+  const [refreshing,    setRefreshing]    = useState(false);
+  const [sidebarOpen,  setSidebarOpen]    = useState(false);
+  const [searchQuery,  setSearchQuery]    = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
-  const [sort, setSort]                 = useState('latest');
-  const [typeFilter, setTypeFilter]     = useState('all');
+  const [sort,         setSort]           = useState('latest');
+  const [typeFilter,   setTypeFilter]     = useState('all');
   const [unstarringIds, setUnstarringIds] = useState(new Set());
-  const [openingId, setOpeningId]         = useState(null);
+  const [openingId,    setOpeningId]      = useState(null);
+
+  // ── Distinct loading / error / offline states ────────────────────────────
+  // 'loading'  — initial fetch in progress, no cache shown yet
+  // 'success'  — data available (from cache, server, or both)
+  // 'offline'  — no network AND cache was empty → honest message
+  // 'error'    — server failed (with or without cache) → retry option
+  const [fetchState, setFetchState] = useState('loading');
+  // 'offline' = true means we showed the user an offline message already
+  const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
 
   const searchRef  = useRef(null);
   const searchAnim = useRef(new Animated.Value(0)).current;
 
-  // ── Load ───────────────────────────────────────────────────────────────────
-  const load = useCallback(async () => {
-    // Step 1 — load from local cache instantly
-    // NOTE: storage.getAllByPrefix() returns plain parsed objects, not
-    // {key, value} pairs — `entry` below IS the starred-file record.
+  // ── Auth guard: redirect if not logged in ────────────────────────────────
+  useEffect(() => {
+    if (!user) {
+      logout();
+    }
+  }, [user, logout]);
+
+  // ── Load ─────────────────────────────────────────────────────────────────
+  const load = useCallback(async ({ isRefresh = false } = {}) => {
+    if (!isRefresh) setLoading(true);
+
+    let cachedData = [];
+    let hasCache = false;
+    let serverFailed = false;
+
+    // Step 1 — load from local cache instantly (never shows spinner to user)
     try {
       const cached = await storage.getAllByPrefix('starred:');
       if (cached?.length) {
-        setStarredFiles(cached.filter(Boolean));
-        setLoading(false); // show cached content immediately, no spinner
+        cachedData = cached.filter(Boolean);
+        hasCache = true;
+        setStarredFiles(cachedData);
       }
-    } catch {}
+    } catch (err) {
+      // Cache read failed — proceed to server fetch, don't crash
+    }
 
     // Step 2 — fetch from server in background
     try {
       const { data } = await getStarredFiles();
-      const serverFiles = data.starredFiles || [];
+
+      // Handle 401: expired or invalid token
+      if (data?.status === 401 || data?.message?.toLowerCase?.().includes('unauthorized')) {
+        logout();
+        return;
+      }
+
+      const serverFiles = data?.starredFiles || [];
       setStarredFiles(serverFiles);
 
       // Step 3 — sync to local cache
-      // Clear stale keys first, then write fresh ones
       try {
         await storage.deleteAllByPrefix('starred:');
       } catch {}
       for (const f of serverFiles) {
-        // storage.set() already JSON.stringifies internally — pass the plain
-        // object directly (no pre-stringify).
         await storage.set(`starred:${f.fileId}`, f);
       }
-    } catch {
-      // Server failed — cached data already showing, stay silent
+
+      // Server succeeded — we're good
+      setFetchState('success');
+      setOfflineBannerDismissed(false);
+    } catch (err) {
+      serverFailed = true;
+
+      // Handle 401 at the network level too
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        logout();
+        return;
+      }
+
+      if (hasCache) {
+        // We have cached data — background refresh failed, stay silent
+        // (user can still see and use their cached files)
+        setFetchState('success');
+      } else {
+        // No cache and server failed — show honest offline / error message
+        setFetchState('offline');
+      }
+    } finally {
+      if (!isRefresh) setLoading(false);
     }
-  }, []);
+  }, [logout]);
 
   useEffect(() => {
-    setLoading(true);
-    load().finally(() => setLoading(false));
+    load();
   }, [load]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true); await load(); setRefreshing(false);
+    setRefreshing(true);
+    await load({ isRefresh: true });
+    setRefreshing(false);
   }, [load]);
 
-  // ── Search toggle ──────────────────────────────────────────────────────────
+  // ── Search toggle ────────────────────────────────────────────────────────
   const toggleSearch = useCallback(() => {
     if (searchVisible) {
       setSearchQuery('');
@@ -393,99 +447,63 @@ export default function StarredScreen() {
     }
   }, [searchVisible, searchAnim]);
 
-  // ── Unstar (optimistic removal) ────────────────────────────────────────────
+  // ── Unstar (optimistic removal) ───────────────────────────────────────────
   const handleUnstar = useCallback(async (file) => {
     const id = file.fileId || file._id;
     setUnstarringIds((prev) => new Set(prev).add(id));
     try {
-      await unstarFile(id);
+      const res = await unstarFile(id);
+
+      // Handle 401
+      if (res?.status === 401 || res?.data?.status === 401 || res?.data?.message?.toLowerCase?.().includes('unauthorized')) {
+        logout();
+        return;
+      }
+
       setStarredFiles((prev) => prev.filter((f) => (f.fileId || f._id) !== id));
-      // Remove from local cache so it's gone offline too
       await storage.delete(`starred:${id}`);
-    } catch {
+    } catch (err) {
+      // Handle 401 at network level
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        logout();
+        return;
+      }
       Alert.alert('Error', 'Failed to unstar file. Please try again.');
     } finally {
       setUnstarringIds((prev) => {
         const next = new Set(prev); next.delete(id); return next;
       });
     }
-  }, []);
+  }, [logout]);
 
-  // ── Open file ──────────────────────────────────────────────────────────────
-  // The server's getStarredFiles API does not return downloadUrl / previewUrl.
-  // Those URLs also expire after a few hours even when cached.
-  // So before calling openFile(), we always fetch a fresh downloadUrl from
-  // getMaterialFiles(). This is fast (~200ms) and guarantees the download works.
-  // If internet is unavailable, we fall back to whatever is cached on disk
-  // (fileRepository localPath) — openFile handles that automatically.
+  // ── Open file ─────────────────────────────────────────────────────────────
+  // Starring is just a bookmark now — it carries no offline guarantee of its
+  // own. Whether this opens without internet depends entirely on whether the
+  // file's material was saved, and that check lives in one place:
+  // fileActions.openFile(). This screen doesn't duplicate that logic anymore.
   const handleOpen = useCallback(async (file) => {
-    const fileId     = file.fileId || file._id;
-    const materialId = file.materialId;
-    console.log("========== STARRED ==========");
-    console.log("File ID:", file.fileId);
-    console.log("Material ID:", materialId);
-    console.log("File:", file);
+    console.log('OPEN FILE:', JSON.stringify(file, null, 2));   // ← add this line
+    const fileId = file.fileId || file._id;
     setOpeningId(fileId);
-
-    let freshDownloadUrl = file.downloadUrl || null;
-    let freshPreviewUrl  = file.previewUrl  || null;
-
-    // Always try to get fresh URLs — cached ones may be expired or missing
-    if (materialId) {
-      try {
-        const { data } = await getMaterialFiles(materialId);
-        console.log("Material API Response:", data);
-        const allFiles = [
-          ...(data.files || []),
-          ...(data.subFolders || []).flatMap(sf => sf.files || []),
-        ];
-        console.log("All Files:", allFiles);
-        const fresh = allFiles.find(
-          sf =>
-               String(sf._id) === String(fileId) ||
-               String(sf.fileId) === String(fileId) ||
-               String(sf.id) === String(fileId)
-        );
-
-        console.log("Matched File:", fresh);
-        if (fresh?.downloadUrl) freshDownloadUrl = fresh.downloadUrl;
-        console.log("Download URL:", freshDownloadUrl);
-        console.log("Preview URL:", freshPreviewUrl);
-        if (fresh?.previewUrl)  freshPreviewUrl  = fresh.previewUrl;
-
-        // Update local starred cache with fresh URLs so next open skips this step.
-        // storage.get() already returns a parsed object (never a string), and
-        // storage.set() already stringifies internally — re-parsing/re-stringifying
-        // here was throwing silently and corrupting the cached entry.
-        try {
-          const existing = await storage.get(`starred:${fileId}`);
-          await storage.set(`starred:${fileId}`, {
-            ...(existing || {}),
-            downloadUrl: freshDownloadUrl,
-            previewUrl:  freshPreviewUrl,
-          });
-        } catch {}
-      } catch {
-        // No internet — openFile will use localPath from fileRepository if cached
-      }
-    }
-
-    setOpeningId(null);
-
-    openFile(
+    await openFile(
       {
         _id:         fileId,
         fileId:      fileId,
         name:        file.fileName || file.name,
         fileName:    file.fileName || file.name,
         mimeType:    file.mimeType,
-        previewUrl:  freshPreviewUrl,
-        downloadUrl: freshDownloadUrl,
+        previewUrl:  file.previewUrl  || null,
+        downloadUrl: file.downloadUrl || null,
+        materialId:  file.materialId,
+        subjectName: file.subjectName,
       },
-      { _id: materialId, subjectName: file.subjectName },
+      { _id: file.materialId, subjectName: file.subjectName },
       navigation,
+      logout,
     );
-  }, [navigation]);
+
+    setOpeningId(null);
+  }, [navigation, logout]);
 
   // ── Derived list (search + type filter + sort) ─────────────────────────────
   const filtered = useMemo(() => {
@@ -504,7 +522,7 @@ export default function StarredScreen() {
 
     if (sort === 'latest') return [...list].sort((a, b) => new Date(b.starredAt || b.createdAt) - new Date(a.starredAt || a.createdAt));
     if (sort === 'oldest') return [...list].sort((a, b) => new Date(a.starredAt || a.createdAt) - new Date(b.starredAt || b.createdAt));
-    if (sort === 'name')   return [...list].sort((a, b) => (a.fileName || '').localeCompare(b.fileName || ''));
+    if (sort === 'name')  return [...list].sort((a, b) => (a.fileName || '').localeCompare(b.fileName || ''));
     return list;
   }, [starredFiles, searchQuery, typeFilter, sort]);
 
@@ -521,8 +539,9 @@ export default function StarredScreen() {
 
   const keyExtractor = useCallback((item) => item.fileId || item._id, []);
 
-  // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading) {
+  // ── Distinct state rendering ──────────────────────────────────────────────
+
+  if (loading && fetchState === 'loading') {
     return (
       <SafeAreaView style={s.center} edges={['top']}>
         <ActivityIndicator size="large" color={C.accent} />
@@ -530,10 +549,27 @@ export default function StarredScreen() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Offline / error banner ────────────────────────────────────────────────
+  const showBanner = fetchState === 'offline' && !offlineBannerDismissed;
+
   return (
     <View style={s.root}>
       <SafeAreaView style={s.safe} edges={['top']}>
+
+        {/* ── Offline / error banner ── */}
+        {showBanner && (
+          <TouchableOpacity
+            style={s.banner}
+            onPress={() => load()}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="cloud-offline-outline" size={16} color={C.warning} />
+            <Text style={s.bannerText}>
+              You're offline — showing cached files
+            </Text>
+            <Text style={s.bannerRetry}>Tap to retry</Text>
+          </TouchableOpacity>
+        )}
 
         {/* ── Header ── */}
         <View style={s.header}>
@@ -590,7 +626,6 @@ export default function StarredScreen() {
             contentContainerStyle={s.toolbarScroll}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Sort pills */}
             {SORTS.map((opt) => (
               <TouchableOpacity
                 key={opt.key}
@@ -603,10 +638,8 @@ export default function StarredScreen() {
               </TouchableOpacity>
             ))}
 
-            {/* Divider */}
             <View style={s.toolbarDivider} />
 
-            {/* File-type filter pills */}
             {TYPE_FILTERS.map((opt) => (
               <TouchableOpacity
                 key={opt.key}
@@ -625,7 +658,6 @@ export default function StarredScreen() {
               </TouchableOpacity>
             ))}
 
-            {/* Count badge */}
             <View style={s.countWrap}>
               <Text style={s.countBadge}>{filtered.length} item{filtered.length !== 1 ? 's' : ''}</Text>
             </View>
@@ -645,17 +677,31 @@ export default function StarredScreen() {
           removeClippedSubviews
           ListEmptyComponent={
             <View style={s.emptyCard}>
-              <Text style={s.emptyEmoji}>⭐</Text>
+              <Text style={s.emptyEmoji}>
+                {fetchState === 'offline' ? '📡' : searchQuery || typeFilter !== 'all' ? '🔍' : '⭐'}
+              </Text>
               <Text style={s.emptyTitle}>
-                {searchQuery || typeFilter !== 'all' ? 'No results found' : 'No starred files yet'}
+                {fetchState === 'offline'
+                  ? 'No internet connection'
+                  : searchQuery || typeFilter !== 'all'
+                  ? 'No results found'
+                  : 'No starred files yet'}
               </Text>
               <Text style={s.emptyDesc}>
-                {searchQuery
+                {fetchState === 'offline'
+                  ? 'Starred files will appear here once you\'re back online and the sync completes.'
+                  : searchQuery
                   ? `No starred files match "${searchQuery}".`
                   : typeFilter !== 'all'
                   ? 'No starred files match this file type.'
                   : 'Tap the star on any file to save it here for quick access.'}
               </Text>
+              {fetchState === 'offline' && (
+                <TouchableOpacity style={s.retryBtn} onPress={() => load()}>
+                  <Ionicons name="refresh-outline" size={15} color={C.white} />
+                  <Text style={s.retryBtnText}>Retry</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
@@ -678,6 +724,30 @@ const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
   safe:   { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
+
+  // Offline banner
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(251,191,36,0.10)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(251,191,36,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: T.sm,
+    color: C.warning,
+    fontWeight: '500',
+  },
+  bannerRetry: {
+    fontSize: T.xs,
+    color: C.warning,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
 
   // Header
   header: {
@@ -742,7 +812,7 @@ const s = StyleSheet.create({
   // List
   listContent: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 40, flexGrow: 1 },
 
-  // Empty
+  // Empty / offline / error
   emptyCard: {
     backgroundColor: C.surface, borderRadius: R.xl, paddingVertical: 40,
     alignItems: 'center', borderWidth: 1, borderColor: C.border, marginTop: 20,
@@ -750,4 +820,11 @@ const s = StyleSheet.create({
   emptyEmoji: { fontSize: 44, marginBottom: 12 },
   emptyTitle: { fontSize: T.md, fontWeight: '700', color: C.textPrimary, marginBottom: 6 },
   emptyDesc:  { fontSize: T.base, color: C.textMuted, textAlign: 'center', paddingHorizontal: 28, lineHeight: 20 },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: C.accent, borderRadius: R.md,
+    paddingHorizontal: 20, paddingVertical: 10,
+    marginTop: 16,
+  },
+  retryBtnText: { fontSize: T.sm, fontWeight: '700', color: C.white },
 });

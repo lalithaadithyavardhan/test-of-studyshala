@@ -30,7 +30,7 @@ try {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { getRecentFiles, getMaterialFiles } from '../api/studentApi';
+import { getRecentFiles } from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
 import SidebarDrawer from '../components/SidebarDrawer';
 import { API_BASE_URL } from '../config/config';
@@ -95,7 +95,6 @@ const WORKSPACE = [
   { key: 'SavedMaterials', label: 'Saved',        icon: 'bookmark-outline', count: 'Subjects' },
   { key: 'Starred',        label: 'Starred',       icon: 'star-outline',     count: 'Files'  },
   { key: 'History',        label: 'History',       icon: 'time-outline',     count: 'Access codes'  },
-  { key: 'Downloads',   label: 'Downloads', icon: 'arrow-down-circle-outline',   count: 'Subjects & Files'   },
 ];
 
 const TRUST_PILLS = ['No ads', 'Free forever', 'Drive backed', 'Instant access'];
@@ -103,7 +102,7 @@ const TRUST_PILLS = ['No ads', 'Free forever', 'Drive backed', 'Instant access']
 const HOW_STEPS = [
   { num: '1', title: 'Sign in with Google', desc: 'Use your institutional Google account to log in securely' },
   { num: '2', title: 'Enter access code',   desc: 'Get the 8-character code from your faculty member'      },
-  { num: '3', title: 'Browse & download',   desc: 'Preview files or save them directly to your device'      },
+  { num: '3', title: 'Browse & save',       desc: 'Preview files online, or save a material to keep it offline'      },
 ];
 
 const SUBJECT_ICONS = ['book-outline', 'code-slash-outline', 'calculator-outline', 'flask-outline'];
@@ -303,57 +302,31 @@ export default function StudentDashboard({ navigation }) {
   const [openingFileId, setOpeningFileId] = useState(null);
 
   // ── Open a "recently viewed" file ────────────────────────────────────────
-  // NOTE: the recent-files record only ever contains
-  // {fileId, fileName, mimeType, materialId, subjectName, viewedAt} — it
-  // never carries a previewUrl/downloadUrl (those aren't part of what the
-  // server stores for recent files, and even if cached they expire after a
-  // few hours). So, same as StarredScreen.handleOpen(), we fetch a fresh
-  // download/preview URL from getMaterialFiles() FIRST and attach it to the
-  // file object before calling openFile() — passing a file with no URL at
-  // all is what caused the blank-screen bug.
+  // fileActions.openFile() handles everything: checking for a local saved
+  // copy first, refreshing the preview/download URL from the server if
+  // needed, and showing an honest message if neither is available. Nothing
+  // needs to be duplicated here.
   const handleRecentFilePress = async (file) => {
     const fileId     = file.fileId;
     const materialId = file.materialId;
     setOpeningFileId(fileId);
 
-    let freshDownloadUrl = file.downloadUrl || null;
-    let freshPreviewUrl  = file.previewUrl  || null;
-
-    if (materialId) {
-      try {
-        const { data } = await getMaterialFiles(materialId);
-        const allFiles = [
-          ...(data.files || []),
-          ...(data.subFolders || []).flatMap(sf => sf.files || []),
-        ];
-        const fresh = allFiles.find(
-          sf =>
-            String(sf._id) === String(fileId) ||
-            String(sf.fileId) === String(fileId)
-        );
-        if (fresh?.downloadUrl) freshDownloadUrl = fresh.downloadUrl;
-        if (fresh?.previewUrl)  freshPreviewUrl  = fresh.previewUrl;
-      } catch {
-        // No internet / access issue — openFile() will fall back to
-        // fileRepository's localPath if this file was cached before.
-      }
-    }
-
-    setOpeningFileId(null);
-
-    openFile(
+    await openFile(
       {
         _id:         fileId,
         fileId:      fileId,
         name:        file.fileName,
         fileName:    file.fileName,
         mimeType:    file.mimeType,
-        previewUrl:  freshPreviewUrl,
-        downloadUrl: freshDownloadUrl,
+        previewUrl:  file.previewUrl  || null,
+        downloadUrl: file.downloadUrl || null,
+        materialId,
       },
       { _id: materialId, subjectName: file.subjectName },
       navigation,
     );
+
+    setOpeningFileId(null);
 
     // Optimistic "recently viewed" update — bump this file to the top locally
     // right away. This is what makes the list correct offline too: the

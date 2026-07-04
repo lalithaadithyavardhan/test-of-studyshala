@@ -9,9 +9,7 @@ import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { cacheManager } from '../services/cacheManager';
-import { offlineSyncService } from '../services/offlineSyncService';
-import { materialRepository } from '../database/materialRepository';
+import { downloadManager } from '../services/downloadManager';
 import { getMaterialFiles } from '../api/studentApi';
 
 import SplashScreen from '../screens/SplashScreen';
@@ -27,8 +25,6 @@ import MaterialAccessScreen from '../screens/MaterialAccessScreen';
 import FileViewerScreen from '../screens/FileViewerScreen';
 
 import StorageSettingsScreen from '../screens/StorageSettingsScreen';
-
-import DownloadsScreen from '../screens/DownloadsScreen';
 
 // Faculty screens
 import FacultyDashboardScreen from '../screens/FacultyDashboardScreen';
@@ -84,8 +80,6 @@ function StudentRoot() {
         component={StorageSettingsScreen}
       />
 
-      <StudentStack.Screen name="Downloads" component={DownloadsScreen} />
-
     </StudentStack.Navigator>
   );
 }
@@ -130,25 +124,12 @@ export default function AppNavigator() {
   const { isAuthenticated, loading, user } = useAuth();
 
   // ── Startup tasks (fire-and-forget, never block the UI) ──────────────────
+  // Single-tier offline model: there's no cache to clean up or expire
+  // anymore. The only startup job is re-checking materials the student has
+  // already saved, in case their files changed on the server since the
+  // last time this device was online.
   useEffect(() => {
-    // 1. Evict expired cache files from disk + materialRepository
-    cacheManager.runCleanup().catch(() => {});
-
-    // 2. Evict individually-starred expired files (not covered by materialRepository)
-    offlineSyncService.evictExpiredCache().catch(() => {});
-
-    // 3. Background sync: re-download changed files for all saved materials
-    (async () => {
-      try {
-        const savedMaterials = await materialRepository.getAllSaved();
-        if (savedMaterials.length) {
-          offlineSyncService.backgroundSync(
-            savedMaterials,
-            (materialId) => getMaterialFiles(materialId),
-          ).catch(() => {});
-        }
-      } catch {}
-    })();
+    downloadManager.resyncSavedMaterials(getMaterialFiles).catch(() => {});
   }, []); // Run once on mount
 
   if (loading) {

@@ -1,3 +1,10 @@
+/**
+ * database/materialRepository.js — StudyShala
+ * ==============================================
+ * savedOffline: true is permanent — there is no expiry, no eviction. A
+ * material stays saved until the student explicitly removes it (which
+ * deletes its files via downloadManager.deleteSavedMaterial()).
+ */
 import { storage } from './db';
 
 const PREFIX = 'material:';
@@ -18,6 +25,9 @@ export const materialRepository = {
     return await storage.get(PREFIX + materialId);
   },
 
+  // ── getAllSaved ───────────────────────────────────────────────────────────
+  // The Saved Materials screen's single data source — every material the
+  // student has permanently downloaded, most recently opened first.
   async getAllSaved() {
     const all = await storage.getAllByPrefix(PREFIX);
     return all
@@ -45,14 +55,9 @@ export const materialRepository = {
     return m ? m.version : null;
   },
 
-  async getExpiredCache(days) {
-    const all = await storage.getAllByPrefix(PREFIX);
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-    return all.filter(m => !m.savedOffline && m.lastOpened && new Date(m.lastOpened) < cutoff);
-  },
-
   async delete(materialId) {
     await storage.delete(PREFIX + materialId);
   },
 };
+
+export default materialRepository;

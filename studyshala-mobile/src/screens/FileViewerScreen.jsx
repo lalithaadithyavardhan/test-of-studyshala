@@ -25,6 +25,18 @@
  *  remote-URL viewing path, unchanged from the working old version) is left
  *  untouched.
  *
+ * REMOTE URL FALLBACK FIX (this version):
+ *  Files opened via a local-cache fast path (e.g. from StarredScreen) arrive
+ *  here with only a `localPath` — no previewUrl/downloadUrl. On Expo Go,
+ *  local file:// paths can't be converted to a WebView-safe content:// URI
+ *  (FileProvider limitation), so resolvedLocalUri fails, and previously the
+ *  screen fell back to buildViewUrl() with nothing to build from — an empty
+ *  string fed straight into WebView, producing a silent blank/black screen.
+ *  Fix: when a file arrives with no previewUrl/downloadUrl, fetch fresh ones
+ *  from getMaterialFiles() the same way fileActions.openFile() already does,
+ *  and hold the loading state until either a real URL is ready or we can
+ *  honestly show the "couldn't open" error screen.
+ *
  * Header behaviour:
  *  - Auto-hides after 3 s of inactivity (animated slide-up)
  *  - Tap anywhere on content  → toggle header visibility
@@ -48,7 +60,7 @@ import {
   View, Text, StyleSheet,
   TouchableOpacity, TouchableWithoutFeedback,
   ActivityIndicator, Animated, Platform,
-  Share, Modal, Linking,
+  Share, Modal, Linking, Alert,
   Dimensions, StatusBar,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -59,6 +71,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { getMaterialFiles } from '../api/studentApi';
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 const C = {
@@ -132,8 +145,21 @@ function getFileType(file) {
   return 'webview'; // fallback
 }
 
-/** Always use previewUrl directly — it's already a valid Google Drive preview link */
-function buildViewUrl(file, _type) {
+/**
+ * Build the URL WebView will load.
+ *  - PDF / Office docs: wrapped with Google's public Docs Viewer, since the
+ *    raw Drive /preview link often finishes "loading" before its own
+ *    JS-heavy viewer has rendered anything inside a plain WebView.
+ *  - Everything else (image/video/audio/text): raw previewUrl/downloadUrl,
+ *    which Drive renders directly and reliably.
+ */
+function buildViewUrl(file, type) {
+  if (type === 'pdf' || type === 'office') {
+    const source = file.downloadUrl || file.previewUrl;
+    if (source) {
+      return `https://docs.google.com/viewer?url=${encodeURIComponent(source)}&embedded=true`;
+    }
+  }
   return file.previewUrl || file.downloadUrl || '';
 }
 
@@ -197,20 +223,64 @@ async function resolveLocalUriForWebView(rawPath) {
     return null;
   }
 
+  const withoutScheme = normalized.replace('file://', '');
+  const decodedPath   = decodeURIComponent(withoutScheme); // e.g. real space
+  const encodedPath   = withoutScheme;                     // e.g. literal %20
+
+  // Don't assume which form matches what's actually on disk — different Expo/
+  // Android versions have gone back and forth on this. Ask the filesystem
+  // directly which one is real, and use that. This is what "isn't writable"
+  // and the FileNotFoundException on copyAsync were both actually reporting:
+  // not a permissions issue, just the wrong candidate path.
+  let realPath = null;
   try {
-    // IMPORTANT: FileSystem.downloadAsync()/createDownloadResumable() return
-    // result.uri already URL-encoded (e.g. spaces become %20). That's correct
-    // for a file:// URI, but getContentUriAsync() expects a literal filesystem
-    // path — passing the encoded form makes it look for a file that doesn't
-    // exist (one literally named "...%20..."), which surfaces as a confusing
-    // "isn't writable" IOException. Decoding here fixes it for every file
-    // type uniformly (this was never a rendering issue, just a wrong path).
-    const pathWithoutScheme = decodeURIComponent(normalized.replace('file://', ''));
-    const contentUri = await FileSystem.getContentUriAsync(pathWithoutScheme);
+    const decodedInfo = await FileSystem.getInfoAsync(decodedPath).catch(() => ({}));
+    if (decodedInfo.exists) {
+      realPath = decodedPath;
+    } else {
+      const encodedInfo = await FileSystem.getInfoAsync(encodedPath).catch(() => ({}));
+      if (encodedInfo.exists) realPath = encodedPath;
+    }
+  } catch (e) {
+    console.log('[FVS] resolveLocalUriForWebView: existence check error:', e?.message);
+  }
+
+  console.log('[FVS] resolveLocalUriForWebView: on-disk match =', realPath || 'NEITHER FORM EXISTS', {
+    decodedPath, encodedPath,
+  });
+
+  if (!realPath) {
+    // Genuinely missing from disk (deleted outside the app, storage cleared,
+    // etc). No point trying getContentUriAsync/copyAsync on a path that
+    // doesn't exist — go straight to the remote fallback.
+    return null;
+  }
+
+  try {
+    const contentUri = await FileSystem.getContentUriAsync(realPath);
     console.log('[FVS] resolveLocalUriForWebView: content:// =', contentUri);
     return contentUri;
   } catch (e) {
-    console.log('[FVS] resolveLocalUriForWebView ERROR:', e?.message);
+    console.log('[FVS] resolveLocalUriForWebView ERROR (direct path):', e?.message, realPath);
+  }
+
+  // Fallback: some Android/Expo builds reject content-URI generation for
+  // paths nested under documentDirectory (e.g. StudyShala/Saved/<id>/...)
+  // even for a path that FileSystem.getInfoAsync just confirmed exists.
+  // cacheDirectory is consistently covered by the FileProvider config when
+  // documentDirectory subfolders sometimes aren't, so copy there and retry.
+  try {
+    const fileName = realPath.split('/').pop();
+    const cachePath = FileSystem.cacheDirectory + fileName;
+    const cacheInfo = await FileSystem.getInfoAsync(cachePath).catch(() => ({}));
+    if (!cacheInfo.exists) {
+      await FileSystem.copyAsync({ from: realPath, to: cachePath });
+    }
+    const contentUri = await FileSystem.getContentUriAsync(cachePath);
+    console.log('[FVS] resolveLocalUriForWebView: content:// via cache copy =', contentUri);
+    return contentUri;
+  } catch (e2) {
+    console.log('[FVS] resolveLocalUriForWebView ERROR (cache-copy fallback):', e2?.message);
     return null;
   }
 }
@@ -625,6 +695,15 @@ export default function FileViewerScreen({ route, navigation }) {
   const { file, material } = route.params ?? {};
   const insets = useSafeAreaInsets();
 
+  useEffect(() => {
+    console.log('[FVS] mount params:', {
+      fileId: file?._id, name: file?.name,
+      localPath: file?.localPath,
+      previewUrl: file?.previewUrl, downloadUrl: file?.downloadUrl,
+      materialId: material?._id || file?.materialId,
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(false);
   const [menuOpen,      setMenuOpen]      = useState(false);
@@ -649,6 +728,7 @@ export default function FileViewerScreen({ route, navigation }) {
   //   Android, file:// on iOS). null until resolved or if resolution fails.
   const [rawLocalPath,     setRawLocalPath]     = useState(file?.localPath || null);
   const [resolvedLocalUri, setResolvedLocalUri] = useState(null);
+  const [localResolutionDone, setLocalResolutionDone] = useState(!file?.localPath);
   const pollTimerRef = useRef(null);
 
   // Whenever rawLocalPath changes, resolve it to a URI WebView can actually load.
@@ -656,20 +736,127 @@ export default function FileViewerScreen({ route, navigation }) {
     let cancelled = false;
     if (!rawLocalPath) {
       setResolvedLocalUri(null);
+      setLocalResolutionDone(true);
       return;
     }
+    setLocalResolutionDone(false);
     (async () => {
       const resolved = await resolveLocalUriForWebView(rawLocalPath);
-      if (!cancelled) setResolvedLocalUri(resolved);
+      if (!cancelled) {
+        setResolvedLocalUri(resolved);
+        setLocalResolutionDone(true);
+      }
     })();
     return () => { cancelled = true; };
   }, [rawLocalPath]);
 
+  // ── Remote URL fallback ───────────────────────────────────────────────────
+  // Files opened with only a localPath (no previewUrl/downloadUrl — this is
+  // how fileActions.openFile()'s Step 1 fast path hands off a saved file)
+  // need a fresh remote URL fetched here whenever local resolution can't be
+  // used (e.g. Expo Go's content:// / FileProvider limitation). Without this,
+  // resolvedLocalUri fails, buildViewUrl() has nothing to build from, and
+  // WebView silently loads an empty string — the black-screen bug.
+  const [remoteUrls, setRemoteUrls] = useState({ previewUrl: null, downloadUrl: null });
+  const [remoteFetchDone, setRemoteFetchDone] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const needsRemote = !file?.previewUrl && !file?.downloadUrl;
+    const materialId  = material?._id || file?.materialId;
+
+    if (!needsRemote || !materialId) {
+      if (needsRemote && !materialId) {
+        console.log('[FVS] remote fallback skipped — no materialId available on file/material params');
+      }
+      setRemoteFetchDone(true);
+      return;
+    }
+
+    setRemoteFetchDone(false);
+    (async () => {
+      try {
+        const res = await getMaterialFiles(materialId);
+        const data = res?.data || {};
+        const allFiles = [
+          ...(data.files || []),
+          ...(data.subFolders || []).flatMap(sf => sf.files || []),
+        ];
+        const fresh = allFiles.find(f2 =>
+          String(f2._id) === String(file?._id) ||
+          String(f2.fileId) === String(file?._id) ||
+          String(f2.id) === String(file?._id),
+        );
+        console.log('[FVS] remote fallback fetch result:', {
+          materialId, fileId: file?._id, totalFilesFetched: allFiles.length,
+          matched: !!fresh, freshPreviewUrl: fresh?.previewUrl, freshDownloadUrl: fresh?.downloadUrl,
+        });
+        if (fresh && !cancelled) {
+          setRemoteUrls({
+            previewUrl:  fresh.previewUrl  || null,
+            downloadUrl: fresh.downloadUrl || null,
+          });
+        }
+      } catch (e) {
+        console.log('[FVS] remote URL refresh failed:', e?.message);
+      } finally {
+        if (!cancelled) setRemoteFetchDone(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // effectiveFile: the file object actually used for building the view URL —
+  // route params first, remote refresh filling in only what's missing.
+  const effectiveFile = {
+    ...file,
+    previewUrl:  file?.previewUrl  || remoteUrls.previewUrl,
+    downloadUrl: file?.downloadUrl || remoteUrls.downloadUrl,
+  };
+
+  // Android WebView cannot render .docx/.pptx/.xlsx at all — it's an HTML
+  // renderer, not an Office document engine. The Google Docs Viewer wrapper
+  // (buildViewUrl) only works for the REMOTE case because it hands the file
+  // to Google's own servers to render; a local content:// URI can't be
+  // reached by Google's servers, so there is no way to render a genuinely
+  // local Office file inside this WebView, full stop. The only real fix is
+  // to hand the file off to a native document-viewer app already on the
+  // device (Google Docs, WPS Office, Microsoft Office, etc.) via the OS's
+  // own "open with" resolution — exactly what Linking.openURL() does for a
+  // content:// URI on Android.
+  const needsNativeHandoff = fileType === 'office' && !!resolvedLocalUri;
+
+  useEffect(() => {
+    if (needsNativeHandoff) setLoading(false);
+  }, [needsNativeHandoff]);
+
+  const handleOpenLocalDocument = () => {
+    Linking.openURL(resolvedLocalUri).catch(() => {
+      Alert.alert(
+        'No document viewer found',
+        'Install a document viewer app (Google Docs, WPS Office, Microsoft Word/PowerPoint, etc.) to open this file offline.',
+      );
+    });
+  };
+
   // viewUrl: prefer the resolved cached URI; if cache resolution hasn't
   // finished yet OR failed, fall back to the proven remote previewUrl —
   // never feed WebView a raw app-private file:// path.
-  const viewUrl = resolvedLocalUri || buildViewUrl(file ?? {}, fileType);
+  const viewUrl   = resolvedLocalUri || buildViewUrl(effectiveFile, fileType);
+  // urlsReady: both the local-cache resolution attempt and the remote-URL
+  // refresh attempt (if one was needed) have finished — only once both are
+  // done do we know whether viewUrl is genuinely empty or just not ready yet.
+  const urlsReady = localResolutionDone && remoteFetchDone;
   const isLoading = loading;
+
+  // If everything that could produce a URL has finished and we still don't
+  // have one, show the honest error screen instead of a silent blank WebView.
+  useEffect(() => {
+    if (urlsReady && !viewUrl && !error) {
+      setLoading(false);
+      setError(true);
+    }
+  }, [urlsReady, viewUrl, error]);
 
   // ── Header show / hide ────────────────────────────────────────────────────
   const hideHeader = useCallback(() => {
@@ -757,7 +944,7 @@ export default function FileViewerScreen({ route, navigation }) {
 
   const downloadToCache = async () => {
     if (!FileSystem) throw new Error('expo-file-system not available');
-    const url = file?.downloadUrl || file?.previewUrl;
+    const url = effectiveFile?.downloadUrl || effectiveFile?.previewUrl;
     if (!url) throw new Error('No download URL');
     const ext      = (file?.name || 'file').split('.').pop() || 'bin';
     const fileName = `studyshala_${Date.now()}.${ext}`;
@@ -774,14 +961,14 @@ export default function FileViewerScreen({ route, navigation }) {
         const canShare  = await Sharing.isAvailableAsync();
         if (canShare) { await Sharing.shareAsync(localUri, { mimeType: file?.mimeType || '*/*', dialogTitle: file?.name || 'Share file' }); return; }
       }
-      await Share.share({ message: `${file?.name ?? 'File'}\n${file?.downloadUrl ?? file?.previewUrl ?? ''}` });
+      await Share.share({ message: `${file?.name ?? 'File'}\n${effectiveFile?.downloadUrl ?? effectiveFile?.previewUrl ?? ''}` });
     } catch (e) {
-      await Share.share({ message: `${file?.name ?? 'File'}\n${file?.downloadUrl ?? file?.previewUrl ?? ''}` });
+      await Share.share({ message: `${file?.name ?? 'File'}\n${effectiveFile?.downloadUrl ?? effectiveFile?.previewUrl ?? ''}` });
     }
   };
 
   const handleOpenBrowser = () => {
-    const url = file?.previewUrl || file?.downloadUrl;
+    const url = effectiveFile?.previewUrl || effectiveFile?.downloadUrl;
     if (url) Linking.openURL(url).catch(() => {});
   };
 
@@ -797,7 +984,7 @@ export default function FileViewerScreen({ route, navigation }) {
         return;
       }
 
-      const url = buildImageDownloadUrl(file);
+      const url = buildImageDownloadUrl(effectiveFile);
       if (!url) {
         setSaveStatus('error:No download URL available');
         setTimeout(() => setSaveStatus(''), 3500);
@@ -902,7 +1089,7 @@ export default function FileViewerScreen({ route, navigation }) {
         }
       }
 
-      Linking.openURL(file?.downloadUrl || file?.previewUrl || '').catch(() => {});
+      Linking.openURL(effectiveFile?.downloadUrl || effectiveFile?.previewUrl || '').catch(() => {});
       setSaveStatus('saved');
     } catch (_) {
       setSaveStatus('error');
@@ -914,6 +1101,8 @@ export default function FileViewerScreen({ route, navigation }) {
   // ── Render content by type ────────────────────────────────────────────────
   const renderContent = () => {
     if (error) return null;
+    if (needsNativeHandoff) return null; // handled by its own screen below
+    if (!viewUrl) return null; // still resolving local/remote URL — loading overlay stays visible
 
     if (fileType === 'image') {
       return (
@@ -998,6 +1187,26 @@ export default function FileViewerScreen({ route, navigation }) {
               <ActivityIndicator size="large" color={C.accent} />
               <Text style={s.loadingTitle}>Opening file…</Text>
               <Text style={s.loadingDesc}>{FILE_TYPE_LABEL[fileType] || 'Loading'}</Text>
+            </View>
+          </View>
+        )}
+
+        {needsNativeHandoff && (
+          <View style={s.errorWrap}>
+            <View style={s.errorCard}>
+              <View style={s.errorIconWrap}>
+                <Ionicons name="document-text-outline" size={36} color={C.accent} />
+              </View>
+              <Text style={s.errorTitle}>Open with a document app</Text>
+              <Text style={s.errorDesc}>
+                This file is saved on your device and ready to view offline — Word,
+                PowerPoint and Excel files open through your phone's own document
+                viewer app rather than inside StudyShala.
+              </Text>
+              <TouchableOpacity style={s.errorBtn} onPress={handleOpenLocalDocument} activeOpacity={0.85}>
+                <Ionicons name="open-outline" size={16} color={C.white} />
+                <Text style={s.errorBtnText}>Open Document</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}

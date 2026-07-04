@@ -1,31 +1,56 @@
 /**
  * utils/fileActions.js
  * ======================
- * Offline-first file opening — Spotify model.
+ * The single shared "open a file" function every screen uses.
  *
- * openFile() flow:
- *   1. Check local disk first → open instantly if cached (zero internet)
- *   2. Not on disk → download to Cache dir in background while navigating
- *   3. Download failed + no previewUrl → clear offline error
- *   4. Download failed + previewUrl exists → stream from URL as last resort
+ * openFile() flow — matches the one offline rule for the whole app:
+ *   1. Look the file up in fileRepository. If it has a localPath AND that
+ *      file still exists on disk → open it immediately. Zero internet,
+ *      zero network calls, zero ambiguity: this only happens when the
+ *      file's material was saved.
+ *   2. No local copy → this file was never saved for offline use. Try to
+ *      stream it from the network (fresh preview/download URL) so browsing
+ *      and previewing still works fine with internet.
+ *   3. No local copy AND no internet → tell the user honestly that this
+ *      material hasn't been saved for offline use, instead of a generic
+ *      "couldn't open file" error.
  *
- * downloadFile() — silently saves to Downloads dir via downloadManager and
- * registers it in fileRepository so it shows up in the Downloads screen.
- * No share sheet / "choose a location" prompt — see comment above downloadFile().
+ * There is no more background-download-into-cache step here. The ONLY way
+ * a file becomes available offline is Save on its material — see
+ * services/downloadManager.js. Opening a file never writes anything to disk.
+ *
+ * Auth: 401/403 responses from getMaterialFiles trigger logout so the user is
+ * never shown a misleading "connect to internet" error on an expired session.
  */
 
 import * as FileSystem from 'expo-file-system';
-import { Alert } from 'react-native';
-import { trackRecentFile, getMaterialFiles } from '../api/studentApi';
-import { downloadManager } from '../services/downloadManager';
+import { Alert, Linking } from 'react-native';
+import { trackRecentFile, getMaterialFiles, getDownloadUrl } from '../api/studentApi';
 import { fileRepository } from '../database/fileRepository';
-import { storage } from '../database/db';
+import { downloadManager } from '../services/downloadManager';
 
-const CACHE_DIR = FileSystem.cacheDirectory + 'StudyShala/Cache/';
+// ── Check if a URL is a valid http(s) URL ─────────────────────────────────────
+function isValidHttpUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// ── Handle 401 / 403 from any API call ────────────────────────────────────────
+async function handleAuthFailure(logout) {
+  if (typeof logout === 'function') {
+    logout();
+  } else {
+    Alert.alert('Session expired', 'Please log in again to continue.', [{ text: 'OK' }]);
+  }
+}
 
 // ── Normalise file shape ───────────────────────────────────────────────────────
 // MaterialAccessScreen uses _id/name; StarredScreen uses fileId/fileName.
-// Normalise once here so the rest of the function is clean.
 function normalise(file) {
   return {
     ...file,
@@ -36,15 +61,9 @@ function normalise(file) {
     mimeType:    file.mimeType   || '',
     previewUrl:  file.previewUrl  || null,
     downloadUrl: file.downloadUrl || null,
+    materialId:  file.materialId  || null,
+    subjectName: file.subjectName || null,
   };
-}
-
-// ── Ensure cache directory exists ─────────────────────────────────────────────
-async function ensureCacheDir() {
-  const info = await FileSystem.getInfoAsync(CACHE_DIR);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
-  }
 }
 
 // ── Navigate to FileViewer ─────────────────────────────────────────────────────
@@ -53,8 +72,20 @@ function navigateToViewer(navigation, file, material) {
   parentNav.navigate('FileViewer', { file, material });
 }
 
+function trackOpen(f, material) {
+  trackRecentFile({
+    fileId:      f._id,
+    fileName:    f.name,
+    mimeType:    f.mimeType,
+    materialId:  material?._id || f.materialId,
+    subjectName: material?.subjectName || f.subjectName,
+  }).catch(() => {});
+}
+
 // ── Main openFile ─────────────────────────────────────────────────────────────
-export const openFile = async (file, material, navigation) => {
+// Optional logout param allows this function to trigger re-auth on 401 without
+// needing to import AuthContext directly in a non-component module.
+export const openFile = async (file, material, navigation, logout) => {
   if (!navigation) {
     Alert.alert('Error', 'Could not open this file.');
     return;
@@ -62,192 +93,137 @@ export const openFile = async (file, material, navigation) => {
 
   const f = normalise(file);
 
-  // ── Step 1: Check local disk first ──────────────────────────────────────────
-  // fileRepository stores localPath once a file has been downloaded.
+  // ── Step 1: local file — the only guaranteed-offline path ─────────────────
   const localRecord = await fileRepository.getById(f._id);
 
   if (localRecord?.localPath) {
-    // Verify the file actually still exists on disk (OS may have evicted it)
     try {
       const diskInfo = await FileSystem.getInfoAsync(localRecord.localPath);
       if (diskInfo.exists) {
-        // ✅ Open instantly — zero internet needed
         await fileRepository.updateLastOpened(f._id);
-        trackRecentFile({
-          fileId:      f._id,
-          fileName:    f.name,
-          mimeType:    f.mimeType,
-          materialId:  material?._id,
-          subjectName: material?.subjectName,
-        }).catch(() => {});
+        trackOpen(f, material);
         navigateToViewer(navigation, { ...f, localPath: localRecord.localPath }, material);
         return;
       }
-    } catch {}
-    // File record exists but file is gone from disk — fall through to re-download
+    } catch {
+      // getInfoAsync threw unexpectedly — fall through and try streaming instead.
+    }
+    // Record says it's saved but the bytes are gone from disk (e.g. the user
+    // cleared app storage outside the app). Treat as not-saved from here on.
   }
 
-  // ── Step 2: Not on disk — fetch fresh URL then download ────────────────────
-  // The stored downloadUrl / previewUrl in AsyncStorage (starred cache) is a
-  // time-limited Google Drive URL that expires after a few hours.
-  // Strategy:
-  //   a) Try to get a fresh downloadUrl from the API first.
-  //   b) If API succeeds → navigate + download with fresh URL in background.
-  //   c) If API fails (no internet) → fall back to streaming from previewUrl.
-  //   d) If neither works → show offline error.
+  // ── Step 2: not saved — try to stream it live from the network ────────────
+  let freshDownloadUrl = isValidHttpUrl(f.downloadUrl) ? f.downloadUrl : null;
+  let freshPreviewUrl  = isValidHttpUrl(f.previewUrl)  ? f.previewUrl  : null;
 
-  // a) Try to refresh URLs from the server
-  let freshDownloadUrl = f.downloadUrl;
-  let freshPreviewUrl  = f.previewUrl;
+  const materialIdForRefresh = material?._id || f.materialId;
+  let refreshAttempted = false;
+  let refreshFailed    = false;
 
-  if (material?._id) {
+  if (materialIdForRefresh) {
+    refreshAttempted = true;
     try {
-      const { data } = await getMaterialFiles(material._id);
+      const res = await getMaterialFiles(materialIdForRefresh);
+
+      if (res?.status === 401 || res?.status === 403 ||
+          res?.data?.status === 401 || res?.data?.status === 403) {
+        await handleAuthFailure(logout);
+        return;
+      }
+
+      const data = res?.data || {};
       const allFiles = [
         ...(data.files || []),
         ...(data.subFolders || []).flatMap(sf => sf.files || []),
       ];
-      const fresh = allFiles.find(sf => sf._id === f._id);
-      if (fresh?.downloadUrl) freshDownloadUrl = fresh.downloadUrl;
-      if (fresh?.previewUrl)  freshPreviewUrl  = fresh.previewUrl;
-
-      // Also update the starred cache so next open uses fresh URLs.
-      // NOTE: storage.set() already JSON.stringifies internally — pass the
-      // plain object, never JSON.stringify it yourself here.
-      try {
-        const existing = await storage.get(`starred:${f._id}`);
-        if (existing) {
-          await storage.set(`starred:${f._id}`, {
-            ...existing,
-            downloadUrl: freshDownloadUrl,
-            previewUrl:  freshPreviewUrl,
-          });
-        }
-      } catch {}
-    } catch {
-      // No internet — continue with cached URLs (may be expired)
+      const fresh = allFiles.find(sf =>
+        String(sf._id) === String(f._id) ||
+        String(sf.fileId) === String(f._id) ||
+        String(sf.id) === String(f._id),
+      );
+      if (fresh?.downloadUrl && isValidHttpUrl(fresh.downloadUrl)) freshDownloadUrl = fresh.downloadUrl;
+      if (fresh?.previewUrl  && isValidHttpUrl(fresh.previewUrl))  freshPreviewUrl  = fresh.previewUrl;
+    } catch (err) {
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        await handleAuthFailure(logout);
+        return;
+      }
+      refreshFailed = true;
     }
   }
 
-  // b) Download with fresh URL
-  if (freshDownloadUrl) {
-    // Navigate first — student sees the screen immediately.
-    // IMPORTANT: also pass the fresh previewUrl/downloadUrl through here.
-    // "Recently viewed" entries never carry a previewUrl/downloadUrl of
-    // their own (the recent-files record is just fileId/fileName/etc), so
-    // without this the viewer has nothing to render until the background
-    // download finishes — which is what caused the blank-screen bug when
-    // opening files from the Dashboard's "Recently viewed" list.
+  if (freshPreviewUrl || freshDownloadUrl) {
+    trackOpen(f, material);
     navigateToViewer(
       navigation,
-      { ...f, previewUrl: freshPreviewUrl || f.previewUrl, downloadUrl: freshDownloadUrl, isDownloading: true },
+      { ...f, previewUrl: freshPreviewUrl, downloadUrl: freshDownloadUrl },
       material,
     );
-
-    // Track recent file fire-and-forget
-    trackRecentFile({
-      fileId:      f._id,
-      fileName:    f.name,
-      mimeType:    f.mimeType,
-      materialId:  material?._id,
-      subjectName: material?.subjectName,
-    }).catch(() => {});
-
-    // Download to Cache dir in background
-    try {
-      await ensureCacheDir();
-      const safeName  = (f.name || 'file').replace(/[^\w.\-() ]/g, '_');
-      const localPath = `${CACHE_DIR}${f._id}_${safeName}`;
-
-      const downloadResumable = FileSystem.createDownloadResumable(
-        freshDownloadUrl,
-        localPath,
-        {},
-      );
-
-      const result = await downloadResumable.downloadAsync();
-      if (result?.uri) {
-        // Save to fileRepository so next open is instant (offline)
-        await fileRepository.upsert({
-          fileId:      f._id,
-          name:        f.name,
-          fileName:    f.name,
-          mimeType:    f.mimeType,
-          materialId:  material?._id,
-          downloaded:  true,
-          localPath:   result.uri,
-          cachedAt:    new Date().toISOString(),
-          lastOpened:  new Date().toISOString(),
-          previewUrl:  freshPreviewUrl,
-          downloadUrl: freshDownloadUrl,
-        });
-      }
-    } catch {
-      // Download failed — FileViewer already open, will show error state
-    }
     return;
   }
 
-  // c) No downloadUrl — try streaming from previewUrl
-  if (freshPreviewUrl) {
-    trackRecentFile({
-      fileId:      f._id,
-      fileName:    f.name,
-      mimeType:    f.mimeType,
-      materialId:  material?._id,
-      subjectName: material?.subjectName,
-    }).catch(() => {});
-    navigateToViewer(navigation, { ...f, previewUrl: freshPreviewUrl }, material);
-    return;
-  }
+  // ── Step 3: nothing available — honest, specific message ──────────────────
+  // Last-resort raw link: even if it failed the strict isValidHttpUrl() check
+  // or the fresh-fetch match, try the browser with whatever URL the file
+  // originally carried — a bad regex match shouldn't strand the user with
+  // literally no way to reach a file that might still be perfectly openable.
+  const lastResortUrl = f.downloadUrl || f.previewUrl || freshDownloadUrl || freshPreviewUrl || null;
+  const openInBrowser = lastResortUrl
+    ? { text: 'Open in Browser', onPress: () => Linking.openURL(lastResortUrl).catch(() => {}) }
+    : null;
 
-  // d) Nothing available — truly offline with no cache
-  Alert.alert(
-    'File unavailable offline',
-    'This file has not been cached yet. Please connect to the internet to open it for the first time.',
-  );
+  console.log('[fileActions] openFile Step 3 — no URL resolved', {
+    fileId: f._id, materialId: materialIdForRefresh,
+    originalPreviewUrl: file?.previewUrl, originalDownloadUrl: file?.downloadUrl,
+    refreshAttempted, refreshFailed, lastResortUrl,
+  });
+
+  if (refreshAttempted && refreshFailed) {
+    Alert.alert(
+      'No internet connection',
+      'This material hasn\u2019t been saved for offline use. Connect to the internet to view it, or save the material first.',
+      [{ text: 'OK', style: 'cancel' }],
+    );
+  } else if (!materialIdForRefresh) {
+    Alert.alert(
+      'File unavailable',
+      'This file could not be opened. Try opening it from its subject or material folder.',
+      openInBrowser ? [{ text: 'OK', style: 'cancel' }, openInBrowser] : [{ text: 'OK', style: 'cancel' }],
+    );
+  } else {
+    Alert.alert(
+      'File not found',
+      'This file may have been removed from the server. Please try opening it from its material folder.',
+      openInBrowser ? [{ text: 'OK', style: 'cancel' }, openInBrowser] : [{ text: 'OK', style: 'cancel' }],
+    );
+  }
 };
 
-// ── downloadFile — permanent save to device, no share-sheet prompt ────────────
-// IMPORTANT: this must go through downloadManager.downloadToDevice() (which
-// saves to documentDirectory/StudyShala/Downloads/ AND registers the file in
-// fileRepository) — NOT a one-off FileSystem.downloadAsync() call. Two bugs
-// this fixes:
-//   1. Previously this called Sharing.shareAsync() immediately after saving,
-//      which pops the OS share sheet and forces the user to pick a
-//      destination/app — that's not what tapping "Download" should do.
-//   2. Previously this never wrote anything to fileRepository, so even
-//      though the file was saved correctly on disk, it could never show up
-//      in the Downloads screen.
-// `material` is optional but should be passed whenever available so the
-// saved file is correctly associated with its subject/material for grouping
-// in the Downloads screen.
-export const downloadFile = async (file, material) => {
+// ── downloadFile — permanent save of one specific file ────────────────────────
+// For "long-press → Download" and "download selected" actions, i.e. saving
+// just a few files without saving their whole material. Goes through
+// downloadManager.saveFiles() — the same permanent storage and dedupe logic
+// as Save, just scoped to specific files instead of "everything."
+export const downloadFile = async (file, material, logout, onDone) => {
   const f = normalise(file);
+  const materialId = material?._id || f.materialId;
 
-  if (!f.downloadUrl) {
-    Alert.alert('Unavailable', 'This file has no download link.');
+  if (!materialId) {
+    Alert.alert('Unavailable', 'This file can\u2019t be downloaded on its own — open it from its material folder first.');
     return;
   }
 
   try {
-    await downloadManager.downloadToDevice(
-      {
-        fileId:      f._id,
-        name:        f.name,
-        fileName:    f.name,
-        mimeType:    f.mimeType,
-        materialId:  material?._id || f.materialId,
-        subjectName: material?.subjectName || f.subjectName,
-        facultyName: material?.facultyName || f.facultyName,
-        department:  material?.department  || f.department,
-        previewUrl:  f.previewUrl,
-      },
-      f.downloadUrl,
+    await downloadManager.saveFiles(
+      materialId,
+      [f],
+      (fileId) => getDownloadUrl(materialId, fileId),
     );
-    // No share sheet — the file is now saved and will appear in the
-    // Downloads screen. Nothing further to do here.
+    onDone?.(true);
   } catch (e) {
     Alert.alert('Download failed', e?.message || 'Could not download this file. Please try again.');
+    onDone?.(false);
   }
 };
+
+export default { openFile, downloadFile };

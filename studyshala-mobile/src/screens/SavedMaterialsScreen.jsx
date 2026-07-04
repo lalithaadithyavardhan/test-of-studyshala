@@ -21,7 +21,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import SidebarDrawer from '../components/SidebarDrawer';
-import { getSavedMaterials, removeSavedMaterial } from '../api/studentApi';
+import { getSavedMaterials, removeSavedMaterial, saveMaterial } from '../api/studentApi';
+import { downloadManager } from '../services/downloadManager';
 import { useAuth } from '../context/AuthContext';
 import { materialRepository } from '../database/materialRepository';
 
@@ -69,7 +70,7 @@ function getSubjectStyle(name = '') {
 }
 
 // ─── Material Card ────────────────────────────────────────────────────────────
-function MaterialCard({ material, onPress, onRemove }) {
+function MaterialCard({ material, onPress, onRemove, verified }) {
   const subStyle = getSubjectStyle(material.subjectName);
 
   const meta = [
@@ -88,7 +89,26 @@ function MaterialCard({ material, onPress, onRemove }) {
         </View>
 
         <View style={card.titleBlock}>
-          <Text style={card.subjectName} numberOfLines={1}>{material.subjectName || 'Untitled'}</Text>
+          <View style={card.titleRow}>
+            <Text style={card.subjectName} numberOfLines={1}>{material.subjectName || 'Untitled'}</Text>
+            {/* Offline-verified badge — reflects ACTUAL on-device file
+                presence (fileRepository), not the server's "saved" flag,
+                so it can never lie about whether this opens without
+                internet. Undefined while still checking (avoids a flash
+                of the wrong state). */}
+            {verified === true && (
+              <View style={card.verifiedBadge}>
+                <View style={card.verifiedDot} />
+                <Text style={card.verifiedText}>Available offline</Text>
+              </View>
+            )}
+            {verified === false && (
+              <View style={card.unverifiedBadge}>
+                <Ionicons name="alert-circle" size={11} color={C.textMuted} />
+                <Text style={card.unverifiedText}>Incomplete — re-save</Text>
+              </View>
+            )}
+          </View>
           {material.semester != null && (
             <View style={card.semPill}>
               <Text style={card.semPillText}>Sem {material.semester}</Text>
@@ -150,6 +170,51 @@ const card = StyleSheet.create({
   titleBlock: {
     flex: 1,
     gap: 5,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(76,175,80,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(76,175,80,0.30)',
+    borderRadius: R.full,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    flexShrink: 0,
+  },
+  verifiedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4CAF50',
+  },
+  verifiedText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#4CAF50',
+  },
+  unverifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: C.elevated,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: R.full,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    flexShrink: 0,
+  },
+  unverifiedText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: C.textMuted,
   },
   subjectName: {
     fontSize: T.md,
@@ -245,6 +310,12 @@ export default function SavedMaterialsScreen({ navigation }) {
   // true only when we're showing cached data because the server fetch failed
   // (no internet) — matches the pattern already used in HistoryScreen.
   const [isOffline, setIsOffline]     = useState(false);
+  // materialId -> true/false/undefined(still checking) — whether every
+  // file for that material is actually confirmed present on this device.
+  // This drives the offline-verified badge and is independent of
+  // material.savedOffline, which only reflects server/local-DB intent,
+  // not actual on-disk truth.
+  const [verifiedMap, setVerifiedMap] = useState({});
   const searchRef  = useRef(null);
   const searchAnim = useRef(new Animated.Value(0)).current;
 
@@ -291,6 +362,12 @@ export default function SavedMaterialsScreen({ navigation }) {
           savedAt:     mat.savedAt || mat.createdAt,
         });
       }
+
+      // Step 4 — reconcile: push any material this device saved while
+      // offline (best-effort server call never went through) now that
+      // we have connectivity. Best-effort and non-blocking — never lets
+      // a reconciliation failure affect what the user sees.
+      downloadManager.reconcile(serverMaterials.map(m => m._id), saveMaterial).catch(() => {});
     } catch {
       // Server failed — cached data already showing; tell the user it's stale
       if (hadCache) setIsOffline(true);
@@ -301,6 +378,19 @@ export default function SavedMaterialsScreen({ navigation }) {
     setLoading(true);
     load().finally(() => setLoading(false));
   }, [load]);
+
+  // Recompute the offline-verified badge whenever the visible material
+  // list changes — entirely local, no network needed.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        materials.map(async (m) => [m._id, await downloadManager.verifyMaterialOffline(m._id)]),
+      );
+      if (!cancelled) setVerifiedMap(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [materials]);
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
@@ -342,23 +432,27 @@ export default function SavedMaterialsScreen({ navigation }) {
       {
         text: 'Remove', style: 'destructive',
         onPress: async () => {
+          // Delete local files/DB records FIRST and unconditionally — this
+          // must never depend on network access. Previously the server
+          // call ran first and blocked this on failure, so removing a
+          // material while offline silently did nothing at all: the files
+          // stayed on disk, the record stayed in the list, and it kept
+          // failing to open later because nothing was ever actually saved
+          // correctly to begin with.
           try {
-            await removeSavedMaterial(material._id);
+            // downloadManager already flips materialRepository's
+            // savedOffline flag to false internally, so no separate
+            // upsert is needed here.
+            await downloadManager.deleteSavedMaterial(material._id);
             setMaterials((prev) => prev.filter((m) => m._id !== material._id));
-            // Update local cache — mark as not saved offline
-            await materialRepository.upsert({
-              materialId:   material._id,
-              subject:      material.subjectName,
-              facultyName:  material.facultyName,
-              department:   material.department,
-              semester:     material.semester,
-              accessCode:   material.accessCode,
-              version:      material.version || 1,
-              savedOffline: false,
-            });
           } catch {
-            Alert.alert('Error', 'Failed to remove material.');
+            Alert.alert('Error', 'Failed to remove downloaded files.');
+            return;
           }
+
+          // Best-effort server sync — the device is already correctly
+          // "unsaved" regardless of whether this succeeds.
+          removeSavedMaterial(material._id).catch(() => {});
         },
       },
     ]);
@@ -475,6 +569,7 @@ export default function SavedMaterialsScreen({ navigation }) {
               material={item}
               onPress={handleOpen}
               onRemove={handleRemove}
+              verified={verifiedMap[item._id]}
             />
           )}
           ListEmptyComponent={

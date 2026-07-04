@@ -12,14 +12,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import SidebarDrawer from '../components/SidebarDrawer';
 import {
   getMaterialFiles, saveMaterial, removeSavedMaterial,
-  starFile, unstarFile, getStarredFiles,
+  starFile, unstarFile, getStarredFiles, getDownloadUrl,
 } from '../api/studentApi';
-import { downloadFile } from '../utils/fileActions';
+import { openFile, downloadFile } from '../utils/fileActions';
 import { useAuth } from '../context/AuthContext';
 import { materialRepository } from '../database/materialRepository';
 import { storage } from '../database/db';
 
-import { offlineSyncService } from '../services/offlineSyncService';
+import { downloadManager } from '../services/downloadManager';
 
 // ── Theme — identical to SavedMaterialsScreen ─────────────────────────────────
 const C = {
@@ -648,6 +648,12 @@ export default function MaterialAccessScreen({ route, navigation }) {
         // Save to local cache — include previewUrl + downloadUrl so StarredScreen can open offline
         // storage.set() already JSON.stringifies internally — never wrap in
         // JSON.stringify() here, that double-encodes it.
+        // Starring is a bookmark only — it never downloads or caches
+        // anything. Whether this file opens offline depends entirely on
+        // whether its material has been saved (see handleSaveToggle below).
+        // StarredScreen looks up the file's local path at open time via
+        // fileRepository, so nothing extra needs to be stored here for
+        // offline access — this is just enough for the Starred list itself.
         await storage.set(`starred:${file._id}`, {
           fileId: file._id,
           fileName: file.name,
@@ -657,55 +663,119 @@ export default function MaterialAccessScreen({ route, navigation }) {
           previewUrl: file.previewUrl || null,
           downloadUrl: file.downloadUrl || null,
           starredAt: new Date().toISOString(),
-          cachedAt: Date.now(),
         });
-
-        offlineSyncService.cacheFile(file).catch(() => {});
       }
     } catch {
       showDialog('Error', 'Failed to update star.', [{ text: 'OK', style: 'cancel' }]);
     }
   };
 
-  const handleSaveToggle = async () => {
+  // ── Save = the one and only offline-download action in the app ─────────────
+  // Saving a material downloads every one of its files permanently, and the
+  // toggle only ever completes (isSaved flips) once that download has
+  // actually finished — no fire-and-forget, so "Saved" always means
+  // "guaranteed available offline," never "probably available offline."
+  const runSaveDownload = async () => {
     setSaving(true);
     try {
-      if (isSaved) {
-        await removeSavedMaterial(material._id);
+      // Collects every file across the material's own list and any
+      // subfolders, so nested files are saved too, not just the top level.
+      const allFiles = [
+        ...files,
+        ...subFolders.flatMap(sf => sf.files || []),
+      ];
+
+      // Download FIRST, tell the server SECOND. If we told the server
+      // before this point and the download then failed or partially
+      // failed, the server would believe this material is offline-ready
+      // on this device when it isn't — any later sync (this screen,
+      // SavedMaterialsScreen, another device) would trust that false
+      // signal and try to open a file that was never actually downloaded.
+      await downloadManager.saveMaterial(
+        material._id,
+        allFiles,
+        (fileId) => getDownloadUrl(material._id, fileId),
+      );
+
+      setIsSaved(true);
+      showToast('bookmark', C.accent, 'Saved for offline use', material.subjectName);
+
+      await materialRepository.upsert({
+        materialId: material._id,
+        subject: material.subjectName,
+        facultyName: material.facultyName,
+        department: material.department,
+        semester: material.semester,
+        accessCode: material.accessCode,
+        version: material.version || 1,
+        savedOffline: true,
+      });
+
+      // Best-effort — the device's local state is already correct and
+      // verified at this point regardless of whether this succeeds. If
+      // it fails (connection drops right after the download finishes),
+      // the reconciliation pass will push this to the server later.
+      saveMaterial(material._id).catch(() => {});
+    } catch (e) {
+      // Download didn't fully complete — do NOT mark as saved. A half-saved
+      // material would break the "Saved always means offline-ready" promise.
+      showDialog(
+        'Couldn\u2019t save for offline',
+        e.response?.data?.message || 'Some files failed to download. Check your connection and try again.',
+        [{ text: 'OK', style: 'cancel' }],
+      );
+    } finally { setSaving(false); }
+  };
+
+  const handleSaveToggle = async () => {
+    if (isSaved) {
+      setSaving(true);
+      // Delete local files/DB records FIRST and unconditionally — this
+      // must never depend on network access. Previously the server call
+      // ran first and blocked this on failure, so unsaving while offline
+      // silently did nothing at all.
+      try {
+        await downloadManager.deleteSavedMaterial(material._id);
         setIsSaved(false);
         showToast('bookmark-outline', C.textSec, 'Removed from saved', material.subjectName);
-        // Update local cache — mark as not saved offline
-        await materialRepository.upsert({
-          materialId: material._id,
-          subject: material.subjectName,
-          facultyName: material.facultyName,
-          department: material.department,
-          semester: material.semester,
-          accessCode: material.accessCode,
-          version: material.version || 1,
-          savedOffline: false,
-        });
-      } else {
-        await saveMaterial(material._id);
-        setIsSaved(true);
-        showToast('bookmark', C.accent, 'Saved to library', material.subjectName);
-        // Upsert into materialRepository so SavedMaterialsScreen shows it offline
-        await materialRepository.upsert({
-          materialId: material._id,
-          subject: material.subjectName,
-          facultyName: material.facultyName,
-          department: material.department,
-          semester: material.semester,
-          accessCode: material.accessCode,
-          version: material.version || 1,
-          savedOffline: true,
-        });
-        // Download all files to Cache dir in background so material works offline
-        offlineSyncService.cacheMaterial(material._id, files, material).catch(() => {});
+      } catch (e) {
+        // Only a genuine local-deletion failure lands here.
+        showDialog('Error', 'Failed to remove downloaded files.', [{ text: 'OK', style: 'cancel' }]);
+        setSaving(false);
+        return;
       }
-    } catch (e) {
-      showDialog('Error', e.response?.data?.message || 'Failed to update.', [{ text: 'OK', style: 'cancel' }]);
-    } finally { setSaving(false); }
+      setSaving(false);
+
+      // Best-effort server sync — the device is already correctly
+      // "unsaved" regardless of whether this succeeds.
+      removeSavedMaterial(material._id).catch(() => {});
+      return;
+    }
+
+    // Warn before large / cellular downloads so Save never surprises anyone
+    // with a big data bill.
+    const allFiles = [...files, ...subFolders.flatMap(sf => sf.files || [])];
+    const forecast = await downloadManager.getForecast(allFiles);
+    if (!forecast.willFit) {
+      showDialog(
+        'Not enough storage',
+        `This material needs about ${formatSize(forecast.requiredSize)}, but your device doesn\u2019t have enough free space.`,
+        [{ text: 'OK', style: 'cancel' }],
+      );
+      return;
+    }
+    if (forecast.requiredSize > 20 * 1024 * 1024) { // > 20MB, worth a heads-up
+      showDialog(
+        'Save for offline?',
+        `This will download about ${formatSize(forecast.requiredSize)} to your device.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Download', onPress: runSaveDownload },
+        ],
+      );
+      return;
+    }
+    runSaveDownload();
   };
 
   const handleFilePress = async (file) => {
@@ -727,7 +797,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
         lastOpened: new Date().toISOString(),
       });
     } catch {}
-    navigation.navigate('FileViewer', { file, material });
+    await openFile(file, material, navigation, logout);
   };
 
   const handleFileLongPress = (file) => {
@@ -800,7 +870,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
         lastOpened: new Date().toISOString(),
       });
     } catch {}
-    navigation.navigate('FileViewer', { file, material });
+    await openFile(file, material, navigation, logout);
   };
 
   // Long-press enters selection mode and selects the pressed file
