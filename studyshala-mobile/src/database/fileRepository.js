@@ -112,6 +112,17 @@ export const fileRepository = {
     await storage.delete(MAT_FILES_PREFIX + materialId);
   },
 
+  // ── deleteMany ────────────────────────────────────────────────────────────
+  // Used by downloadManager's sync pass (Phase 3) to remove individual files
+  // that were deleted by the faculty on the server, without touching the
+  // rest of the material's files or its materialId→fileIds index entry for
+  // the ones that remain.
+  async deleteMany(fileIds = []) {
+    for (const fileId of fileIds) {
+      await this.delete(fileId);
+    }
+  },
+
   async delete(fileId) {
     const f = await this.getById(fileId);
     if (f?.materialId) {

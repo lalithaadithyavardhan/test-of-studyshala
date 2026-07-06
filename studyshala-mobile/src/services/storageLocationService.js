@@ -119,6 +119,7 @@ export const storageLocationService = {
   async mirrorToExternalIfConfigured(internalFileUri, fileName, mimeType) {
     if (!this.isExternalPickerSupported()) return null;
 
+    let destUri = null;
     try {
       const mode = await this.getMode();
       if (mode !== 'external') return null;
@@ -127,23 +128,69 @@ export const storageLocationService = {
       if (!directoryUri) return null;
 
       const safeMime = mimeType || 'application/octet-stream';
-      const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+      destUri = await FileSystem.StorageAccessFramework.createFileAsync(
         directoryUri,
         fileName,
         safeMime,
       );
 
-      // copyAsync handles binary files correctly without needing a manual
-      // base64 round-trip.
-      await FileSystem.copyAsync({ from: internalFileUri, to: destUri });
+      // copyAsync does NOT reliably write binary content into a SAF
+      // content:// destination on every Android version/Expo SDK — it can
+      // throw ("directory cannot be created") AFTER createFileAsync has
+      // already created an empty placeholder file, leaving a permanent
+      // 0-byte file with the right name sitting in the external folder
+      // (and since externalUri never got recorded, every future retry
+      // creates yet another 0-byte duplicate — "file (1).ext",
+      // "file (2).ext", etc). Reading the source as base64 and writing it
+      // with StorageAccessFramework.writeAsStringAsync() is the reliable,
+      // officially-supported way to put binary content into a SAF URI.
+      const base64Content = await FileSystem.readAsStringAsync(internalFileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await FileSystem.StorageAccessFramework.writeAsStringAsync(destUri, base64Content, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
       return destUri;
     } catch (e) {
       // Folder permission may have been revoked, folder deleted, disk full,
       // etc. The internal download already succeeded, so we fail silently
       // here — the student still has their file, just not mirrored.
+      // Clean up any empty placeholder createFileAsync already created —
+      // otherwise it sits there forever AND causes duplicate placeholders
+      // to pile up on every subsequent retry.
+      if (destUri) {
+        await FileSystem.StorageAccessFramework.deleteAsync(destUri).catch(() => {});
+      }
       console.log('[storageLocationService] mirror failed:', e?.message);
       return null;
+    }
+  },
+
+  /**
+   * deleteExternalMirror(externalUri)
+   * ────────────────────────────────────
+   * Counterpart to mirrorToExternalIfConfigured(). When a Saved material is
+   * removed, the internal copy and the DB record are deleted by
+   * downloadManager — but without this, the SAF-mirrored copy in the
+   * student's chosen external folder was silently left behind forever,
+   * which is exactly the kind of orphaned "still there after Remove"
+   * offline copy Rule 4 (Delete Behaviour) exists to prevent. Best-effort:
+   * the folder may have been deleted, permission may have been revoked, or
+   * the file may already be gone — none of that should block the rest of
+   * the (already-successful) delete flow.
+   *
+   * @param {string} externalUri - content:// URI previously returned by
+   *   mirrorToExternalIfConfigured() and stored as fileRepository's
+   *   `externalUri`.
+   */
+  async deleteExternalMirror(externalUri) {
+    if (!externalUri) return;
+    if (!this.isExternalPickerSupported()) return;
+    try {
+      await FileSystem.StorageAccessFramework.deleteAsync(externalUri);
+    } catch (e) {
+      console.log('[storageLocationService] deleteExternalMirror failed (non-fatal):', e?.message);
     }
   },
 };

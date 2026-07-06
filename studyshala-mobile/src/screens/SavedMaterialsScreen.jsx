@@ -1,678 +1,150 @@
 /**
- * screens/SavedMaterialsScreen.jsx — StudyShala
- * Warm dark theme matching StudentDashboard
- *   bg #13120f · surface #1e1c19 · accent #DE7356
- *
- * Features:
- *  - Back button  (goBack)
- *  - Sidebar open button
- *  - Search bar  (filters by subjectName client-side)
- *  - Sort pills  (Latest first / Oldest first / Name A–Z)
- *  - Item count badge
- *  - File-card style material cards (matching reference screenshot)
+ * screens/SavedMaterialsScreen.jsx
+ * ===================================
+ * Materials the student tapped "Save for Later" on (EnterCodeScreen).
+ * Cache-first (works offline), then refreshes from the server — same
+ * pattern already used by DashboardScreen's recent-files list and
+ * HistoryScreen, via the `storage` local cache under the `saved:` prefix.
  */
-
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, ActivityIndicator,
-  Alert, RefreshControl, TouchableOpacity, TextInput,
-  Animated, Platform,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import SidebarDrawer from '../components/SidebarDrawer';
-import { getSavedMaterials, removeSavedMaterial, saveMaterial } from '../api/studentApi';
-import { downloadManager } from '../services/downloadManager';
-import { useAuth } from '../context/AuthContext';
-import { materialRepository } from '../database/materialRepository';
+import { C, R, T } from '../components/theme';
+import MaterialCard from '../components/MaterialCard';
+import { getSavedMaterials, removeSavedMaterial } from '../api/studentApi';
+import { storage } from '../database/db';
 
-// ─── Theme ───────────────────────────────────────────────────────────────────
-const C = {
-  bg:           '#13120f',
-  surface:      '#1e1c19',
-  surface2:     '#252320',
-  elevated:     '#2a2724',
-  border:       '#2e2c28',
-  borderSub:    '#2a2724',
-  accent:       '#DE7356',
-  accentBg:     'rgba(222,115,86,0.12)',
-  accentBorder: 'rgba(222,115,86,0.28)',
-  textPrimary:  '#e8e4de',
-  textSec:      '#b1ada1',
-  textMuted:    '#6b6760',
-  white:        '#ffffff',
-};
-const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 16, xxl: 20, full: 999 };
-const T = { xs: 10, sm: 12, base: 13, md: 14, lg: 16, xl: 18 };
-
-// ─── Subject icon map — warm theme colors only ────────────────────────────────
-const SUBJECT_ICONS = {
-  default:   { icon: 'book-outline',       bg: 'rgba(222,115,86,0.14)',  color: '#DE7356' },
-  cs:        { icon: 'code-slash-outline', bg: 'rgba(222,115,86,0.10)',  color: '#C4623F' },
-  math:      { icon: 'calculator-outline', bg: 'rgba(177,173,161,0.12)', color: '#B1ADA1' },
-  physics:   { icon: 'planet-outline',     bg: 'rgba(177,173,161,0.10)', color: '#9a9690' },
-  chemistry: { icon: 'flask-outline',      bg: 'rgba(222,115,86,0.12)',  color: '#c86a4a' },
-  bio:       { icon: 'leaf-outline',       bg: 'rgba(177,173,161,0.10)', color: '#B1ADA1' },
-  english:   { icon: 'language-outline',   bg: 'rgba(222,115,86,0.14)',  color: '#DE7356' },
-  history:   { icon: 'time-outline',       bg: 'rgba(177,173,161,0.12)', color: '#9a9690' },
-};
-
-function getSubjectStyle(name = '') {
-  const n = name.toLowerCase();
-  if (n.includes('data') || n.includes('algorithm') || n.includes('program') || n.includes('operating') || n.includes('network') || n.includes('software') || n.includes('computer') || n.includes('web') || n.includes('database') || n.includes('cloud')) return SUBJECT_ICONS.cs;
-  if (n.includes('math') || n.includes('calculus') || n.includes('algebra') || n.includes('statistic')) return SUBJECT_ICONS.math;
-  if (n.includes('physics') || n.includes('mechanic') || n.includes('electro')) return SUBJECT_ICONS.physics;
-  if (n.includes('chem')) return SUBJECT_ICONS.chemistry;
-  if (n.includes('bio') || n.includes('life')) return SUBJECT_ICONS.bio;
-  if (n.includes('english') || n.includes('communication') || n.includes('language')) return SUBJECT_ICONS.english;
-  if (n.includes('history') || n.includes('social')) return SUBJECT_ICONS.history;
-  return SUBJECT_ICONS.default;
-}
-
-// ─── Material Card ────────────────────────────────────────────────────────────
-function MaterialCard({ material, onPress, onRemove, verified }) {
-  const subStyle = getSubjectStyle(material.subjectName);
-
-  const meta = [
-    material.facultyName  && { icon: 'person-outline',   label: 'Faculty', value: material.facultyName },
-    material.fileCount !== undefined && { icon: 'document-outline', label: 'Files', value: String(material.fileCount ?? material.files?.length ?? 0) },
-    material.department   && { icon: 'business-outline', label: 'Dept',    value: material.department },
-    material.accessCode   && { icon: 'key-outline',       label: 'Code',    value: material.accessCode },
-  ].filter(Boolean);
-
-  return (
-    <View style={card.root}>
-      {/* ── Top: icon + title + sem + remove ── */}
-      <View style={card.top}>
-        <View style={[card.iconBox, { backgroundColor: subStyle.bg }]}>
-          <Ionicons name={subStyle.icon} size={20} color={subStyle.color} />
-        </View>
-
-        <View style={card.titleBlock}>
-          <View style={card.titleRow}>
-            <Text style={card.subjectName} numberOfLines={1}>{material.subjectName || 'Untitled'}</Text>
-            {/* Offline-verified badge — reflects ACTUAL on-device file
-                presence (fileRepository), not the server's "saved" flag,
-                so it can never lie about whether this opens without
-                internet. Undefined while still checking (avoids a flash
-                of the wrong state). */}
-            {verified === true && (
-              <View style={card.verifiedBadge}>
-                <View style={card.verifiedDot} />
-                <Text style={card.verifiedText}>Available offline</Text>
-              </View>
-            )}
-            {verified === false && (
-              <View style={card.unverifiedBadge}>
-                <Ionicons name="alert-circle" size={11} color={C.textMuted} />
-                <Text style={card.unverifiedText}>Incomplete — re-save</Text>
-              </View>
-            )}
-          </View>
-          {material.semester != null && (
-            <View style={card.semPill}>
-              <Text style={card.semPillText}>Sem {material.semester}</Text>
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity style={card.removeBtn} onPress={() => onRemove(material)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Ionicons name="bookmark" size={15} color={C.accent} />
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Meta row ── */}
-      {meta.length > 0 && (
-        <View style={card.metaRow}>
-          {meta.map((m, i) => (
-            <View key={i} style={card.metaItem}>
-              <Ionicons name={m.icon} size={11} color={C.textMuted} />
-              <Text style={card.metaLabel}>{m.label} </Text>
-              <Text style={card.metaValue}>{m.value}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* ── Browse files button ── */}
-      <TouchableOpacity style={card.browseBtn} onPress={() => onPress(material)} activeOpacity={0.82}>
-        <Ionicons name="folder-open-outline" size={14} color={C.white} />
-        <Text style={card.browseBtnText}>Browse files</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-const card = StyleSheet.create({
-  root: {
-    backgroundColor: C.surface,
-    borderRadius: R.xl,
-    borderWidth: 1,
-    borderColor: C.border,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  top: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    paddingBottom: 10,
-    gap: 10,
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: R.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  titleBlock: {
-    flex: 1,
-    gap: 5,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(76,175,80,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(76,175,80,0.30)',
-    borderRadius: R.full,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    flexShrink: 0,
-  },
-  verifiedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#4CAF50',
-  },
-  verifiedText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#4CAF50',
-  },
-  unverifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: C.elevated,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: R.full,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    flexShrink: 0,
-  },
-  unverifiedText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: C.textMuted,
-  },
-  subjectName: {
-    fontSize: T.md,
-    fontWeight: '700',
-    color: C.textPrimary,
-  },
-  semPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: C.elevated,
-    borderRadius: R.full,
-    borderWidth: 1,
-    borderColor: C.border,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  semPillText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: C.textSec,
-  },
-  removeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: R.xs,
-    backgroundColor: C.accentBg,
-    borderWidth: 1,
-    borderColor: C.accentBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-
-  // Meta
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  metaLabel: {
-    fontSize: 11,
-    color: C.textMuted,
-  },
-  metaValue: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.textSec,
-  },
-
-  // Browse button
-  browseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginHorizontal: 12,
-    marginBottom: 12,
-    paddingVertical: 10,
-    borderRadius: R.lg,
-    backgroundColor: C.accent,
-  },
-  browseBtnText: {
-    fontSize: T.sm,
-    fontWeight: '700',
-    color: C.white,
-    letterSpacing: 0.2,
-  },
-});
-
-// ─── Sort config ──────────────────────────────────────────────────────────────
-const SORTS = [
-  { key: 'latest', label: 'Latest first', icon: 'time-outline'      },
-  { key: 'oldest', label: 'Oldest first', icon: 'hourglass-outline'  },
-  { key: 'name',   label: 'Name A–Z',     icon: 'text-outline'       },
-];
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function SavedMaterialsScreen({ navigation }) {
-  const { user, logout }              = useAuth();
-  const [materials, setMaterials]     = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [refreshing, setRefreshing]   = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchVisible, setSearchVisible] = useState(false);
-  const [sort, setSort]               = useState('latest');
-  // true only when we're showing cached data because the server fetch failed
-  // (no internet) — matches the pattern already used in HistoryScreen.
-  const [isOffline, setIsOffline]     = useState(false);
-  // materialId -> true/false/undefined(still checking) — whether every
-  // file for that material is actually confirmed present on this device.
-  // This drives the offline-verified badge and is independent of
-  // material.savedOffline, which only reflects server/local-DB intent,
-  // not actual on-disk truth.
-  const [verifiedMap, setVerifiedMap] = useState({});
-  const searchRef  = useRef(null);
-  const searchAnim = useRef(new Animated.Value(0)).current;
+  const [materials, setMaterials] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [offlineOnly, setOfflineOnly] = useState(false);
 
   const load = useCallback(async () => {
-    let hadCache = false;
-    // Step 1 — show cached saved materials instantly
+    // Step 1 — instant local cache (works with zero internet)
     try {
-      const cached = await materialRepository.getAllSaved();
-      if (cached.length) {
-        hadCache = true;
-        // Shape cached entries to match server response shape
-        const shaped = cached.map(m => ({
-          _id:         m.materialId,
-          subjectName: m.subject,
-          facultyName: m.facultyName,
-          department:  m.department,
-          semester:    m.semester,
-          accessCode:  m.accessCode,
-          savedAt:     m.savedAt,
-        }));
-        setMaterials(shaped);
-        setLoading(false); // show immediately, no spinner
-      }
+      const cached = await storage.getAllByPrefix('saved:');
+      if (cached?.length) setMaterials(cached);
     } catch {}
 
-    // Step 2 — fetch from server in background
+    // Step 2 — fresh data from server
     try {
       const { data } = await getSavedMaterials();
-      const serverMaterials = data.materials || [];
-      setMaterials(serverMaterials);
-      setIsOffline(false);
+      const list = data.materials || [];
+      setMaterials(list);
+      setOfflineOnly(false);
 
-      // Step 3 — upsert each into local cache
-      for (const mat of serverMaterials) {
-        await materialRepository.upsert({
-          materialId:  mat._id,
-          subject:     mat.subjectName,
-          facultyName: mat.facultyName,
-          department:  mat.department,
-          semester:    mat.semester,
-          accessCode:  mat.accessCode,
-          version:     mat.version || 1,
-          savedOffline: true,
-          savedAt:     mat.savedAt || mat.createdAt,
-        });
+      // Step 3 — resync local cache
+      try { await storage.deleteAllByPrefix('saved:'); } catch {}
+      for (const m of list) {
+        try { await storage.set(`saved:${m._id}`, m); } catch {}
       }
-
-      // Step 4 — reconcile: push any material this device saved while
-      // offline (best-effort server call never went through) now that
-      // we have connectivity. Best-effort and non-blocking — never lets
-      // a reconciliation failure affect what the user sees.
-      downloadManager.reconcile(serverMaterials.map(m => m._id), saveMaterial).catch(() => {});
     } catch {
-      // Server failed — cached data already showing; tell the user it's stale
-      if (hadCache) setIsOffline(true);
+      setOfflineOnly(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    setLoading(true);
-    load().finally(() => setLoading(false));
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  // Recompute the offline-verified badge whenever the visible material
-  // list changes — entirely local, no network needed.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const entries = await Promise.all(
-        materials.map(async (m) => [m._id, await downloadManager.verifyMaterialOffline(m._id)]),
-      );
-      if (!cancelled) setVerifiedMap(Object.fromEntries(entries));
-    })();
-    return () => { cancelled = true; };
-  }, [materials]);
-
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
-
-  const toggleSearch = () => {
-    if (searchVisible) {
-      setSearchQuery('');
-      Animated.timing(searchAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start(() => setSearchVisible(false));
-    } else {
-      setSearchVisible(true);
-      Animated.timing(searchAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start(() => searchRef.current?.focus());
-    }
+  const onRefresh = () => {
+    setRefreshing(true);
+    load();
   };
 
-  const handleOpen = async (material) => {
-    // Step 1 — navigate immediately with whatever data we have from the list
-    // MaterialAccessScreen will load its own files with its own cache-first logic
-    const parentNav = navigation.getParent() || navigation;
-    parentNav.navigate('MaterialAccess', { material });
-
-    // Step 2 — update lastOpened in local cache so HistoryScreen reflects this visit
-    try {
-      await materialRepository.upsert({
-        materialId:  material._id,
-        subject:     material.subjectName,
-        facultyName: material.facultyName,
-        department:  material.department,
-        semester:    material.semester,
-        accessCode:  material.accessCode,
-        version:     material.version || 1,
-        savedOffline: true,
-        lastOpened:  new Date().toISOString(),
-      });
-    } catch {}
+  const handleRemove = async (material) => {
+    // Optimistic local removal so it works even if offline; server call
+    // is best-effort and will simply fail silently without connectivity.
+    setMaterials((prev) => prev.filter((m) => m._id !== material._id));
+    storage.delete(`saved:${material._id}`).catch(() => {});
+    removeSavedMaterial(material._id).catch(() => {});
   };
-
-  const handleRemove = (material) => {
-    Alert.alert('Remove saved material?', material.subjectName, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive',
-        onPress: async () => {
-          // Delete local files/DB records FIRST and unconditionally — this
-          // must never depend on network access. Previously the server
-          // call ran first and blocked this on failure, so removing a
-          // material while offline silently did nothing at all: the files
-          // stayed on disk, the record stayed in the list, and it kept
-          // failing to open later because nothing was ever actually saved
-          // correctly to begin with.
-          try {
-            // downloadManager already flips materialRepository's
-            // savedOffline flag to false internally, so no separate
-            // upsert is needed here.
-            await downloadManager.deleteSavedMaterial(material._id);
-            setMaterials((prev) => prev.filter((m) => m._id !== material._id));
-          } catch {
-            Alert.alert('Error', 'Failed to remove downloaded files.');
-            return;
-          }
-
-          // Best-effort server sync — the device is already correctly
-          // "unsaved" regardless of whether this succeeds.
-          removeSavedMaterial(material._id).catch(() => {});
-        },
-      },
-    ]);
-  };
-
-  // Filter + sort
-  const filtered = useMemo(() => {
-    let list = materials;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter((m) => m.subjectName?.toLowerCase().includes(q));
-    }
-    if (sort === 'latest') return [...list].sort((a, b) => new Date(b.savedAt || b.createdAt) - new Date(a.savedAt || a.createdAt));
-    if (sort === 'oldest') return [...list].sort((a, b) => new Date(a.savedAt || a.createdAt) - new Date(b.savedAt || b.createdAt));
-    if (sort === 'name')   return [...list].sort((a, b) => (a.subjectName || '').localeCompare(b.subjectName || ''));
-    return list;
-  }, [materials, searchQuery, sort]);
 
   if (loading) {
     return (
-      <SafeAreaView style={s.center} edges={['top']}>
-        <ActivityIndicator size="large" color={C.accent} />
+      <SafeAreaView style={s.safe}>
+        <View style={s.center}><ActivityIndicator color={C.accent} size="large" /></View>
       </SafeAreaView>
     );
   }
 
   return (
-    <View style={s.root}>
-      <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <View style={s.header}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={18} color={C.textSecondary} />
+        </TouchableOpacity>
+        <Text style={s.title}>Saved Materials</Text>
+      </View>
 
-        {/* ── Header (unchanged) ── */}
-        <View style={s.header}>
-          <TouchableOpacity style={s.iconBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={18} color={C.textSec} />
-          </TouchableOpacity>
-
-          <View style={s.headerMid}>
-            <View style={s.headerIconBox}>
-              <Ionicons name="bookmark" size={16} color={C.accent} />
-            </View>
-            <View>
-              <Text style={s.headerTitle}>Saved Materials</Text>
-              <Text style={s.headerSub}>{materials.length} material{materials.length !== 1 ? 's' : ''} saved</Text>
-            </View>
-            {isOffline && (
-              <View style={s.offlinePill}>
-                <Ionicons name="cloud-offline-outline" size={11} color={C.textMuted} />
-                <Text style={s.offlinePillText}>Offline</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={s.headerRight}>
-            <TouchableOpacity style={s.iconBtn} onPress={toggleSearch}>
-              <Ionicons name={searchVisible ? 'close' : 'search-outline'} size={18} color={C.textSec} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.iconBtn} onPress={() => setSidebarOpen(true)}>
-              <Ionicons name="menu-outline" size={20} color={C.textSec} />
-            </TouchableOpacity>
-          </View>
+      {offlineOnly && (
+        <View style={s.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={14} color={C.warning} />
+          <Text style={s.offlineText}>Offline — showing your last saved list.</Text>
         </View>
+      )}
 
-        {/* ── Search bar ── */}
-        {searchVisible && (
-          <Animated.View style={[s.searchWrap, { opacity: searchAnim }]}>
-            <Ionicons name="search-outline" size={15} color={C.textMuted} />
-            <TextInput
-              ref={searchRef}
-              style={s.searchInput}
-              placeholder="Search saved materials…"
-              placeholderTextColor={C.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              returnKeyType="search"
-            />
-            {!!searchQuery && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={15} color={C.textMuted} />
-              </TouchableOpacity>
-            )}
-          </Animated.View>
+      <FlatList
+        data={materials}
+        keyExtractor={(m) => m._id}
+        contentContainerStyle={s.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+        renderItem={({ item }) => (
+          <MaterialCard
+            material={item}
+            role="student"
+            onPress={(m) => navigation.navigate('MaterialAccess', { material: m })}
+            onRemove={handleRemove}
+            offlineStatus={item.hasOfflineFiles ? 'saved' : null}
+          />
         )}
-
-        {/* ── Sort bar ── */}
-        <View style={s.sortRow}>
-          <Text style={s.sortLabel}>Sort by</Text>
-          {SORTS.map((opt) => (
-            <TouchableOpacity
-              key={opt.key}
-              style={[s.sortPill, sort === opt.key && s.sortPillActive]}
-              onPress={() => setSort(opt.key)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={opt.icon} size={12} color={sort === opt.key ? C.white : C.textMuted} />
-              <Text style={[s.sortPillText, sort === opt.key && s.sortPillTextActive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          <Text style={s.countBadge}>{filtered.length} item{filtered.length !== 1 ? 's' : ''}</Text>
-        </View>
-
-        {/* ── List ── */}
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item._id}
-          contentContainerStyle={s.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />
-          }
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <MaterialCard
-              material={item}
-              onPress={handleOpen}
-              onRemove={handleRemove}
-              verified={verifiedMap[item._id]}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={s.emptyCard}>
-              <Text style={s.emptyEmoji}>🔖</Text>
-              <Text style={s.emptyTitle}>
-                {searchQuery ? 'No results found' : 'Nothing saved yet'}
-              </Text>
-              <Text style={s.emptyDesc}>
-                {searchQuery
-                  ? `No saved materials match "${searchQuery}".`
-                  : 'When you open a material, tap the bookmark icon to save it here for quick access.'}
-              </Text>
-            </View>
-          }
-        />
-      </SafeAreaView>
-
-      <SidebarDrawer
-        visible={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        navigation={navigation}
-        role="student"
-        user={user}
-        onLogout={logout}
+        ListEmptyComponent={
+          <View style={s.empty}>
+            <Ionicons name="bookmark-outline" size={40} color={C.textMuted} />
+            <Text style={s.emptyText}>No saved materials yet.</Text>
+            <Text style={s.emptySub}>Materials you save for later will show up here.</Text>
+          </View>
+        }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
-// ─── Screen Styles ────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: C.bg },
-  safe:   { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
-
-  // Header (unchanged)
+  safe: { flex: 1, backgroundColor: C.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: C.borderSub,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: C.border,
   },
-  iconBtn: {
+  backBtn: {
     width: 36, height: 36, borderRadius: R.sm,
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerMid:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerIconBox: {
-    width: 34, height: 34, borderRadius: R.sm,
-    backgroundColor: C.accentBg, borderWidth: 1, borderColor: C.accentBorder,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle:  { fontSize: T.md, fontWeight: '700', color: C.textPrimary },
-  headerSub:    { fontSize: T.xs, color: C.textMuted, marginTop: 1 },
-  headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  title: { fontSize: T.md, fontWeight: '700', color: C.textPrimary },
 
-  // Offline indicator
-  offlinePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
-    borderRadius: R.full, paddingHorizontal: 8, paddingVertical: 3,
-    marginLeft: 6,
-  },
-  offlinePillText: { fontSize: 10, fontWeight: '600', color: C.textMuted },
-
-  // Search
-  searchWrap: {
+  offlineBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginHorizontal: 14, marginTop: 10,
-    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
-    borderRadius: R.md, paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: 'rgba(251,191,36,0.1)', marginHorizontal: 14, marginTop: 12,
+    padding: 10, borderRadius: R.sm, borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)',
   },
-  searchInput: { flex: 1, fontSize: T.base, color: C.textPrimary, padding: 0 },
+  offlineText: { color: C.warning, fontSize: T.xs, fontWeight: '600' },
 
-  // Sort bar
-  sortRow: {
-    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap',
-    gap: 6, paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: C.borderSub,
-  },
-  sortLabel:         { fontSize: T.xs, color: C.textMuted, fontWeight: '500', marginRight: 2 },
-  sortPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingVertical: 5, paddingHorizontal: 11,
-    borderRadius: R.full, backgroundColor: C.surface,
-    borderWidth: 1, borderColor: C.border,
-  },
-  sortPillActive:    { backgroundColor: C.elevated, borderColor: C.accent + '60' },
-  sortPillText:      { fontSize: T.xs, color: C.textMuted, fontWeight: '500' },
-  sortPillTextActive:{ color: C.textPrimary, fontWeight: '700' },
-  countBadge:        { marginLeft: 'auto', fontSize: T.xs, color: C.textMuted, fontWeight: '500' },
-
-  // List
-  listContent: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 40, flexGrow: 1 },
-
-  // Empty
-  emptyCard: {
-    backgroundColor: C.surface, borderRadius: R.xl, paddingVertical: 40,
-    alignItems: 'center', borderWidth: 1, borderColor: C.border, marginTop: 20,
-  },
-  emptyEmoji: { fontSize: 44, marginBottom: 12 },
-  emptyTitle: { fontSize: T.md, fontWeight: '700', color: C.textPrimary, marginBottom: 6 },
-  emptyDesc:  { fontSize: T.base, color: C.textMuted, textAlign: 'center', paddingHorizontal: 28, lineHeight: 20 },
+  list: { padding: 14 },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 90, gap: 8 },
+  emptyText: { color: C.textSecondary, fontSize: T.md, fontWeight: '600' },
+  emptySub: { color: C.textMuted, fontSize: T.sm, textAlign: 'center' },
 });

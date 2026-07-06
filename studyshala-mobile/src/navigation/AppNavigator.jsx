@@ -125,11 +125,18 @@ export default function AppNavigator() {
 
   // ── Startup tasks (fire-and-forget, never block the UI) ──────────────────
   // Single-tier offline model: there's no cache to clean up or expire
-  // anymore. The only startup job is re-checking materials the student has
-  // already saved, in case their files changed on the server since the
-  // last time this device was online.
+  // anymore. downloadManager owns the entire auto-sync lifecycle — an
+  // immediate pass on mount, plus another pass every time connectivity is
+  // regained (see downloadManager.initAutoSync). This component doesn't
+  // need to know anything about connectivity APIs; it just wires the
+  // lifecycle up and tears it down on unmount.
   useEffect(() => {
-    downloadManager.resyncSavedMaterials(getMaterialFiles).catch(() => {});
+    // Self-heal any 0-byte files left behind by older download logic before
+    // auto-sync starts, so a corrupt record can't be "verified" as fine by
+    // sync just because a re-check happens to skip it.
+    downloadManager.cleanupCorruptFiles();
+    const unsubscribe = downloadManager.initAutoSync(getMaterialFiles);
+    return unsubscribe;
   }, []); // Run once on mount
 
   if (loading) {
