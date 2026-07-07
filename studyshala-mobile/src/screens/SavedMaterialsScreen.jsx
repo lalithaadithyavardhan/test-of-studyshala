@@ -22,18 +22,41 @@ import { C, R, T } from '../components/theme';
 import MaterialCard from '../components/MaterialCard';
 import { getSavedMaterials, removeSavedMaterial } from '../api/studentApi';
 import { storage } from '../database/db';
+import { syncMaterialOffline, isMaterialFullyOffline } from '../utils/materialSync';
 
 export default function SavedMaterialsScreen({ navigation }) {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineOnly, setOfflineOnly] = useState(false);
+  const [syncStatus, setSyncStatus] = useState({}); // materialId -> 'syncing' | 'complete'
+
+  // Auto-download every file for every saved material, in the background.
+  // Already-saved files are skipped inside syncMaterialOffline, so this is
+  // cheap to re-run every time this screen opens — it just picks up
+  // anything new or previously interrupted.
+  const autoSyncAll = useCallback(async (list) => {
+    for (const m of list) {
+      const already = await isMaterialFullyOffline(m._id);
+      if (already) {
+        setSyncStatus((prev) => ({ ...prev, [m._id]: 'complete' }));
+        continue;
+      }
+      setSyncStatus((prev) => ({ ...prev, [m._id]: 'syncing' }));
+      syncMaterialOffline(m).then((res) => {
+        setSyncStatus((prev) => ({ ...prev, [m._id]: res.success ? 'complete' : 'idle' }));
+      });
+    }
+  }, []);
 
   const load = useCallback(async () => {
     // Step 1 — instant local cache (works with zero internet)
     try {
       const cached = await storage.getAllByPrefix('saved:');
-      if (cached?.length) setMaterials(cached);
+      if (cached?.length) {
+        setMaterials(cached);
+        autoSyncAll(cached);
+      }
     } catch {}
 
     // Step 2 — fresh data from server
@@ -42,6 +65,7 @@ export default function SavedMaterialsScreen({ navigation }) {
       const list = data.materials || [];
       setMaterials(list);
       setOfflineOnly(false);
+      autoSyncAll(list);
 
       // Step 3 — resync local cache
       try { await storage.deleteAllByPrefix('saved:'); } catch {}
@@ -54,7 +78,7 @@ export default function SavedMaterialsScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [autoSyncAll]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -101,13 +125,21 @@ export default function SavedMaterialsScreen({ navigation }) {
         contentContainerStyle={s.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         renderItem={({ item }) => (
-          <MaterialCard
-            material={item}
-            role="student"
-            onPress={(m) => navigation.navigate('MaterialAccess', { material: m })}
-            onRemove={handleRemove}
-            offlineStatus={item.hasOfflineFiles ? 'saved' : null}
-          />
+          <View>
+            <MaterialCard
+              material={item}
+              role="student"
+              onPress={(m) => navigation.navigate('MaterialAccess', { material: m })}
+              onRemove={handleRemove}
+              offlineStatus={syncStatus[item._id] === 'complete' ? 'saved' : null}
+            />
+            {syncStatus[item._id] === 'syncing' && (
+              <View style={s.syncingRow}>
+                <ActivityIndicator size="small" color={C.accent} />
+                <Text style={s.syncingText}>Saving files for offline access…</Text>
+              </View>
+            )}
+          </View>
         )}
         ListEmptyComponent={
           <View style={s.empty}>
@@ -144,6 +176,11 @@ const s = StyleSheet.create({
   offlineText: { color: C.warning, fontSize: T.xs, fontWeight: '600' },
 
   list: { padding: 14 },
+  syncingRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginTop: -6, marginBottom: 12, paddingHorizontal: 4,
+  },
+  syncingText: { color: C.textSecondary, fontSize: T.xs },
   empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 90, gap: 8 },
   emptyText: { color: C.textSecondary, fontSize: T.md, fontWeight: '600' },
   emptySub: { color: C.textMuted, fontSize: T.sm, textAlign: 'center' },

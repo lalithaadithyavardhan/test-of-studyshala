@@ -5,12 +5,10 @@
  * SidebarDrawer handles navigation inside screens.
  */
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { downloadManager } from '../services/downloadManager';
-import { getMaterialFiles } from '../api/studentApi';
 
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -23,8 +21,6 @@ import StarredScreen from '../screens/StarredScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import MaterialAccessScreen from '../screens/MaterialAccessScreen';
 import FileViewerScreen from '../screens/FileViewerScreen';
-
-import StorageSettingsScreen from '../screens/StorageSettingsScreen';
 
 // Faculty screens
 import FacultyDashboardScreen from '../screens/FacultyDashboardScreen';
@@ -75,11 +71,6 @@ function StudentRoot() {
         component={FileViewerScreen}
       />
 
-      <StudentStack.Screen
-        name="StorageSettings"
-        component={StorageSettingsScreen}
-      />
-
     </StudentStack.Navigator>
   );
 }
@@ -122,22 +113,6 @@ function FacultyRoot() {
 
 export default function AppNavigator() {
   const { isAuthenticated, loading, user } = useAuth();
-
-  // ── Startup tasks (fire-and-forget, never block the UI) ──────────────────
-  // Single-tier offline model: there's no cache to clean up or expire
-  // anymore. downloadManager owns the entire auto-sync lifecycle — an
-  // immediate pass on mount, plus another pass every time connectivity is
-  // regained (see downloadManager.initAutoSync). This component doesn't
-  // need to know anything about connectivity APIs; it just wires the
-  // lifecycle up and tears it down on unmount.
-  useEffect(() => {
-    // Self-heal any 0-byte files left behind by older download logic before
-    // auto-sync starts, so a corrupt record can't be "verified" as fine by
-    // sync just because a re-check happens to skip it.
-    downloadManager.cleanupCorruptFiles();
-    const unsubscribe = downloadManager.initAutoSync(getMaterialFiles);
-    return unsubscribe;
-  }, []); // Run once on mount
 
   if (loading) {
     return (

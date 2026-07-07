@@ -2,12 +2,14 @@
  * screens/MaterialAccessScreen.jsx
  * ==================================
  * Reached from EnterCodeScreen ("Open Now") or SavedMaterialsScreen.
- * Fetches the full file/folder listing for a material and lets the
- * student Open (view) or Save (download for offline) each file.
  *
- * Functionality-first per project brief — plain list UI, no heavy polish.
+ * Fully automatic offline saving: the moment the file list loads, every
+ * file in the material starts downloading in the background — no button
+ * to tap. Tapping a file row only opens it. The small icon on the right
+ * of each row is a STATUS indicator only (queued / downloading / saved),
+ * not a button.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,11 +24,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { C, R, T } from '../components/theme';
 import FileListItem from '../components/FileListItem';
 import { getMaterialFiles } from '../api/studentApi';
-import { openFile, saveFileForLater } from '../utils/fileActions';
-import { isAvailableOffline } from '../utils/fileRepository';
-import { storage } from '../database/db';
-
-const listingKey = (materialId) => `materialFiles:${materialId}`;
+import { openFile } from '../utils/fileActions';
+import { isAvailableOffline, saveFileOffline } from '../utils/fileRepository';
+import { getCachedMaterialFiles, setCachedMaterialFiles } from '../utils/materialFilesCache';
 
 export default function MaterialAccessScreen({ route, navigation }) {
   const { material } = route.params || {};
@@ -37,9 +37,12 @@ export default function MaterialAccessScreen({ route, navigation }) {
   const [rootFiles, setRootFiles] = useState([]);
   const [subFolders, setSubFolders] = useState([]);
   const [activeFolder, setActiveFolder] = useState(null); // null = root
-  const [offlineMap, setOfflineMap] = useState({}); // fileId -> bool
-  const [savingId, setSavingId] = useState(null);
-  const [saveProgress, setSaveProgress] = useState(0);
+  const [offlineMap, setOfflineMap] = useState({}); // fileId -> bool (saved)
+  const [downloadingIds, setDownloadingIds] = useState({}); // fileId -> true while in progress
+
+  // Prevents kicking off the same auto-download pass twice (e.g. a refresh
+  // firing while the first pass is still running).
+  const autoDownloadRunId = useRef(0);
 
   const allFilesFlat = useCallback((files, folders) => {
     const nested = (folders || []).flatMap((f) => f.files || []);
@@ -53,6 +56,31 @@ export default function MaterialAccessScreen({ route, navigation }) {
     setOfflineMap(Object.fromEntries(entries));
   }, []);
 
+  // Automatically downloads every file that isn't already saved. Runs
+  // silently in the background — failures are skipped, not alerted,
+  // since this isn't a user-initiated tap.
+  const autoDownloadAll = useCallback(async (files) => {
+    const runId = ++autoDownloadRunId.current;
+    for (const file of files) {
+      if (runId !== autoDownloadRunId.current) return; // a newer pass took over
+      const already = await isAvailableOffline(file._id);
+      if (already) continue;
+
+      setDownloadingIds((prev) => ({ ...prev, [file._id]: true }));
+      try {
+        await saveFileOffline(file, material);
+        setOfflineMap((prev) => ({ ...prev, [file._id]: true }));
+      } catch {
+        // Offline, or this one file failed — move on to the rest.
+      }
+      setDownloadingIds((prev) => {
+        const next = { ...prev };
+        delete next[file._id];
+        return next;
+      });
+    }
+  }, [material]);
+
   const load = useCallback(async () => {
     if (!material?._id) {
       setError('No material selected.');
@@ -63,12 +91,10 @@ export default function MaterialAccessScreen({ route, navigation }) {
     setOfflineNotice('');
 
     // Step 1 — instant local cache of the file listing itself (works with
-    // zero internet). Without this, reopening a material while offline
-    // would fail here even if some of its files were already saved,
-    // because the listing call below needs the network.
+    // zero internet).
     let hadCache = false;
     try {
-      const cached = await storage.get(listingKey(material._id));
+      const cached = await getCachedMaterialFiles(material._id);
       if (cached) {
         setRootFiles(cached.files || []);
         setSubFolders(cached.subFolders || []);
@@ -88,11 +114,12 @@ export default function MaterialAccessScreen({ route, navigation }) {
       await refreshOfflineStatus(allFilesFlat(files, folders));
 
       // Step 3 — resync the cache so this material stays browsable offline
-      try { await storage.set(listingKey(material._id), { files, subFolders: folders }); } catch {}
+      try { await setCachedMaterialFiles(material._id, { files, subFolders: folders }); } catch {}
+
+      // Step 4 — automatically save everything, no tap required
+      autoDownloadAll(allFilesFlat(files, folders));
     } catch (e) {
       if (hadCache) {
-        // We already showed the last known file list — this is expected
-        // while offline, not an error the student needs to act on.
         setOfflineNotice('Offline — showing your last saved file list.');
       } else {
         setError(
@@ -104,7 +131,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [material, allFilesFlat, refreshOfflineStatus]);
+  }, [material, allFilesFlat, refreshOfflineStatus, autoDownloadAll]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -121,39 +148,30 @@ export default function MaterialAccessScreen({ route, navigation }) {
     openFile(file, material, navigation);
   };
 
-  const handleSave = async (file) => {
-    setSavingId(file._id);
-    setSaveProgress(0);
-    const res = await saveFileForLater(file, material, (p) => setSaveProgress(p));
-    setSavingId(null);
-    if (res.success) {
-      setOfflineMap((prev) => ({ ...prev, [file._id]: true }));
-    }
-  };
+  const totalCount = allFilesFlat(rootFiles, subFolders).length;
+  const savedCount = Object.values(offlineMap).filter(Boolean).length;
+  const isDownloading = Object.keys(downloadingIds).length > 0;
 
   const renderFile = ({ item }) => {
     const saved = !!offlineMap[item._id];
-    const isSaving = savingId === item._id;
+    const downloading = !!downloadingIds[item._id];
     return (
       <View style={s.fileRowWrap}>
         <View style={{ flex: 1 }}>
           <FileListItem file={item} onPress={handleOpen} showStar={false} />
         </View>
-        <TouchableOpacity
-          style={[s.actionBtn, saved && s.actionBtnDone]}
-          onPress={() => (saved ? handleOpen(item) : handleSave(item))}
-          disabled={isSaving}
-        >
-          {isSaving ? (
+        {/* Status only — not tappable. Saving happens automatically. */}
+        <View style={[s.statusIcon, saved && s.statusIconDone]}>
+          {downloading ? (
             <ActivityIndicator size="small" color={C.accent} />
           ) : (
             <Ionicons
-              name={saved ? 'checkmark-circle' : 'download-outline'}
+              name={saved ? 'checkmark-circle' : 'time-outline'}
               size={20}
-              color={saved ? C.success : C.accent}
+              color={saved ? C.success : C.textMuted}
             />
           )}
-        </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -198,6 +216,13 @@ export default function MaterialAccessScreen({ route, navigation }) {
         </View>
       )}
 
+      {!error && isDownloading && (
+        <View style={s.downloadBanner}>
+          <ActivityIndicator size="small" color={C.accent} />
+          <Text style={s.downloadText}>Saving files for offline access — {savedCount}/{totalCount} done</Text>
+        </View>
+      )}
+
       {/* Folder chips */}
       {subFolders.length > 0 && (
         <FlatList
@@ -234,12 +259,6 @@ export default function MaterialAccessScreen({ route, navigation }) {
           )
         }
       />
-
-      {savingId && (
-        <View style={s.progressBar}>
-          <View style={[s.progressFill, { width: `${Math.round(saveProgress * 100)}%` }]} />
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -274,6 +293,13 @@ const s = StyleSheet.create({
   },
   offlineText: { color: C.warning, fontSize: T.xs, fontWeight: '600', flex: 1 },
 
+  downloadBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: C.accentBg, marginHorizontal: 14, marginTop: 14,
+    padding: 10, borderRadius: R.sm, borderWidth: 1, borderColor: C.accentBorder,
+  },
+  downloadText: { color: C.accent, fontSize: T.xs, fontWeight: '600', flex: 1 },
+
   chipRow: { flexGrow: 0, paddingHorizontal: 14, paddingVertical: 10 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: R.pill, marginRight: 8,
@@ -285,16 +311,13 @@ const s = StyleSheet.create({
 
   list: { paddingHorizontal: 14, paddingBottom: 24 },
   fileRowWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionBtn: {
+  statusIcon: {
     width: 40, height: 40, borderRadius: R.sm, marginBottom: 8,
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  actionBtnDone: { borderColor: C.success },
+  statusIconDone: { borderColor: C.success },
 
   empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 10 },
   emptyText: { color: C.textMuted, fontSize: T.sm },
-
-  progressBar: { height: 3, backgroundColor: C.surface },
-  progressFill: { height: 3, backgroundColor: C.accent },
 });

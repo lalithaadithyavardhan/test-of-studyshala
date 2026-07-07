@@ -4,17 +4,23 @@
  * Two entry modes, set by fileActions.openFile():
  *
  *  - source: 'local'  → file is fully on-disk (offline-capable).
- *      Images render inline. Everything else (pdf/doc/ppt/video/...) is
- *      handed to the OS's own viewer — Android via expo-intent-launcher,
- *      iOS via the expo-sharing "Open in" sheet — since neither platform's
- *      WebView reliably renders arbitrary local office/pdf files without
- *      extra native libraries. This keeps the offline path simple and
- *      actually working, per the "functionality first" brief.
+ *      Images → <Image>, always worked, no library needed.
+ *      PDF    → rendered natively via `react-native-pdf`'s <Pdf> component.
+ *               This is a real PDF-rendering engine (not the phone's
+ *               WebView), so it works the same on every device and fully
+ *               offline. REQUIRES the custom dev client — this native
+ *               module cannot run inside plain Expo Go.
+ *      Everything else (doc/docx/ppt/pptx/xls/xlsx/...) → handed to the
+ *               OS's own document app via React Native's built-in
+ *               Linking.openURL(). Core React Native, not an Expo native
+ *               module, so it works in Expo Go too. A content:// URI
+ *               passed to it triggers Android's native "choose an app"
+ *               resolution directly.
  *
  *  - source: 'remote' → no local copy yet, but online. Streams
  *      file.previewUrl (a Google Drive preview link from the backend)
- *      inside a WebView. Requires internet — that's expected, since this
- *      branch only runs when nothing is saved locally.
+ *      inside a WebView. Requires internet — expected, since this branch
+ *      only runs when nothing is saved locally.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -25,76 +31,65 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
+import Pdf from 'react-native-pdf';
 import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { C, R, T } from '../components/theme';
 
 const isImage = (mime = '') => mime.startsWith('image/');
+const isPdf = (mime = '', name = '') =>
+  mime.includes('pdf') || name.toLowerCase().endsWith('.pdf');
 
 export default function FileViewerScreen({ route, navigation }) {
   const { file, material, source, localUri } = route.params || {};
-  const [openError, setOpenError] = useState('');
-  const [launching, setLaunching] = useState(false);
   const name = file?.name || file?.fileName || 'File';
   const mime = file?.mimeType || '';
 
-  const openViaShareSheet = useCallback(async () => {
-    const available = await Sharing.isAvailableAsync();
-    if (!available) throw new Error('Sharing not available');
-    await Sharing.shareAsync(localUri, { mimeType: mime, dialogTitle: name });
-  }, [localUri, mime, name]);
+  const [openError, setOpenError] = useState('');
+  const [launching, setLaunching] = useState(false);
 
+  // An app-private file:// path can't be read by other apps directly.
+  // getContentUriAsync() wraps it via Android's FileProvider into a
+  // content:// URI that they CAN read. iOS has no such restriction, so
+  // file:// is used as-is there. Only needed for the "open externally"
+  // path below — react-native-pdf reads the local file:// path directly.
+  const resolveShareableUri = useCallback(async (rawUri) => {
+    if (!rawUri) return null;
+    if (Platform.OS !== 'android') return rawUri;
+    try {
+      return await FileSystem.getContentUriAsync(rawUri);
+    } catch (e) {
+      console.log('[FileViewer] getContentUriAsync failed:', e?.message);
+      return null;
+    }
+  }, []);
+
+  // Word/PPT/Excel/etc — no in-app renderer exists for these, so hand off
+  // to whatever document app is already on the phone.
   const openWithNativeApp = useCallback(async () => {
     setOpenError('');
     setLaunching(true);
     try {
-      if (Platform.OS === 'android') {
-        try {
-          // Required lazily, not at the top of the file: if the native
-          // module is missing (plain Expo Go, no dev client), requiring
-          // it throws "Cannot find native module ExpoIntentLauncher" the
-          // moment it's evaluated. A top-level `import` would throw that
-          // as soon as this screen loads, before we ever get a chance to
-          // catch it — requiring it here means the throw happens inside
-          // this try block instead, where we can fall back gracefully.
-          const IntentLauncher = require('expo-intent-launcher');
-          const contentUri = await FileSystem.getContentUriAsync(localUri);
-          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-            data: contentUri,
-            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-            type: mime || undefined,
-          });
-        } catch (intentErr) {
-          // IntentLauncher's native module isn't present when running in
-          // plain Expo Go (it needs a custom dev client). Fall back to the
-          // share sheet, which IS available in Expo Go, instead of crashing.
-          const missingNativeModule =
-            String(intentErr?.message || '').includes('Cannot find native module');
-          if (missingNativeModule) {
-            await openViaShareSheet();
-          } else {
-            throw intentErr;
-          }
-        }
-      } else {
-        await openViaShareSheet();
-      }
+      const shareableUri = await resolveShareableUri(localUri);
+      if (!shareableUri) throw new Error('Could not prepare this file to open.');
+      await Linking.openURL(shareableUri);
     } catch (e) {
+      console.log('[FileViewer] Could not open file:', e?.message);
       setOpenError('No app on this device can open this file type.');
     } finally {
       setLaunching(false);
     }
-  }, [localUri, mime, openViaShareSheet]);
+  }, [localUri, resolveShareableUri]);
 
   useEffect(() => {
-    if (source === 'local' && !isImage(mime)) {
+    if (source === 'local' && !isImage(mime) && !isPdf(mime, name)) {
       openWithNativeApp();
     }
-  }, [source, mime, openWithNativeApp]);
+  }, [source, mime, name, openWithNativeApp]);
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -116,7 +111,26 @@ export default function FileViewerScreen({ route, navigation }) {
         </View>
       )}
 
-      {source === 'local' && !isImage(mime) && (
+      {source === 'local' && isPdf(mime, name) && !openError && (
+        <Pdf
+          source={{ uri: localUri }}
+          style={s.pdf}
+          trustAllCerts={false}
+          onError={(e) => {
+            console.log('[FileViewer] Pdf render error:', e);
+            setOpenError('Could not render this PDF. It may be corrupted — try saving it again.');
+          }}
+        />
+      )}
+
+      {source === 'local' && isPdf(mime, name) && !!openError && (
+        <View style={s.center}>
+          <Ionicons name="alert-circle-outline" size={40} color={C.danger} />
+          <Text style={s.errorText}>{openError}</Text>
+        </View>
+      )}
+
+      {source === 'local' && !isImage(mime) && !isPdf(mime, name) && (
         <View style={s.center}>
           {launching ? (
             <>
@@ -190,4 +204,5 @@ const s = StyleSheet.create({
 
   imageWrap: { flex: 1, backgroundColor: C.black },
   image: { flex: 1 },
+  pdf: { flex: 1, width: '100%', backgroundColor: C.bg },
 });

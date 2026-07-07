@@ -31,6 +31,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { validateAccessCode, saveMaterial } from '../api/studentApi';
+import { syncMaterialOffline } from '../utils/materialSync';
 
 // ─── Theme — mirrors StudentDashboard exactly ────────────────────────────────
 const C = {
@@ -281,9 +282,14 @@ export default function EnterCodeScreen({ navigation }) {
   // ── Save for Later ─────────────────────────────────────────────────────────
   const handleSaveLater = async () => {
     if (!successData?.material?._id) { setSuccessData(null); return; }
+    const material = successData.material;
     setSavingLater(true);
     try {
-      await saveMaterial(successData.material._id);
+      await saveMaterial(material._id);
+      // Fire-and-forget: download every file in this material for offline
+      // access. Deliberately not awaited — the dialog shouldn't sit open
+      // while potentially several files download in the background.
+      syncMaterialOffline(material).catch(() => {});
     } catch { /* non-critical — already saved or network blip */ }
     finally {
       setSavingLater(false);
