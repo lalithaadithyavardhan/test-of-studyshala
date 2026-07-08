@@ -6,7 +6,7 @@
  * pattern already used by DashboardScreen's recent-files list and
  * HistoryScreen, via the `storage` local cache under the `saved:` prefix.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C, R, T } from '../components/theme';
@@ -24,11 +25,50 @@ import { getSavedMaterials, removeSavedMaterial } from '../api/studentApi';
 import { storage } from '../database/db';
 import { syncMaterialOffline, isMaterialFullyOffline } from '../utils/materialSync';
 
+const describeError = (e) => {
+  // Axios: a genuine "device has no route to the server" failure has no
+  // e.response at all and the message is exactly "Network Error".
+  if (!e?.response && e?.message === 'Network Error') {
+    return 'No internet connection';
+  }
+  if (e?.code === 'ECONNABORTED') {
+    return "Server is taking too long to respond (it may be waking up — try again in a moment)";
+  }
+  if (e?.response?.status === 401) {
+    return 'Your session may have expired — please log out and log back in';
+  }
+  if (e?.response?.status === 403) {
+    return "This account isn't recognized as a student account — please log out and log back in";
+  }
+  if (e?.response?.status >= 500) {
+    return 'Server error — try again shortly';
+  }
+  if (e?.response) {
+    return `Request failed (${e.response.status})`;
+  }
+  return 'Could not reach the server';
+};
+
+// Only genuine connectivity/server-availability problems are worth
+// silently retrying in the background. A 401/403 means the request
+// reached the server fine and was deliberately rejected — retrying with
+// the same token will just get rejected again, forever. Those need the
+// user to actually re-authenticate, not a background retry loop.
+const isRetryable = (e) => {
+  if (!e?.response && e?.message === 'Network Error') return true;
+  if (e?.code === 'ECONNABORTED') return true;
+  if (e?.response?.status >= 500) return true;
+  return false;
+};
+
 export default function SavedMaterialsScreen({ navigation }) {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineOnly, setOfflineOnly] = useState(false);
+  const [offlineReason, setOfflineReason] = useState('');
+  const [canAutoRetry, setCanAutoRetry] = useState(false);
+  const retryTimerRef = useRef(null);
   const [syncStatus, setSyncStatus] = useState({}); // materialId -> 'syncing' | 'complete'
 
   // Auto-download every file for every saved material, in the background.
@@ -65,6 +105,7 @@ export default function SavedMaterialsScreen({ navigation }) {
       const list = data.materials || [];
       setMaterials(list);
       setOfflineOnly(false);
+      setCanAutoRetry(false);
       autoSyncAll(list);
 
       // Step 3 — resync local cache
@@ -72,15 +113,56 @@ export default function SavedMaterialsScreen({ navigation }) {
       for (const m of list) {
         try { await storage.set(`saved:${m._id}`, m); } catch {}
       }
-    } catch {
+    } catch (e) {
+      console.log('[SavedMaterials] getSavedMaterials failed:', {
+        message: e?.message,
+        code: e?.code,
+        status: e?.response?.status,
+        responseData: e?.response?.data,
+        url: e?.config?.url,
+        baseURL: e?.config?.baseURL,
+      });
       setOfflineOnly(true);
+      setOfflineReason(describeError(e));
+      setCanAutoRetry(isRetryable(e));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [autoSyncAll]);
 
-  useEffect(() => { load(); }, [load]);
+  // Reload every time this screen comes into focus, not just on first
+  // mount — e.g. coming back from EnterCodeScreen after saving something
+  // new, or simply returning to the tab after connectivity changed.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      return () => {
+        if (retryTimerRef.current) {
+          clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = null;
+        }
+      };
+    }, [load])
+  );
+
+  // Background auto-retry: only for genuine connectivity/server-availability
+  // failures (see isRetryable above) — never for a 401/403, since retrying
+  // with the same rejected token would just fail identically forever and
+  // silently spam the server. Stops as soon as a load() succeeds.
+  useEffect(() => {
+    if (offlineOnly && canAutoRetry) {
+      retryTimerRef.current = setTimeout(() => {
+        load();
+      }, 15000);
+    }
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, [offlineOnly, canAutoRetry, load]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -114,8 +196,15 @@ export default function SavedMaterialsScreen({ navigation }) {
 
       {offlineOnly && (
         <View style={s.offlineBanner}>
-          <Ionicons name="cloud-offline-outline" size={14} color={C.warning} />
-          <Text style={s.offlineText}>Offline — showing your last saved list.</Text>
+          <Ionicons
+            name={canAutoRetry ? 'cloud-offline-outline' : 'alert-circle-outline'}
+            size={14}
+            color={C.warning}
+          />
+          <Text style={s.offlineText}>
+            {offlineReason || 'Offline'} — showing your last saved list.
+            {canAutoRetry ? ' Retrying automatically…' : ''}
+          </Text>
         </View>
       )}
 
