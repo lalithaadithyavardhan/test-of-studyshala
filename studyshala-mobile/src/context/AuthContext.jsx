@@ -77,6 +77,16 @@ export const AuthProvider = ({ children }) => {
       // Swallow — local cleanup proceeds regardless.
     }
     try {
+      // revokeAccess() fully revokes the granted token so Google Play
+      // Services forgets the account was authorized for this app — this is
+      // what actually forces the account chooser on the next signIn().
+      // signOut() alone only clears the local session and isn't enough on
+      // its own to bring the picker back on some Android devices.
+      await GoogleSignin.revokeAccess();
+    } catch (e) {
+      // Not signed in via native Google Sign-In, or already revoked — fine.
+    }
+    try {
       await GoogleSignin.signOut();
     } catch (e) {
       // Not signed in via native Google Sign-In, or already signed out — fine.

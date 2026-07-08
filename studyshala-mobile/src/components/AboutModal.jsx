@@ -2,17 +2,22 @@ import React from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Modal, Pressable, ScrollView, Linking, Alert as RNAlert,
+  Animated, Easing, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+// Adjust this path to wherever app-icon-1024.png actually lives in your project
+const APP_ICON = require('../../assets/app-icon-1024.png');
+
 const C = {
-  bg: '#13120f', surface: '#1e1c19', elevated: '#2a2724', border: '#2e2c28',
-  accent: '#DE7356', accentBg: 'rgba(222,115,86,0.09)', accentBorder: 'rgba(222,115,86,0.25)',
-  textPrimary: '#e8e4de', textSec: '#b1ada1', textMuted: '#6b6760', white: '#ffffff',
+  bg: '#0f0e0c', surface: '#1a1814', elevated: '#25221e', border: '#2a2622',
+  accent: '#DE7356', accentBg: 'rgba(222,115,86,0.12)', accentBorder: 'rgba(222,115,86,0.3)',
+  textPrimary: '#f0ece6', textSec: '#c4bfb8', textMuted: '#8a857d', white: '#ffffff',
+  gradientStart: '#DE7356', gradientEnd: '#E8956A',
 };
 
 const DEV_GITHUB = 'https://github.com/lalithaadithyavardhan';
-const DEV_EMAIL  = 'adithyasai533@gmail.com';
+const DEV_EMAIL  = 'borraadhitya@gmail.com';
 
 const HOW_TO_USE = [
   { icon: 'key-outline',         title: 'Enter Access Code',    desc: 'Get a code from your faculty and enter it to unlock their materials.' },
@@ -32,6 +37,29 @@ const STACK = [
 ];
 
 export default function AboutModal({ visible, onClose }) {
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(50)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      fadeAnim.setValue(0);
+      slideAnim.setValue(50);
+    }
+  }, [visible]);
 
   const openGitHub = () => {
     Linking.openURL(DEV_GITHUB).catch(() =>
@@ -49,170 +77,428 @@ export default function AboutModal({ visible, onClose }) {
   return (
     <Modal
       transparent
-      animationType="slide"
+      animationType="fade"
       visible={visible}
       onRequestClose={onClose}
       statusBarTranslucent
     >
       <Pressable style={s.backdrop} onPress={onClose}>
-        <Pressable style={s.card} onPress={() => {}}>
-          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-
-            <View style={s.handle} />
-             {/* ── App Header ── */}
-            <View style={s.appHeader}>
-              <View style={s.appIcon}>
-                <Text style={s.appIconText}>S</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.appName}>StudyShala</Text>
-                <Text style={s.appTagline}>Study smarter, not harder.</Text>
-              </View>
-              <View style={s.versionBadge}>
-                <Text style={s.versionText}>v1.0</Text>
-              </View>
-            </View>
-            {/* ── Developer ── */}
-            <Text style={s.sectionLabel}>DEVELOPER</Text>
-            <View style={s.devBox}>
-              <View style={s.devInfo}>
-                <Text style={s.devName}>Developed by Adithya</Text>
-                <Text style={s.devRole}>Student · Full-stack Developer</Text>
-              </View>
-
-              {/* GitHub */}
-              <View style={s.contactRow}>
-                <View style={s.contactLeft}>
-                  <Ionicons name="logo-github" size={16} color={C.textPrimary} />
-                  <View>
-                    <Text style={s.contactHandle}>lalithaadithyavardhan</Text>
-                    <Text style={s.contactMeta}>github.com</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={s.openBtn} onPress={openGitHub} activeOpacity={0.8}>
-                  <Ionicons name="open-outline" size={12} color={C.bg} />
-                  <Text style={s.openBtnText}>Open</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Email */}
-              <View style={[s.contactRow, { borderTopWidth: 1, borderTopColor: C.border, marginTop: 0 }]}>
-                <View style={s.contactLeft}>
-                  <Ionicons name="mail-outline" size={16} color={C.accent} />
-                  <View>
-                    <Text style={[s.contactHandle, { color: C.accent }]}>adithyasai533</Text>
-                    <Text style={s.contactMeta}>@gmail.com</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={[s.openBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.accentBorder }]}
-                  onPress={openMail} activeOpacity={0.8}
-                >
-                  <Ionicons name="mail-outline" size={12} color={C.accent} />
-                  <Text style={[s.openBtnText, { color: C.accent }]}>Contact</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-           
-
-            <Text style={s.appDesc}>
-              StudyShala is a material-sharing platform built for students and faculty. Faculty upload study materials — PDFs, slides, and documents — and share them with students using a simple access code. No WhatsApp groups, no email chains. Everything in one place.
-            </Text>
-
-            <View style={s.divider} />
-
-            {/* ── How to Use ── */}
-            <Text style={s.sectionLabel}>HOW TO USE</Text>
-            {HOW_TO_USE.map((step, i) => (
-              <View key={i} style={s.stepRow}>
-                <View style={s.stepNum}>
-                  <Text style={s.stepNumText}>{i + 1}</Text>
-                </View>
-                <View style={s.stepIconBox}>
-                  <Ionicons name={step.icon} size={16} color={C.accent} />
+        <Animated.View style={[s.cardContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <Pressable style={s.card} onPress={() => {}}>
+            <ScrollView
+              style={s.scrollView}
+              contentContainerStyle={s.scrollContent}
+              showsVerticalScrollIndicator={false}
+              bounces={true}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={s.handle} />
+              
+              {/* ── App Header ── */}
+              <View style={s.appHeader}>
+                <View style={s.appIconContainer}>
+                  <View style={s.appIconShadow} />
+                  <Image
+                    source={APP_ICON}
+                    style={s.appIconImage}
+                    resizeMode="cover"
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.stepTitle}>{step.title}</Text>
-                  <Text style={s.stepDesc}>{step.desc}</Text>
+                  <Text style={s.appName}>StudyShala</Text>
+                  <Text style={s.appTagline}>Study smarter, not harder.</Text>
+                </View>
+                <View style={s.versionBadge}>
+                  <Text style={s.versionText}>v1.0</Text>
                 </View>
               </View>
-            ))}
 
-            <View style={s.divider} />
+              {/* ── Developer ── */}
+              <Text style={s.sectionLabel}>DEVELOPER</Text>
+              <View style={s.devBox}>
+                <View style={s.devInfo}>
+                  <Text style={s.devName}>Developed by Adhitya Borra</Text>
+                  <Text style={s.devRole}>Student · Full-stack Developer</Text>
+                </View>
 
-            {/* ── Built With ── */}
-            <Text style={s.sectionLabel}>BUILT WITH</Text>
-            <View style={s.stackGrid}>
-              {STACK.map((item, i) => (
-                <View key={i} style={s.stackItem}>
-                  <Ionicons name={item.icon} size={14} color={item.color} />
-                  <Text style={s.stackText}>{item.text}</Text>
+                {/* GitHub */}
+                <TouchableOpacity style={s.contactRow} onPress={openGitHub} activeOpacity={0.8}>
+                  <View style={s.contactLeft}>
+                    <View style={s.iconCircle}>
+                      <Ionicons name="logo-github" size={18} color={C.textPrimary} />
+                    </View>
+                    <View>
+                      <Text style={s.contactHandle}>lalithaadithyavardhan</Text>
+                      <Text style={s.contactMeta}>github.com</Text>
+                    </View>
+                  </View>
+                  <View style={s.openBtn}>
+                    <Ionicons name="open-outline" size={14} color={C.bg} />
+                    <Text style={s.openBtnText}>Open</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Email */}
+                <TouchableOpacity style={[s.contactRow, s.contactRowBorder]} onPress={openMail} activeOpacity={0.8}>
+                  <View style={s.contactLeft}>
+                    <View style={[s.iconCircle, { backgroundColor: C.accentBg }]}>
+                      <Ionicons name="mail-outline" size={18} color={C.accent} />
+                    </View>
+                    <View>
+                      <Text style={[s.contactHandle, { color: C.accent }]}>borraadhitya</Text>
+                      <Text style={s.contactMeta}>@gmail.com</Text>
+                    </View>
+                  </View>
+                  <View style={[s.openBtn, s.openBtnOutline]}>
+                    <Ionicons name="mail-outline" size={14} color={C.accent} />
+                    <Text style={[s.openBtnText, { color: C.accent }]}>Contact</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* ── Description ── */}
+              <Text style={s.appDesc}>
+                StudyShala is a material-sharing platform built for students and faculty. Faculty upload study materials — PDFs, slides, and documents — and share them with students using a simple access code. No WhatsApp groups, no email chains. Everything in one place.
+              </Text>
+
+              <View style={s.divider} />
+
+              {/* ── How to Use ── */}
+              <Text style={s.sectionLabel}>HOW TO USE</Text>
+              {HOW_TO_USE.map((step, i) => (
+                <View key={i} style={s.stepRow}>
+                  <View style={s.stepNum}>
+                    <Text style={s.stepNumText}>{i + 1}</Text>
+                  </View>
+                  <View style={s.stepIconBox}>
+                    <Ionicons name={step.icon} size={18} color={C.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.stepTitle}>{step.title}</Text>
+                    <Text style={s.stepDesc}>{step.desc}</Text>
+                  </View>
                 </View>
               ))}
-            </View>
 
-            <View style={s.divider} />
+              <View style={s.divider} />
 
-            
-            {/* Footer */}
-            <Text style={s.footerLine}>© {new Date().getFullYear()} StudyShala · Built by Adithya</Text>
+              {/* ── Built With ── */}
+              <Text style={s.sectionLabel}>BUILT WITH</Text>
+              <View style={s.stackGrid}>
+                {STACK.map((item, i) => (
+                  <View key={i} style={s.stackItem}>
+                    <Ionicons name={item.icon} size={16} color={item.color} />
+                    <Text style={s.stackText}>{item.text}</Text>
+                  </View>
+                ))}
+              </View>
 
-            <TouchableOpacity style={s.closeBtn} onPress={onClose} activeOpacity={0.8}>
-              <Text style={s.closeBtnText}>Close</Text>
-            </TouchableOpacity>
+              <View style={s.divider} />
 
-            <View style={{ height: 16 }} />
-          </ScrollView>
-        </Pressable>
+              {/* Footer */}
+              <Text style={s.footerLine}>© {new Date().getFullYear()} StudyShala · Built by Adithya</Text>
+
+              <TouchableOpacity style={s.closeBtn} onPress={onClose} activeOpacity={0.8}>
+                <Text style={s.closeBtnText}>Close</Text>
+              </TouchableOpacity>
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
-  card:          { backgroundColor: C.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: '90%', paddingHorizontal: 20 },
-  handle:        { width: 36, height: 4, backgroundColor: C.elevated, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 18 },
-  divider:       { height: 1, backgroundColor: C.border, marginVertical: 18 },
-  sectionLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, color: C.textMuted, textTransform: 'uppercase', marginBottom: 14 },
-
-  // App header
-  appHeader:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  appIcon:       { width: 46, height: 46, borderRadius: 13, backgroundColor: C.accentBg, borderWidth: 1, borderColor: C.accentBorder, alignItems: 'center', justifyContent: 'center' },
-  appIconText:   { fontSize: 22, fontWeight: '900', color: C.accent },
-  appName:       { fontSize: 18, fontWeight: '800', color: C.textPrimary },
-  appTagline:    { fontSize: 11, color: C.textMuted, marginTop: 2, fontWeight: '500' },
-  versionBadge:  { backgroundColor: C.elevated, borderRadius: 6, borderWidth: 1, borderColor: C.border, paddingHorizontal: 8, paddingVertical: 4 },
-  versionText:   { fontSize: 11, fontWeight: '700', color: C.textMuted },
-  appDesc:       { fontSize: 13, color: C.textSec, lineHeight: 21 },
-
-  // How to use steps
-  stepRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 14 },
-  stepNum:       { width: 20, height: 20, borderRadius: 10, backgroundColor: C.accentBg, borderWidth: 1, borderColor: C.accentBorder, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  stepNumText:   { fontSize: 10, fontWeight: '800', color: C.accent },
-  stepIconBox:   { width: 32, height: 32, borderRadius: 9, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  stepTitle:     { fontSize: 13, fontWeight: '700', color: C.textPrimary, marginBottom: 2 },
-  stepDesc:      { fontSize: 12, color: C.textMuted, lineHeight: 18, fontWeight: '400' },
-
-  // Stack
-  stackGrid:     { gap: 10 },
-  stackItem:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.elevated, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10 },
-  stackText:     { fontSize: 13, color: C.textSec, fontWeight: '500' },
-
-  // Developer
-  devBox:        { backgroundColor: C.elevated, borderRadius: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden', marginBottom: 16 },
-  devInfo:       { padding: 14, borderBottomWidth: 1, borderBottomColor: C.border },
-  devName:       { fontSize: 14, fontWeight: '700', color: C.textPrimary },
-  devRole:       { fontSize: 11, color: C.textMuted, marginTop: 3, fontWeight: '500' },
-  contactRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
-  contactLeft:   { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  contactHandle: { fontSize: 13, fontWeight: '700', color: C.textPrimary },
-  contactMeta:   { fontSize: 11, color: C.textMuted, fontWeight: '500', marginTop: 1 },
-  openBtn:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.textPrimary, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
-  openBtnText:   { fontSize: 11, fontWeight: '700', color: C.bg },
-
-  footerLine:    { fontSize: 11, color: C.textMuted, textAlign: 'center', marginBottom: 14 },
-  closeBtn:      { backgroundColor: C.elevated, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingVertical: 13, alignItems: 'center' },
-  closeBtnText:  { fontSize: 13, fontWeight: '600', color: C.textSec },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'flex-end',
+  },
+  cardContainer: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: '90%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  card: {
+    backgroundColor: C.surface,
+  },
+  scrollView: {
+    flexGrow: 0,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 12,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: C.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  appHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    gap: 16,
+  },
+  appIconContainer: {
+    position: 'relative',
+  },
+  appIconImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: C.accent,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  appIconShadow: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    right: -4,
+    bottom: -4,
+    backgroundColor: 'rgba(222,115,86,0.2)',
+    borderRadius: 16,
+    zIndex: -1,
+  },
+  appName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: C.textPrimary,
+    letterSpacing: -0.5,
+  },
+  appTagline: {
+    fontSize: 14,
+    color: C.textSec,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  versionBadge: {
+    backgroundColor: C.elevated,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  versionText: {
+    fontSize: 12,
+    color: C.textSec,
+    fontWeight: '600',
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.accent,
+    letterSpacing: 1.5,
+    paddingHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  devBox: {
+    backgroundColor: C.elevated,
+    marginHorizontal: 24,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  devInfo: {
+    marginBottom: 16,
+  },
+  devName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: C.textPrimary,
+  },
+  devRole: {
+    fontSize: 13,
+    color: C.textSec,
+    marginTop: 2,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  contactRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    marginTop: 8,
+    paddingTop: 16,
+  },
+  contactLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: C.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  contactHandle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.textPrimary,
+  },
+  contactMeta: {
+    fontSize: 12,
+    color: C.textMuted,
+    marginTop: 1,
+  },
+  openBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.textPrimary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 6,
+  },
+  openBtnOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: C.accentBorder,
+  },
+  openBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.bg,
+  },
+  appDesc: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: C.textSec,
+    paddingHorizontal: 24,
+    marginTop: 20,
+    fontWeight: '400',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: C.border,
+    marginHorizontal: 24,
+    marginTop: 24,
+    opacity: 0.6,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    marginBottom: 16,
+    gap: 12,
+  },
+  stepNum: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: C.accentBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  stepNumText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.accent,
+  },
+  stepIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: C.elevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  stepTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.textPrimary,
+    marginBottom: 2,
+  },
+  stepDesc: {
+    fontSize: 13,
+    color: C.textSec,
+    lineHeight: 18,
+  },
+  stackGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  stackItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.elevated,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: 8,
+    minWidth: '48%',
+  },
+  stackText: {
+    fontSize: 13,
+    color: C.textSec,
+    fontWeight: '500',
+  },
+  footerLine: {
+    fontSize: 12,
+    color: C.textMuted,
+    textAlign: 'center',
+    marginTop: 24,
+    fontWeight: '500',
+  },
+  closeBtn: {
+    backgroundColor: C.accent,
+    marginHorizontal: 24,
+    marginTop: 16,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  closeBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.white,
+  },
 });
