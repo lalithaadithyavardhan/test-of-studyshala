@@ -13,11 +13,28 @@
  * FIX: Drive API uses its own dedicated OAuth2 client (GOOGLE_DRIVE_CLIENT_ID,
  * GOOGLE_DRIVE_CLIENT_SECRET) — completely separate from the user login OAuth
  * client (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET). This prevents conflicts.
+ *
+ * CONVERSION: Non-PDF files (PPTX, DOCX, XLSX, etc.) are automatically
+ * converted to PDF via Google Drive export before being stored. This ensures
+ * all files are renderable offline in the mobile app.
  */
 
 const { google } = require('googleapis');
 const stream     = require('stream');
 const logger     = require('../utils/logger');
+
+// MIME types that must be converted to PDF before storing
+const CONVERT_MIME_MAP = {
+  // PowerPoint
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'application/vnd.google-apps.presentation',
+  'application/vnd.ms-powerpoint':                                              'application/vnd.google-apps.presentation',
+  // Word
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':   'application/vnd.google-apps.document',
+  'application/msword':                                                         'application/vnd.google-apps.document',
+  // Excel
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':         'application/vnd.google-apps.spreadsheet',
+  'application/vnd.ms-excel':                                                   'application/vnd.google-apps.spreadsheet',
+};
 
 class DriveService {
   constructor () {
@@ -93,6 +110,61 @@ class DriveService {
       webViewLink: res.data.webViewLink,
       size:        parseInt(res.data.size || 0)
     };
+  }
+
+  /**
+   * Upload a non-PDF file, convert it to PDF via Google Drive, then store
+   * only the PDF. The intermediate Google Workspace file is deleted.
+   * Returns { fileId, webViewLink, size, convertedName }.
+   */
+  async convertAndUploadAsPdf (buffer, fileName, mimeType, folderId = null) {
+    const googleMimeType = CONVERT_MIME_MAP[mimeType];
+    if (!googleMimeType) {
+      throw new Error(`No conversion path for mimeType: ${mimeType}`);
+    }
+
+    const pdfName = fileName.replace(/\.[^.]+$/, '.pdf');
+    let intermediateFileId = null;
+
+    try {
+      // Step 1: Upload original file as Google Workspace format (triggers conversion)
+      const pass = new stream.PassThrough();
+      pass.end(buffer);
+
+      const importRes = await this.drive.files.create({
+        resource: { name: fileName, mimeType: googleMimeType },
+        media:    { mimeType, body: pass },
+        fields:   'id'
+      });
+      intermediateFileId = importRes.data.id;
+      logger.info(`Intermediate Google Workspace file created: ${fileName} → ${intermediateFileId}`);
+
+      // Step 2: Export as PDF (returns a readable stream)
+      const exportRes = await this.drive.files.export(
+        { fileId: intermediateFileId, mimeType: 'application/pdf' },
+        { responseType: 'arraybuffer' }
+      );
+
+      const pdfBuffer = Buffer.from(exportRes.data);
+      logger.info(`Exported to PDF: ${pdfName} (${pdfBuffer.length} bytes)`);
+
+      // Step 3: Upload the PDF buffer as a regular file
+      const result = await this.uploadFile(pdfBuffer, pdfName, 'application/pdf', folderId);
+
+      logger.info(`PDF stored on Drive: ${pdfName} → ${result.fileId}`);
+      return { ...result, convertedName: pdfName };
+
+    } finally {
+      // Always clean up the intermediate Google Workspace file
+      if (intermediateFileId) {
+        try {
+          await this.drive.files.delete({ fileId: intermediateFileId });
+          logger.info(`Intermediate file deleted: ${intermediateFileId}`);
+        } catch (cleanupErr) {
+          logger.warn(`Failed to delete intermediate file ${intermediateFileId}: ${cleanupErr.message}`);
+        }
+      }
+    }
   }
 
   async deleteFile (fileId) {

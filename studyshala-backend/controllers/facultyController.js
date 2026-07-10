@@ -6,6 +6,8 @@
  *   - Upload files to a specific sub-folder OR root
  *   - Faculty-to-student message (create + update)
  *   - Watermarking via watermarkService (PDFs + images)
+ *   - Auto-convert non-PDF uploads (PPTX, DOCX, XLSX, etc.) to PDF via
+ *     Google Drive so all files render offline in the mobile app
  */
 
 const Folder          = require('../models/Folder');
@@ -14,6 +16,16 @@ const driveService    = require('../services/driveService');
 const { logAction }   = require('../middleware/logging');
 const logger          = require('../utils/logger');
 const crypto          = require('crypto');
+
+// MIME types that require PDF conversion before storing
+const CONVERTIBLE_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+  'application/vnd.ms-powerpoint',                                              // .ppt
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',   // .docx
+  'application/msword',                                                         // .doc
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // .xlsx
+  'application/vnd.ms-excel',                                                   // .xls
+]);
 
 // ── URL helpers ──────────────────────────────────────────────────────────────
 
@@ -125,6 +137,7 @@ const createFolder = async (req, res) => {
 
 // ── Upload files (root or sub-folder) ────────────────────────────────────────
 // Body param: subFolderId (optional) — if present, files go into that sub-folder
+// Non-PDF files are automatically converted to PDF via Google Drive before storing.
 
 const uploadFiles = async (req, res) => {
   try {
@@ -159,24 +172,40 @@ const uploadFiles = async (req, res) => {
     const uploaded = [];
 
     for (const file of req.files) {
-      // ── Drive upload ────────────────────────────────────────────────────
-      // NOTE: Upload-time watermarking removed — it caused severe slowness
-      // for large files (full file buffered, processed, then re-uploaded).
-      // Files are already protected: access is gated by MongoDB access codes,
-      // and Drive URLs are opaque without the fileId.
-      let driveFileId = null;
-      let fileSize    = file.size;
+      let driveFileId  = null;
+      let fileSize     = file.size;
+      let storedName   = file.originalname;
+      let storedMime   = file.mimetype;
+
+      const needsConversion = CONVERTIBLE_MIME_TYPES.has(file.mimetype);
 
       try {
-        const result = await driveService.uploadFile(
-          file.buffer,
-          file.originalname,
-          file.mimetype,
-          parentDriveId
-        );
-        driveFileId = result.fileId;
-        fileSize    = result.size || file.buffer.length;
-        logger.info(`Uploaded to Drive: ${file.originalname} → ${driveFileId}`);
+        if (needsConversion) {
+          // Convert to PDF via Google Drive, then store the PDF
+          logger.info(`Converting to PDF: ${file.originalname} (${file.mimetype})`);
+          const result = await driveService.convertAndUploadAsPdf(
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+            parentDriveId
+          );
+          driveFileId = result.fileId;
+          fileSize    = result.size || file.buffer.length;
+          storedName  = result.convertedName;   // e.g. "lecture.pdf"
+          storedMime  = 'application/pdf';
+          logger.info(`Converted & stored as PDF: ${storedName} → ${driveFileId}`);
+        } else {
+          // PDF or image — upload directly as before
+          const result = await driveService.uploadFile(
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+            parentDriveId
+          );
+          driveFileId = result.fileId;
+          fileSize    = result.size || file.buffer.length;
+          logger.info(`Uploaded to Drive: ${file.originalname} → ${driveFileId}`);
+        }
       } catch (driveErr) {
         logger.error(`Drive upload failed for ${file.originalname}: ${driveErr.message}`);
         return res.status(500).json({
@@ -185,9 +214,9 @@ const uploadFiles = async (req, res) => {
       }
 
       const doc = {
-        name:         file.originalname,
+        name:         storedName,
         originalName: file.originalname,
-        mimeType:     file.mimetype,
+        mimeType:     storedMime,
         size:         fileSize,
         driveFileId,
         uploadedAt:   new Date(),
