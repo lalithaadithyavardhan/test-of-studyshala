@@ -22,6 +22,7 @@
 import * as FileSystem from 'expo-file-system';
 import * as Network from 'expo-network';
 import { storage } from '../database/db';
+import { getStorageLocation } from './storageLocation';
 
 const FILES_DIR = `${FileSystem.documentDirectory}studyshala_files/`;
 
@@ -116,13 +117,46 @@ export const saveFileOffline = async (file, material, onProgress) => {
       throw new Error('Downloaded file is empty.');
     }
 
+    // If a custom storage folder is configured, copy the finished download
+    // there and use THAT as the file's permanent location. This only ever
+    // affects NEW downloads — files already saved elsewhere (default or a
+    // previously-chosen folder) are never moved.
+    let finalUri = result.uri;
+    try {
+      const location = await getStorageLocation();
+      if (location.type === 'custom' && location.treeUri) {
+        const safName = safeName(file.name || file.fileName);
+        const safUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          location.treeUri,
+          safName,
+          file.mimeType || 'application/octet-stream'
+        );
+        const base64 = await FileSystem.readAsStringAsync(result.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        await FileSystem.writeAsStringAsync(safUri, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        // Only remove the default-location temp copy once the custom-folder
+        // copy is confirmed written — never delete before it's safely there.
+        await FileSystem.deleteAsync(result.uri, { idempotent: true });
+        finalUri = safUri;
+      }
+    } catch (safErr) {
+      // Custom-folder copy failed for any reason (permission revoked,
+      // folder deleted externally, etc). The default-location copy above
+      // is already verified good — just keep using it rather than losing
+      // the download entirely.
+      console.log('[fileRepository] custom folder copy failed, keeping default location:', safErr?.message);
+    }
+
     const record = {
       fileId,
       materialId: material?._id || file.materialId || null,
       name: file.name || file.fileName,
       mimeType: file.mimeType,
       expectedSize: info.size,
-      localUri: result.uri,
+      localUri: finalUri,
       status: 'complete',
       downloadedAt: new Date().toISOString(),
     };

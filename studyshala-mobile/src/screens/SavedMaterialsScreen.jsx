@@ -34,7 +34,10 @@ import SidebarDrawer from '../components/SidebarDrawer';
 import { useAuth } from '../context/AuthContext';
 import { getSavedMaterials, removeSavedMaterial } from '../api/studentApi';
 import { storage } from '../database/db';
+import { scopedKey } from '../utils/accountScope';
 import { syncMaterialOffline, isMaterialFullyOffline } from '../utils/materialSync';
+import { getCachedMaterialFiles, flattenMaterialFiles } from '../utils/materialFilesCache';
+import { removeFileOffline } from '../utils/fileRepository';
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 const C = {
@@ -247,7 +250,7 @@ export default function SavedMaterialsScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      const cached = await storage.getAllByPrefix('saved:');
+      const cached = await storage.getAllByPrefix(scopedKey('saved:'));
       if (cached?.length) {
         setMaterials(cached);
         autoSyncAll(cached);
@@ -262,9 +265,9 @@ export default function SavedMaterialsScreen({ navigation }) {
       setCanAutoRetry(false);
       autoSyncAll(list);
 
-      try { await storage.deleteAllByPrefix('saved:'); } catch {}
+      try { await storage.deleteAllByPrefix(scopedKey('saved:')); } catch {}
       for (const m of list) {
-        try { await storage.set(`saved:${m._id}`, m); } catch {}
+        try { await storage.set(scopedKey(`saved:${m._id}`), m); } catch {}
       }
     } catch (e) {
       console.log('[SavedMaterials] getSavedMaterials failed:', {
@@ -320,18 +323,34 @@ export default function SavedMaterialsScreen({ navigation }) {
   };
 
   const handleRemove = (material) => {
-    Alert.alert('Remove saved material?', material.subjectName, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          setMaterials((prev) => prev.filter((m) => m._id !== material._id));
-          storage.delete(`saved:${material._id}`).catch(() => {});
-          removeSavedMaterial(material._id).catch(() => {});
+    Alert.alert(
+      'Remove saved material?',
+      `This also deletes ${material.subjectName || 'this material'}'s downloaded files from your device.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setMaterials((prev) => prev.filter((m) => m._id !== material._id));
+            storage.delete(scopedKey(`saved:${material._id}`)).catch(() => {});
+            removeSavedMaterial(material._id).catch(() => {});
+
+            // Actually free the storage those files were using — previously
+            // this only removed the bookmark, leaving downloaded files
+            // sitting on the device with no way for the student to see or
+            // reclaim them.
+            try {
+              const cached = await getCachedMaterialFiles(material._id);
+              const files = flattenMaterialFiles(cached);
+              for (const f of files) {
+                await removeFileOffline(f._id);
+              }
+            } catch {}
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const filtered = useMemo(() => {
@@ -517,7 +536,7 @@ const s = StyleSheet.create({
 
   sortRow: {
     flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap',
-    gap: 6, paddingHorizontal: 6, paddingVertical: 10,
+    gap: 6, paddingHorizontal: 14, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: C.borderSub,
   },
   sortLabel: { fontSize: T.xs, color: C.textMuted, fontWeight: '500', marginRight: 2 },

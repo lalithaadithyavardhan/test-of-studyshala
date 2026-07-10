@@ -55,9 +55,10 @@ import {
   starFile, unstarFile, getStarredFiles,
 } from '../api/studentApi';
 import { openFile, exportFile } from '../utils/fileActions';
-import { isAvailableOffline, saveFileOffline } from '../utils/fileRepository';
-import { getCachedMaterialFiles, setCachedMaterialFiles } from '../utils/materialFilesCache';
+import { isAvailableOffline, saveFileOffline, removeFileOffline } from '../utils/fileRepository';
+import { getCachedMaterialFiles, setCachedMaterialFiles, flattenMaterialFiles } from '../utils/materialFilesCache';
 import { storage } from '../database/db';
+import { scopedKey } from '../utils/accountScope';
 import { useAuth } from '../context/AuthContext';
 
 // ─── Theme — matches the restyled SavedMaterialsScreen exactly ──────────────
@@ -149,7 +150,7 @@ const FILTERS = [
 
 // ─── Recently opened — local per-material list, via our own storage module ──
 const MAX_RECENT = 5;
-const recentKey = (materialId) => `recentFilesFor:${materialId}`;
+const recentKey = (materialId) => scopedKey(`recentFilesFor:${materialId}`);
 
 async function loadRecentFiles(materialId) {
   const list = await storage.get(recentKey(materialId));
@@ -538,7 +539,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
 
   const loadStarred = useCallback(async () => {
     try {
-      const result = await storage.getAllByPrefix('starred:');
+      const result = await storage.getAllByPrefix(scopedKey('starred:'));
       const cachedIds = (result || []).map((entry) => entry.fileId).filter(Boolean);
       if (cachedIds.length) setStarredIds(cachedIds);
     } catch {}
@@ -547,7 +548,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
       const serverIds = (data.starredFiles || []).map((s) => s.fileId);
       setStarredIds(serverIds);
       for (const f of data.starredFiles || []) {
-        await storage.set(`starred:${f.fileId}`, {
+        await storage.set(scopedKey(`starred:${f.fileId}`), {
           fileId: f.fileId, fileName: f.fileName, mimeType: f.mimeType,
           materialId: f.materialId, subjectName: f.subjectName,
           previewUrl: f.previewUrl || null, downloadUrl: f.downloadUrl || null,
@@ -559,7 +560,7 @@ export default function MaterialAccessScreen({ route, navigation }) {
 
   const checkSavedStatus = useCallback(async () => {
     try {
-      const cached = await storage.get(`saved:${initialMaterial._id}`);
+      const cached = await storage.get(scopedKey(`saved:${initialMaterial._id}`));
       setIsSaved(!!cached);
     } catch {}
   }, [initialMaterial]);
@@ -608,11 +609,11 @@ export default function MaterialAccessScreen({ route, navigation }) {
       if (already) {
         await unstarFile(file._id);
         setStarredIds((prev) => prev.filter((id) => id !== file._id));
-        await storage.delete(`starred:${file._id}`);
+        await storage.delete(scopedKey(`starred:${file._id}`));
       } else {
         await starFile({ fileId: file._id, fileName: file.name, mimeType: file.mimeType, materialId: material._id, subjectName: material.subjectName });
         setStarredIds((prev) => [...prev, file._id]);
-        await storage.set(`starred:${file._id}`, {
+        await storage.set(scopedKey(`starred:${file._id}`), {
           fileId: file._id, fileName: file.name, mimeType: file.mimeType,
           materialId: material._id, subjectName: material.subjectName,
           previewUrl: file.previewUrl || null, downloadUrl: file.downloadUrl || null,
@@ -631,12 +632,31 @@ export default function MaterialAccessScreen({ route, navigation }) {
     try {
       if (isSaved) {
         await removeSavedMaterial(material._id);
-        await storage.delete(`saved:${material._id}`);
+        await storage.delete(scopedKey(`saved:${material._id}`));
         setIsSaved(false);
         showToast('bookmark-outline', C.textSec, 'Removed from Saved Materials', material.subjectName);
+
+        // Actually free the storage those files were using — previously
+        // this only removed the bookmark, leaving downloaded files sitting
+        // on the device with no way for the student to see or reclaim them.
+        try {
+          const cached = await getCachedMaterialFiles(material._id);
+          const filesToRemove = flattenMaterialFiles(cached);
+          for (const f of filesToRemove) {
+            await removeFileOffline(f._id);
+          }
+          // Reflect it on screen immediately — otherwise the status icons
+          // next to each file would keep showing a stale "saved" checkmark
+          // until the next reload.
+          setOfflineMap((prev) => {
+            const next = { ...prev };
+            for (const f of filesToRemove) delete next[f._id];
+            return next;
+          });
+        } catch {}
       } else {
         await saveMaterial(material._id);
-        await storage.set(`saved:${material._id}`, material);
+        await storage.set(scopedKey(`saved:${material._id}`), material);
         setIsSaved(true);
         showToast('bookmark', C.accent, 'Added to Saved Materials', material.subjectName);
       }

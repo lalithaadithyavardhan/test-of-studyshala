@@ -21,6 +21,7 @@ import FileListItem from '../components/FileListItem';
 import { getStarredFiles, unstarFile } from '../api/studentApi';
 import { openFile } from '../utils/fileActions';
 import { storage } from '../database/db';
+import { scopedKey } from '../utils/accountScope';
 
 export default function StarredScreen({ navigation }) {
   const [files, setFiles] = useState([]);
@@ -30,7 +31,7 @@ export default function StarredScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      const cached = await storage.getAllByPrefix('starred:');
+      const cached = await storage.getAllByPrefix(scopedKey('starred:'));
       if (cached?.length) setFiles(cached);
     } catch {}
 
@@ -40,9 +41,9 @@ export default function StarredScreen({ navigation }) {
       setFiles(list);
       setOfflineOnly(false);
 
-      try { await storage.deleteAllByPrefix('starred:'); } catch {}
+      try { await storage.deleteAllByPrefix(scopedKey('starred:')); } catch {}
       for (const f of list) {
-        try { await storage.set(`starred:${f.fileId}`, f); } catch {}
+        try { await storage.set(scopedKey(`starred:${f.fileId}`), f); } catch {}
       }
     } catch {
       setOfflineOnly(true);
@@ -77,7 +78,7 @@ export default function StarredScreen({ navigation }) {
 
   const handleUnstar = async (item) => {
     setFiles((prev) => prev.filter((f) => f.fileId !== item.fileId));
-    storage.delete(`starred:${item.fileId}`).catch(() => {});
+    storage.delete(scopedKey(`starred:${item.fileId}`)).catch(() => {});
     unstarFile(item.fileId).catch(() => {});
   };
 

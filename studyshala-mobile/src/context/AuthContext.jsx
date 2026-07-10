@@ -18,6 +18,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { STORAGE_KEYS, API_BASE_URL } from '../config/config';
 import { setForceLogoutHandler } from '../api/client';
 import { logoutRequest } from '../api/authApi';
+import { setCurrentAccount } from '../utils/accountScope';
 
 const AuthContext = createContext(null);
 
@@ -38,8 +39,10 @@ export const AuthProvider = ({ children }) => {
           SecureStore.getItemAsync(STORAGE_KEYS.LAST_ROLE),
         ]);
         if (storedToken && storedUser) {
+          const parsedUser = JSON.parse(storedUser);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setUser(parsedUser);
+          setCurrentAccount(parsedUser.email || parsedUser._id);
         }
         if (storedRole) setLastRole(storedRole);
       } catch (e) {
@@ -68,6 +71,7 @@ export const AuthProvider = ({ children }) => {
     setToken(jwtToken);
     setUser(userData);
     setLastRole(userData.role);
+    setCurrentAccount(userData.email || userData._id);
   }, []);
 
   const logout = useCallback(async () => {
@@ -75,16 +79,6 @@ export const AuthProvider = ({ children }) => {
       await logoutRequest();
     } catch (e) {
       // Swallow — local cleanup proceeds regardless.
-    }
-    try {
-      // revokeAccess() fully revokes the granted token so Google Play
-      // Services forgets the account was authorized for this app — this is
-      // what actually forces the account chooser on the next signIn().
-      // signOut() alone only clears the local session and isn't enough on
-      // its own to bring the picker back on some Android devices.
-      await GoogleSignin.revokeAccess();
-    } catch (e) {
-      // Not signed in via native Google Sign-In, or already revoked — fine.
     }
     try {
       await GoogleSignin.signOut();
@@ -97,6 +91,7 @@ export const AuthProvider = ({ children }) => {
     // next time, matching the website's "remember last role" behavior.
     setToken(null);
     setUser(null);
+    setCurrentAccount(null); // resets to 'anonymous' — never leaves the previous account's key active
   }, []);
 
   const updateUser = useCallback(async (partialUser) => {

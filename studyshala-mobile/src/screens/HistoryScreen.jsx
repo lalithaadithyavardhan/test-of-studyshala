@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 // Lets Access History show instantly from local cache with zero internet,
 // then silently refresh from the server in the background when online.
 import { storage } from '../database/db';
+import { scopedKey } from '../utils/accountScope';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const C = {
@@ -390,7 +391,7 @@ export default function HistoryScreen({ navigation }) {
     // NOTE: storage.getAllByPrefix() returns plain parsed objects, not
     // {key, value} pairs — each item below IS the history record itself.
     try {
-      const cached = await storage.getAllByPrefix('history:');
+      const cached = await storage.getAllByPrefix(scopedKey('history:'));
       if (cached?.length) {
         const items = cached.filter(Boolean);
         if (items.length) {
@@ -412,12 +413,12 @@ export default function HistoryScreen({ navigation }) {
 
       // Step 3 — sync to local cache (clear stale keys, write fresh ones)
       try {
-        await storage.deleteAllByPrefix('history:');
+        await storage.deleteAllByPrefix(scopedKey('history:'));
       } catch {}
       for (const m of items) {
         // storage.set() already JSON.stringifies internally — pass the plain
         // object, never pre-stringify it.
-        try { await storage.set(`history:${m._id}`, m); } catch {}
+        try { await storage.set(scopedKey(`history:${m._id}`), m); } catch {}
       }
     } catch {
       // Server unreachable — if we already showed cached data, fail silently
@@ -476,7 +477,7 @@ export default function HistoryScreen({ navigation }) {
           const updated = { ...item, isSaved: true };
           next.set(materialId, updated);
           // Keep offline cache in sync so "Saved" survives app restarts offline
-          storage.set(`history:${materialId}`, updated).catch(() => {});
+          storage.set(scopedKey(`history:${materialId}`), updated).catch(() => {});
         }
         return next;
       });

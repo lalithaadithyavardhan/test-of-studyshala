@@ -9,6 +9,8 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import { ServerStatusProvider } from '../context/ServerStatusContext';
+import ServerStatusBanner from '../components/ServerStatusBanner';
 
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -21,6 +23,7 @@ import StarredScreen from '../screens/StarredScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import MaterialAccessScreen from '../screens/MaterialAccessScreen';
 import FileViewerScreen from '../screens/FileViewerScreen';
+import StorageSettingsScreen from '../screens/StorageSettingsScreen';
 
 // Faculty screens
 import FacultyDashboardScreen from '../screens/FacultyDashboardScreen';
@@ -71,6 +74,11 @@ function StudentRoot() {
         component={FileViewerScreen}
       />
 
+      <StudentStack.Screen
+        name="StorageSettings"
+        component={StorageSettingsScreen}
+      />
+
     </StudentStack.Navigator>
   );
 }
@@ -114,39 +122,34 @@ function FacultyRoot() {
 export default function AppNavigator() {
   const { isAuthenticated, loading, user } = useAuth();
 
-  if (loading) {
-    return (
+  return (
+    <ServerStatusProvider>
       <NavigationContainer>
+        <ServerStatusBanner />
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
-          <RootStack.Screen
-            name="Splash"
-            component={SplashScreen}
-          />
+          {loading ? (
+            <RootStack.Screen
+              name="Splash"
+              component={SplashScreen}
+            />
+          ) : !isAuthenticated ? (
+            <RootStack.Screen
+              name="Login"
+              component={LoginScreen}
+            />
+          ) : user?.role === 'faculty' || user?.role === 'admin' ? (
+            <RootStack.Screen
+              name="FacultyRoot"
+              component={FacultyRoot}
+            />
+          ) : (
+            <RootStack.Screen
+              name="StudentRoot"
+              component={StudentRoot}
+            />
+          )}
         </RootStack.Navigator>
       </NavigationContainer>
-    );
-  }
-
-  return (
-    <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          <RootStack.Screen
-            name="Login"
-            component={LoginScreen}
-          />
-        ) : user?.role === 'faculty' || user?.role === 'admin' ? (
-          <RootStack.Screen
-            name="FacultyRoot"
-            component={FacultyRoot}
-          />
-        ) : (
-          <RootStack.Screen
-            name="StudentRoot"
-            component={StudentRoot}
-          />
-        )}
-      </RootStack.Navigator>
-    </NavigationContainer>
+    </ServerStatusProvider>
   );
 }

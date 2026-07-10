@@ -1,21 +1,31 @@
 /**
- * screens/LoginScreen.jsx — StudyShala Dark Theme
+ * screens/LoginScreen.jsx — StudyShala Dark Theme (v2 visual refresh)
  *
  *   Background  #13120f  warm dark (not cold black)
  *   Surface     #1e1c19  warm card surface
  *   Border      #2e2c28  normal border
- *   Accent      #DE7356  Claude Peach / terra-cotta — the ONE brand color
+ *   Accent      #DE7356  Claude Peach / terra-cotta — the PRIMARY brand color
+ *   Faculty tnt #7C76B0  muted indigo — used ONLY as the faculty icon's
+ *                        inactive tint, matching the reference design. It
+ *                        disappears the moment the card is selected (the
+ *                        card then animates to the shared orange accent,
+ *                        same as Student), so the app still reads as
+ *                        single-accent overall.
  *   TextPrimary #e8e4de  warm white
  *   TextSec     #b1ada1  warm gray
  *   TextMuted   #6b6760  readable dim
  *
- * Student and Faculty now share the SAME accent color (peach). There is no
- * separate "faculty gray" anymore — role differentiation comes from the
- * icon + copy, not a second color. The selection state itself is animated
- * (border, fill, icon tint, label tint, tick-mark, scale) instead of an
- * instant style swap, and the screen has a soft one-time entrance animation
- * on the logo + a gentle breathing glow — this is the very first thing a
- * user sees, so it's worth the extra polish even though it only plays once.
+ * VISUAL-ONLY REFRESH — no functions, handlers, animations, navigation,
+ * or API logic were changed. Additions are purely decorative UI:
+ *   - trust badge under the tagline
+ *   - "I AM A…" section divider with trailing dot
+ *   - per-role inactive icon tint (student = neutral, faculty = indigo)
+ *   - "role can change later" caption under the role row
+ *   - bottom 4-up feature strip (Offline / Materials / Save / Secure)
+ *
+ * Student and Faculty still SHARE the same accent (peach) the instant a
+ * card is selected — role differentiation only shows up in the unselected
+ * icon tint + copy, exactly like before.
  */
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -31,10 +41,15 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL, GOOGLE_WEB_CLIENT_ID } from '../config/config';
 import { C, R, T } from '../components/theme';
 
-// ── Single brand accent, used for BOTH roles ──
+// ── Single brand accent, used for BOTH roles when selected ──
 const ACCENT = '#DE7356';
 const ACCENT_SOFT = 'rgba(222,115,86,0.14)';
 const ACCENT_TRANSPARENT = 'rgba(222,115,86,0)';
+
+// ── Faculty-only inactive tint (purely cosmetic, matches reference design) ──
+const FACULTY_TINT = '#8B85C4';
+const FACULTY_TINT_SOFT = 'rgba(124,118,176,0.16)';
+const FACULTY_TINT_BORDER = 'rgba(124,118,176,0.35)';
 
 const ROLES = [
   {
@@ -42,13 +57,26 @@ const ROLES = [
     label: 'Student',
     desc: 'Access materials with a code',
     icon: 'school-outline',
+    inactiveIconColor: C.textSecondary,
+    inactiveBoxBg: C.elevated,
+    inactiveBoxBorder: C.border,
   },
   {
     key: 'faculty',
     label: 'Faculty',
     desc: 'Upload & manage materials',
     icon: 'easel-outline',
+    inactiveIconColor: FACULTY_TINT,
+    inactiveBoxBg: FACULTY_TINT_SOFT,
+    inactiveBoxBorder: FACULTY_TINT_BORDER,
   },
+];
+
+const FEATURES = [
+  { icon: 'download-outline', title: 'Offline Access', desc: 'Study anytime,\nanywhere' },
+  { icon: 'document-text-outline', title: 'All Materials', desc: 'Notes, PDFs,\nPPTs & more' },
+  { icon: 'bookmark-outline', title: 'Save & Organize', desc: 'organized' },
+  { icon: 'shield-checkmark-outline', title: 'Secure & Safe', desc: 'always protected' },
 ];
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -99,8 +127,8 @@ function RoleCard({ role, active, onPress }) {
 
   const borderColor = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [C.border, ACCENT] });
   const backgroundColor = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [C.surface, ACCENT_SOFT] });
-  const iconBoxBg = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [C.elevated, ACCENT_SOFT] });
-  const iconBoxBorder = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [ACCENT_TRANSPARENT, ACCENT] });
+  const iconBoxBg = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [role.inactiveBoxBg, ACCENT_SOFT] });
+  const iconBoxBorder = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [role.inactiveBoxBorder, ACCENT] });
   const iconInactiveOpacity = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const labelColor = selectAnim.interpolate({ inputRange: [0, 1], outputRange: [C.textSecondary, ACCENT] });
   const cardScale = selectScale.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] });
@@ -149,7 +177,7 @@ function RoleCard({ role, active, onPress }) {
         >
           <View style={s.iconStack}>
             <Animated.View style={[s.iconLayer, { opacity: iconInactiveOpacity }]}>
-              <Ionicons name={role.icon} size={26} color={C.textSecondary} />
+              <Ionicons name={role.icon} size={26} color={role.inactiveIconColor} />
             </Animated.View>
             <Animated.View style={[s.iconLayer, { opacity: selectAnim }]}>
               <Ionicons name={role.icon} size={26} color={ACCENT} />
@@ -276,9 +304,17 @@ export default function LoginScreen() {
               />
             </View>
           </Animated.View>
-          <Animated.View style={{ opacity: brandOpacity, transform: [{ translateY: brandTranslate }] }}>
-            <Text style={s.appName}>StudyShala</Text>
+          <Animated.View style={{ opacity: brandOpacity, transform: [{ translateY: brandTranslate }], alignItems: 'center' }}>
+            <Text style={s.appName}>
+              Study<Text style={{ color: ACCENT }}>Shala</Text>
+            </Text>
             <Text style={s.appTagline}>Your college study companion</Text>
+
+            {/* ── Trust badge (decorative only) ── */}
+            <View style={s.trustBadge}>
+              <Ionicons name="shield-checkmark-outline" size={13} color={ACCENT} />
+              <Text style={s.trustBadgeText}>Secure • Smart • Student First</Text>
+            </View>
           </Animated.View>
         </View>
 
@@ -293,8 +329,12 @@ export default function LoginScreen() {
           </View>
         )}
 
-        {/* ── Role label ── */}
-        <Text style={s.sectionLabel}>I am a…</Text>
+        {/* ── Role label + divider ── */}
+        <View style={s.sectionLabelRow}>
+          <Text style={s.sectionLabel}>I am a…</Text>
+          <View style={s.sectionLine} />
+          <View style={s.sectionDot} />
+        </View>
 
         {/* ── Role cards ── */}
         <View style={s.roleRow}>
@@ -307,6 +347,12 @@ export default function LoginScreen() {
             />
           ))}
         </View>
+
+        {/* ── Role change hint (decorative only) ── */}
+        {/*<View style={s.roleHint}>
+          <Ionicons name="lock-closed-outline" size={12} color={C.textMuted} />
+          <Text style={s.roleHintText}>Role can be changed later in settings</Text>
+        </View>*/}
 
         {/* ── Google button ── */}
         <Animated.View style={{ transform: [{ scale: ctaPressAnim }] }}>
@@ -344,8 +390,21 @@ export default function LoginScreen() {
         <Text style={s.footnote}>
           {selectedRole === 'faculty'
             ? '🔒 Verified by your institution\'s Google account'
-            : '✨ Sign in with your college Google account'}
+            : '✨ Sign in with your Google account'}
         </Text>
+
+        {/* ── Feature strip (decorative only) ── */}
+        <View style={s.featureStrip}>
+          {FEATURES.map((f) => (
+            <View key={f.title} style={s.featureItem}>
+              <View style={s.featureIconBox}>
+                <Ionicons name={f.icon} size={19} color={ACCENT} />
+              </View>
+              <Text style={s.featureTitle}>{f.title}</Text>
+              <Text style={s.featureDesc}>{f.desc}</Text>
+            </View>
+          ))}
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -362,7 +421,7 @@ const s = StyleSheet.create({
   },
 
   // Brand
-  brand: { alignItems: 'center', marginBottom: 40 },
+  brand: { alignItems: 'center', marginBottom: 36 },
   logoWrap: {
     marginBottom: 18,
     alignItems: 'center',
@@ -396,14 +455,27 @@ const s = StyleSheet.create({
     height: '100%',
   },
   appName: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
     color: C.textPrimary,
     letterSpacing: -0.5,
     marginBottom: 6,
     textAlign: 'center',
   },
-  appTagline: { fontSize: T.base, color: C.textSecondary, textAlign: 'center' },
+  appTagline: { fontSize: T.base, color: C.textSecondary, textAlign: 'center', marginBottom: 14 },
+
+  // Trust badge
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+  },
+  trustBadgeText: { fontSize: T.xs, color: C.textSecondary, fontWeight: '600' },
 
   // Warning
   warning: {
@@ -420,31 +492,47 @@ const s = StyleSheet.create({
   warningText: { flex: 1, color: C.warning, fontSize: T.sm, lineHeight: 18 },
   warningCode: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '700' },
 
-  // Section label
+  // Section label + divider
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
   sectionLabel: {
     fontSize: T.xs,
     fontWeight: '700',
     color: C.textMuted,
     letterSpacing: 0.9,
     textTransform: 'uppercase',
-    marginBottom: 12,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: C.border,
+  },
+  sectionDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: ACCENT,
   },
 
   // Role cards
-  roleRow: { flexDirection: 'row', gap: 12, marginBottom: 28 },
+  roleRow: { flexDirection: 'row', gap: 12, marginBottom: 14 },
   roleCard: {
     flex: 1,
     backgroundColor: C.surface,
     borderRadius: R.lg,
-    borderWidth: 1.5,
+    borderWidth: 3.5,
     borderColor: C.border,
-    paddingVertical: 24,
-    paddingHorizontal: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 10,
     alignItems: 'center',
     position: 'relative',
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 14,
-    elevation: 2,
+    elevation: 0,
   },
   tick: {
     position: 'absolute',
@@ -471,6 +559,16 @@ const s = StyleSheet.create({
   iconLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   roleLabel: { fontSize: T.md, fontWeight: '700', marginBottom: 4 },
   roleDesc: { fontSize: T.xs, color: C.textMuted, textAlign: 'center', lineHeight: 16 },
+
+  // Role change hint
+  roleHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 22,
+  },
+  roleHintText: { fontSize: T.xs, color: C.textMuted },
 
   // Google button
   googleBtn: {
@@ -508,5 +606,40 @@ const s = StyleSheet.create({
   googleG: { color: '#4285F4', fontWeight: '800', fontSize: T.sm },
   googleBtnText: { flex: 1, fontSize: T.base, fontWeight: '700', color: C.textPrimary, textAlign: 'center' },
 
-  footnote: { textAlign: 'center', fontSize: T.sm, color: C.textMuted, lineHeight: 18 },
+  footnote: { textAlign: 'center', fontSize: T.sm, color: C.textMuted, lineHeight: 18, marginBottom: 28 },
+
+  // Feature strip
+  featureStrip: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: R.lg,
+    paddingVertical: 20,
+    paddingHorizontal: 8,
+    backgroundColor: C.surface,
+  },
+  featureItem: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  featureIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: ACCENT_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  featureTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.textPrimary,
+    textAlign: 'center',
+    marginBottom: 3,
+  },
+  featureDesc: {
+    fontSize: 10,
+    color: C.textMuted,
+    textAlign: 'center',
+    lineHeight: 13,
+  },
 });

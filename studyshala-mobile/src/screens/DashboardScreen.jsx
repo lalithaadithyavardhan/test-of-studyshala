@@ -38,6 +38,7 @@ import { API_BASE_URL } from '../config/config';
 // Lets "Recently viewed" show instantly from local cache with zero internet,
 // then silently refresh from the server in the background when online.
 import { storage } from '../database/db';
+import { scopedKey } from '../utils/accountScope';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THEME — warm dark palette from HTML mockup
@@ -225,7 +226,7 @@ export default function StudentDashboard({ navigation }) {
     // not {key, value} pairs — each `entry` below IS the recent-file record,
     // so we must not do entry.value / JSON.parse(entry.value) here.
     try {
-      const cached = await storage.getAllByPrefix('recent:');
+      const cached = await storage.getAllByPrefix(scopedKey('recent:'));
       if (cached?.length) {
         const items = cached
           .filter(Boolean)
@@ -243,13 +244,13 @@ export default function StudentDashboard({ navigation }) {
 
       // Step 3 — sync to local cache so the list survives going offline
       try {
-        await storage.deleteAllByPrefix('recent:');
+        await storage.deleteAllByPrefix(scopedKey('recent:'));
       } catch {}
       for (const f of serverFiles) {
         // storage.set() already JSON.stringifies internally — pass the plain
         // object, never JSON.stringify it yourself (that double-encodes it
         // and makes it unreadable on the next read, which was the bug here).
-        try { await storage.set(`recent:${f.fileId}`, f); } catch {}
+        try { await storage.set(scopedKey(`recent:${f.fileId}`), f); } catch {}
       }
     } catch {
       // No internet — keep showing whatever cache gave us above, fail silently
@@ -338,7 +339,7 @@ export default function StudentDashboard({ navigation }) {
       const deduped = prev.filter((f) => f.fileId !== file.fileId);
       return [entry, ...deduped].slice(0, RECENT_FILES_LIMIT);
     });
-    storage.set(`recent:${file.fileId}`, entry).catch(() => {});
+    storage.set(scopedKey(`recent:${file.fileId}`), entry).catch(() => {});
   };
 
   const firstName = user?.name?.split(' ')[0] || 'Student';
