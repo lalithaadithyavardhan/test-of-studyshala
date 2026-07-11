@@ -21,7 +21,7 @@ router.get('/google', (req, res, next) => {
   // Faculty need Drive scope so their files go to their own Google Drive.
   // Students and admins only need profile + email.
   const scope = role === 'faculty'
-    ? ['profile', 'email', 'https://www.googleapis.com/auth/drive']
+    ? ['profile', 'email', 'https://www.googleapis.com/auth/drive.file']
     : ['profile', 'email'];
 
   const authOptions = {
