@@ -46,6 +46,12 @@ const userSchema = new mongoose.Schema({
 
   token:               { type: String, default: null },
 
+  // Faculty Google Drive OAuth tokens — set by config/passport.js on login.
+  // Used by services/driveService.js so a faculty member's uploads go to
+  // their own Drive instead of the shared admin fallback account.
+  driveAccessToken:  { type: String, default: null },
+  driveRefreshToken: { type: String, default: null },
+
   
   // Student-specific fields
   savedMaterials: [savedMaterialSchema],
