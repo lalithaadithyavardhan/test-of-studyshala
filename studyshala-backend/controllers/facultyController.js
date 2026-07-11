@@ -100,7 +100,7 @@ const createFolder = async (req, res) => {
 
     if (driveService.enabled) {
       try {
-        const driveFolder = await driveService.createFolder(folderName);
+        const driveFolder = await driveService.createFolder(folderName, null, req.user);
         driveUrl      = driveFolder.folderUrl;
         driveFolderId = driveFolder.folderId;
         logger.info(`Drive folder created: ${folderName} → ${driveFolderId}`);
@@ -187,7 +187,8 @@ const uploadFiles = async (req, res) => {
             file.buffer,
             file.originalname,
             file.mimetype,
-            parentDriveId
+            parentDriveId,
+            req.user
           );
           driveFileId = result.fileId;
           fileSize    = result.size || file.buffer.length;
@@ -200,7 +201,8 @@ const uploadFiles = async (req, res) => {
             file.buffer,
             file.originalname,
             file.mimetype,
-            parentDriveId
+            parentDriveId,
+            req.user
           );
           driveFileId = result.fileId;
           fileSize    = result.size || file.buffer.length;
@@ -268,7 +270,7 @@ const createSubFolder = async (req, res) => {
     let driveSubFolderId = null;
     if (driveService.enabled && folder.driveFolderId && !folder.driveFolderId.startsWith('local')) {
       try {
-        const result = await driveService.createFolder(name.trim(), folder.driveFolderId);
+        const result = await driveService.createFolder(name.trim(), folder.driveFolderId, req.user);
         driveSubFolderId = result.folderId;
         logger.info(`Drive sub-folder created: ${name} → ${driveSubFolderId}`);
       } catch (e) {
@@ -304,13 +306,13 @@ const deleteSubFolder = async (req, res) => {
     if (driveService.enabled) {
       for (const file of sf.files) {
         if (file.driveFileId) {
-          try { await driveService.deleteFile(file.driveFileId); }
+          try { await driveService.deleteFile(file.driveFileId, req.user); }
           catch (e) { logger.warn(`Drive file delete skipped: ${e.message}`); }
         }
       }
       // Delete the Drive sub-folder itself
       if (sf.driveSubFolderId) {
-        try { await driveService.deleteFolder(sf.driveSubFolderId); }
+        try { await driveService.deleteFolder(sf.driveSubFolderId, req.user); }
         catch (e) { logger.warn(`Drive sub-folder delete skipped: ${e.message}`); }
       }
     }
@@ -341,7 +343,7 @@ const deleteSubFolderFile = async (req, res) => {
 
     const file = sf.files[fileIdx];
     if (file.driveFileId && driveService.enabled) {
-      try { await driveService.deleteFile(file.driveFileId); }
+      try { await driveService.deleteFile(file.driveFileId, req.user); }
       catch (e) { logger.warn(`Drive delete skipped: ${e.message}`); }
     }
 
@@ -388,7 +390,7 @@ const deleteFile = async (req, res) => {
 
     const file = folder.files[idx];
     if (file.driveFileId && driveService.enabled) {
-      try { await driveService.deleteFile(file.driveFileId); } catch (e) {
+      try { await driveService.deleteFile(file.driveFileId, req.user); } catch (e) {
         logger.warn(`Drive delete skipped: ${e.message}`);
       }
     }
@@ -413,7 +415,7 @@ const deleteFolder = async (req, res) => {
     if (!folder) return res.status(404).json({ message: 'Folder not found' });
 
     if (driveService.enabled && folder.driveFolderId && !folder.driveFolderId.startsWith('local')) {
-      try { await driveService.deleteFolder(folder.driveFolderId); } catch (e) {
+      try { await driveService.deleteFolder(folder.driveFolderId, req.user); } catch (e) {
         logger.warn(`Drive folder delete skipped: ${e.message}`);
       }
     }
