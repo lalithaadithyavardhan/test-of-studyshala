@@ -22,7 +22,7 @@ const googleMobileLogin = async (req, res) => {
     // same as if the faculty logged in through the website.
     // Students and admins are not affected — they continue below as normal.
     if (chosenRole === 'faculty') {
-      const oauthUrl = `${process.env.BACKEND_URL}/api/auth/google?role=faculty&platform=mobile`;
+      const oauthUrl = 'https://test-of-studyshala.onrender.com/api/auth/google?role=faculty&platform=mobile';
       logger.info(`Faculty mobile login redirected to browser OAuth: ${oauthUrl}`);
       return res.status(200).json({
         requiresOAuth: true,
