@@ -14,6 +14,23 @@ const googleMobileLogin = async (req, res) => {
 
     const chosenRole = ['student', 'faculty', 'admin'].includes(role) ? role : 'student';
 
+    // Faculty need Drive permission which cannot be granted through the native
+    // idToken flow. Tell the app to open the browser OAuth flow instead.
+    // The browser flow (/api/auth/google?role=faculty&platform=mobile) will
+    // save driveRefreshToken on the user and redirect back via the
+    // studyshala://auth-callback deep link with a JWT token — exactly the
+    // same as if the faculty logged in through the website.
+    // Students and admins are not affected — they continue below as normal.
+    if (chosenRole === 'faculty') {
+      const oauthUrl = `${process.env.BACKEND_URL}/api/auth/google?role=faculty&platform=mobile`;
+      logger.info(`Faculty mobile login redirected to browser OAuth: ${oauthUrl}`);
+      return res.status(200).json({
+        requiresOAuth: true,
+        oauthUrl,
+        message: 'Faculty login requires Google Drive permission. Please complete login in the browser.',
+      });
+    }
+
     const ticket = await client.verifyIdToken({
       idToken,
       audience: [process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_ANDROID_CLIENT_ID],
