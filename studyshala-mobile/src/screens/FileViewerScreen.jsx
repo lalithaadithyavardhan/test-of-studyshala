@@ -51,6 +51,35 @@ export default function FileViewerScreen({ route, navigation }) {
 
   const [openError, setOpenError] = useState('');
   const [launching, setLaunching] = useState(false);
+  // react-native-pdf cannot read SAF content:// URIs (tree document URIs).
+  // We copy the file to a temp file:// path first so the PDF renderer can
+  // read it. For regular file:// URIs this is a no-op — localUri is used as-is.
+  const [resolvedUri, setResolvedUri] = useState(null);
+
+  useEffect(() => {
+    if (source !== 'local' || !isPdf(mime, name)) return;
+    if (!localUri) return;
+
+    if (!localUri.startsWith('content://')) {
+      // Already a file:// path — pass directly to react-native-pdf
+      setResolvedUri(localUri);
+      return;
+    }
+
+    // SAF content:// URI — copy to a temp file:// path first
+    const tempPath = `${FileSystem.cacheDirectory}pdf_preview_${Date.now()}.pdf`;
+    FileSystem.copyAsync({ from: localUri, to: tempPath })
+      .then(() => setResolvedUri(tempPath))
+      .catch((e) => {
+        console.log('[FileViewer] Failed to copy SAF URI to temp path:', e?.message);
+        setOpenError('Could not open this file. Try saving it again.');
+      });
+
+    // Clean up the temp file when the screen unmounts
+    return () => {
+      FileSystem.deleteAsync(tempPath, { idempotent: true }).catch(() => {});
+    };
+  }, [source, localUri, mime, name]);
 
   // An app-private file:// path can't be read by other apps directly.
   // getContentUriAsync() wraps it via Android's FileProvider into a
@@ -112,15 +141,22 @@ export default function FileViewerScreen({ route, navigation }) {
       )}
 
       {source === 'local' && isPdf(mime, name) && !openError && (
-        <Pdf
-          source={{ uri: localUri }}
-          style={s.pdf}
-          trustAllCerts={false}
-          onError={(e) => {
-            console.log('[FileViewer] Pdf render error:', e);
-            setOpenError('Could not render this PDF. It may be corrupted — try saving it again.');
-          }}
-        />
+        resolvedUri ? (
+          <Pdf
+            source={{ uri: resolvedUri }}
+            style={s.pdf}
+            trustAllCerts={false}
+            onError={(e) => {
+              console.log('[FileViewer] Pdf render error:', e);
+              setOpenError('Could not render this PDF. It may be corrupted — try saving it again.');
+            }}
+          />
+        ) : (
+          // Still copying SAF URI to temp path — show spinner
+          <View style={s.center}>
+            <ActivityIndicator color={C.accent} size="large" />
+          </View>
+        )
       )}
 
       {source === 'local' && isPdf(mime, name) && !!openError && (

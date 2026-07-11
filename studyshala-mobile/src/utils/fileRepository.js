@@ -131,12 +131,29 @@ export const saveFileOffline = async (file, material, onProgress) => {
           safName,
           file.mimeType || 'application/octet-stream'
         );
+
+        // FIX: createFileAsync on some Android versions returns a content://
+        // URI that points to the FOLDER instead of the new file inside it.
+        // Passing a directory URI to react-native-pdf causes EISDIR crashes.
+        // Verify the returned URI is actually a file before using it.
+        const safInfo = await FileSystem.getInfoAsync(safUri);
+        if (!safInfo.exists || safInfo.isDirectory) {
+          throw new Error('StorageAccessFramework returned a directory URI instead of a file URI — falling back to default storage.');
+        }
+
         const base64 = await FileSystem.readAsStringAsync(result.uri, {
           encoding: FileSystem.EncodingType.Base64,
         });
         await FileSystem.writeAsStringAsync(safUri, base64, {
           encoding: FileSystem.EncodingType.Base64,
         });
+
+        // Verify the written file is non-empty before committing to it
+        const writtenInfo = await FileSystem.getInfoAsync(safUri);
+        if (!writtenInfo.exists || writtenInfo.size === 0) {
+          throw new Error('Custom folder write produced an empty file — falling back to default storage.');
+        }
+
         // Only remove the default-location temp copy once the custom-folder
         // copy is confirmed written — never delete before it's safely there.
         await FileSystem.deleteAsync(result.uri, { idempotent: true });
@@ -161,6 +178,7 @@ export const saveFileOffline = async (file, material, onProgress) => {
       downloadedAt: new Date().toISOString(),
     };
     await storage.set(recordKey(fileId), record);
+    console.log('[fileRepository] finalUri saved:', finalUri);
     return record;
   } catch (err) {
     await storage.set(recordKey(fileId), {

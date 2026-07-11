@@ -122,9 +122,21 @@ function FacultyRoot() {
 export default function AppNavigator() {
   const { isAuthenticated, loading, user } = useAuth();
 
+  const linking = {
+    prefixes: ['studyshala://'],
+    config: {
+      screens: {
+        // Deep link lands here; AuthContext's Linking listener
+        // handles the token extraction and login independently,
+        // so no screen mapping is needed — this just prevents
+        // React Navigation from throwing on an unrecognised URL.
+      },
+    },
+  };
+
   return (
     <ServerStatusProvider>
-      <NavigationContainer>
+      <NavigationContainer linking={linking}>
         <ServerStatusBanner />
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
           {loading ? (

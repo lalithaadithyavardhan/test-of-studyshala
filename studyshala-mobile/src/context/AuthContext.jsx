@@ -19,6 +19,7 @@ import { STORAGE_KEYS, API_BASE_URL } from '../config/config';
 import { setForceLogoutHandler } from '../api/client';
 import { logoutRequest } from '../api/authApi';
 import { setCurrentAccount } from '../utils/accountScope';
+import * as Linking from 'expo-linking';
 
 const AuthContext = createContext(null);
 
@@ -61,6 +62,49 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
     });
   }, []);
+
+  // loginWithToken — called by the deep link handler after faculty browser OAuth.
+  // Fetches the full user object from the backend using the JWT, then calls login().
+  const loginWithToken = useCallback(async (jwtToken) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/user`, {
+        headers: { Authorization: `Bearer ${jwtToken}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch user after OAuth');
+      const data = await response.json();
+      await SecureStore.setItemAsync(STORAGE_KEYS.TOKEN, jwtToken);
+      await SecureStore.setItemAsync(STORAGE_KEYS.USER, JSON.stringify(data.user));
+      await SecureStore.setItemAsync(STORAGE_KEYS.LAST_ROLE, data.user.role);
+      setToken(jwtToken);
+      setUser(data.user);
+      setLastRole(data.user.role);
+      setCurrentAccount(data.user.email || data.user._id);
+    } catch (e) {
+      console.warn('Deep link login failed', e);
+    }
+  }, []);
+
+  // Deep link handler — fires when Google redirects back to
+  // studyshala://auth-callback?token=<jwt> after faculty browser OAuth.
+  useEffect(() => {
+    const handleDeepLink = ({ url }) => {
+      if (!url) return;
+      const parsed = Linking.parse(url);
+      // matches studyshala://auth-callback?token=...
+      if (parsed.hostname === 'auth-callback' && parsed.queryParams?.token) {
+        loginWithToken(parsed.queryParams.token);
+      }
+    };
+
+    // Handle deep link if app was opened FROM COLD START via the link
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    // Handle deep link if app was already running in background
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    return () => subscription.remove();
+  }, [loginWithToken]);
 
   // login(userData, jwtToken) — called after either native Google Sign-In
   // (LoginScreen) or a role switch (switchRole below).

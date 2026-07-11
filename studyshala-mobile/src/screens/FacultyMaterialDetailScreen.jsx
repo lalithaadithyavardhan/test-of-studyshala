@@ -1,4 +1,3 @@
-
 /**
  * screens/FacultyMaterialDetailScreen.jsx — StudyShala
  *
@@ -704,7 +703,7 @@ export default function FacultyMaterialDetailScreen({ route, navigation }) {
       const deduped = prev.filter(f => f._id !== file._id);
       return [{ _id: file._id, name: file.name, mimeType: file.mimeType }, ...deduped].slice(0, MAX_RECENT);
     });
-    navigation.navigate('FileViewer', { file, material });
+    navigation.navigate('FileViewer', { file, material, source: 'remote' });
   };
 
   const handleFileLongPress = (file) => {

@@ -40,7 +40,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL, GOOGLE_WEB_CLIENT_ID } from '../config/config';
 import { C, R, T } from '../components/theme';
-
+import { Linking } from 'react-native';
 // ── Single brand accent, used for BOTH roles when selected ──
 const ACCENT = '#DE7356';
 const ACCENT_SOFT = 'rgba(222,115,86,0.14)';
@@ -236,37 +236,59 @@ export default function LoginScreen() {
   }, [lastRole]);
 
   const handleGoogleLogin = async () => {
-    if (isPlaceholderUrl) {
-      Alert.alert('Backend URL not set', 'Open src/config/config.js and set API_BASE_URL.');
-      return;
-    }
-    if (!selectedRole) {
-      Alert.alert('Pick a role', 'Please select Student or Faculty first.');
-      return;
-    }
-    setLoading(true);
-    try {
-      await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo?.data?.idToken ?? userInfo?.idToken;
-      if (!idToken) { Alert.alert('Sign-in failed', 'No ID token from Google.'); return; }
-      const response = await fetch(`${API_BASE_URL}/api/auth/google/mobile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, role: selectedRole }),
-      });
-      const data = await response.json();
-      if (!response.ok) { Alert.alert('Sign-in failed', data.message || `Error ${response.status}`); return; }
-      await login(data.user, data.token);
-    } catch (error) {
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) { /* silent */ }
-      else if (error.code === statusCodes.IN_PROGRESS) Alert.alert('Please wait', 'Sign-in already in progress.');
-      else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) Alert.alert('Update required', 'Please update Google Play Services.');
-      else Alert.alert('Sign-in error', error.message || 'Something went wrong.');
-    } finally {
+  if (isPlaceholderUrl) {
+    Alert.alert('Backend URL not set', 'Open src/config/config.js and set API_BASE_URL.');
+    return;
+  }
+  if (!selectedRole) {
+    Alert.alert('Pick a role', 'Please select Student or Faculty first.');
+    return;
+  }
+  setLoading(true);
+  try {
+    await GoogleSignin.hasPlayServices();
+    const userInfo = await GoogleSignin.signIn();
+    const idToken = userInfo?.data?.idToken ?? userInfo?.idToken;
+    if (!idToken) { Alert.alert('Sign-in failed', 'No ID token from Google.'); return; }
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/google/mobile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken, role: selectedRole }),
+    });
+    const data = await response.json();
+    if (!response.ok) { Alert.alert('Sign-in failed', data.message || `Error ${response.status}`); return; }
+
+    // ── FACULTY DRIVE FIX ──────────────────────────────────────────────
+    // Backend signals that faculty must complete login via browser so that
+    // Google Drive permission can be granted and saved to their account.
+    if (data.requiresOAuth && data.oauthUrl) {
       setLoading(false);
+      Alert.alert(
+        'One more step',
+        'Faculty login requires Google Drive permission to store your materials. Tap Continue to grant access in your browser — you will be brought back here automatically.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue',
+            onPress: () => Linking.openURL(data.oauthUrl),
+          },
+        ]
+      );
+      return;
     }
-  };
+    // ── END FACULTY DRIVE FIX ──────────────────────────────────────────
+
+    await login(data.user, data.token);
+  } catch (error) {
+    if (error.code === statusCodes.SIGN_IN_CANCELLED) { /* silent */ }
+    else if (error.code === statusCodes.IN_PROGRESS) Alert.alert('Please wait', 'Sign-in already in progress.');
+    else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) Alert.alert('Update required', 'Please update Google Play Services.');
+    else Alert.alert('Sign-in error', error.message || 'Something went wrong.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCtaPressIn = () => {
     Animated.spring(ctaPressAnim, { toValue: 0.97, useNativeDriver: true, friction: 6, tension: 220 }).start();

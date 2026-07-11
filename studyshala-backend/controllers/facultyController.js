@@ -203,6 +203,7 @@ const uploadFiles = async (req, res) => {
     }
 
     const uploaded = [];
+    const failed   = [];
 
     for (const file of req.files) {
       let driveFileId  = null;
@@ -243,9 +244,8 @@ const uploadFiles = async (req, res) => {
         }
       } catch (driveErr) {
         logger.error(`Drive upload failed for ${file.originalname}: ${driveErr.message}`);
-        return res.status(500).json({
-          message: `Failed to upload "${file.originalname}" to Google Drive: ${driveErr.message}`
-        });
+        failed.push({ name: file.originalname, reason: driveErr.message });
+        continue;
       }
 
       const doc = {
@@ -266,17 +266,27 @@ const uploadFiles = async (req, res) => {
       uploaded.push(doc);
     }
 
-    folder.version = (folder.version || 1) + 1;
-    await folder.save();
-    await logAction(req, 'UPLOAD_FILES', 'Folder', folder._id, {
-      fileCount: uploaded.length,
-      destination: subFolderId ? `sub-folder:${targetSubFolder.name}` : 'root'
-    });
-    logger.info(`${uploaded.length} file(s) uploaded to "${folder.subjectName}" by ${req.user.email}`);
+    if (uploaded.length > 0) {
+      folder.version = (folder.version || 1) + 1;
+      await folder.save();
+      await logAction(req, 'UPLOAD_FILES', 'Folder', folder._id, {
+        fileCount: uploaded.length,
+        destination: subFolderId ? `sub-folder:${targetSubFolder.name}` : 'root'
+      });
+    }
+    logger.info(`${uploaded.length} uploaded, ${failed.length} failed for folder by ${req.user.email}`);
+
+    if (uploaded.length === 0 && failed.length > 0) {
+      return res.status(500).json({
+        message: `All files failed. First error: ${failed[0].reason}`,
+        failed,
+      });
+    }
 
     res.json({
-      message:    `${uploaded.length} file(s) uploaded successfully`,
+      message:    `${uploaded.length} file(s) uploaded${failed.length > 0 ? `, ${failed.length} failed` : ''}`,
       files:      uploaded.map(mapFile),
+      failed,
       subFolderId: subFolderId || null
     });
   } catch (err) {

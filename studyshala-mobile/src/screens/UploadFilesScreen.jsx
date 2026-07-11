@@ -192,11 +192,24 @@ export default function UploadFilesScreen({ route, navigation }) {
         ? subFolders.find((f) => f._id === selectedSfId)?.name || 'folder'
         : 'Root folder';
 
-      Alert.alert(
-        'Uploaded! 🎉',
-        `${files.length} file${files.length !== 1 ? 's' : ''} uploaded to "${destName}".`,
-        [{ text: 'Done', onPress: () => navigation.goBack() }]
-      );
+      const failedFiles = res?.data?.failed || [];
+      const uploadedCount = res?.data?.files?.length ?? files.length;
+
+      if (failedFiles.length > 0 && uploadedCount > 0) {
+        Alert.alert(
+          'Partially uploaded',
+          `${uploadedCount} file(s) uploaded to "${destName}".\n\n` +
+          `${failedFiles.length} file(s) failed:\n` +
+          failedFiles.map((f) => `- ${f.name}`).join('\n'),
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else {
+        Alert.alert(
+          'Uploaded! 🎉',
+          `${uploadedCount} file${uploadedCount !== 1 ? 's' : ''} uploaded to "${destName}".`,
+          [{ text: 'Done', onPress: () => navigation.goBack() }]
+        );
+      }
     } catch (e) {
       Alert.alert('Upload failed', e.response?.data?.message || 'Please try again.');
     } finally {
