@@ -8,20 +8,32 @@ const { authenticate } = require('../middleware/auth');
 const mobileAuthController = require('../controllers/mobileAuthController');
 router.post('/google/mobile', mobileAuthController.googleMobileLogin);
 
-// Google OAuth — skip account picker if we know who's logging in
+// Google OAuth — request Drive scope for faculty so files upload to their own Drive
 router.get('/google', (req, res, next) => {
   const role = ['faculty', 'admin', 'student'].includes(req.query.role)
     ? req.query.role : 'student';
-    
+
   // Check if request is coming from mobile
   const platform = req.query.platform === 'mobile' ? 'mobile' : 'web';
 
   const loginHint = req.query.hint || null;
 
+  // Faculty need Drive scope so their files go to their own Google Drive.
+  // Students and admins only need profile + email.
+  const scope = role === 'faculty'
+    ? ['profile', 'email', 'https://www.googleapis.com/auth/drive']
+    : ['profile', 'email'];
+
   const authOptions = {
-    scope: ['profile', 'email'],
+    scope,
     // Pass both role and platform in the state string, separated by a pipe
-    state: `${role}|${platform}`,
+    state:          `${role}|${platform}`,
+    // Always prompt faculty for consent so Google returns a refresh token
+    // NOTE: passport-google-oauth20 only reads the camelCase key "accessType" —
+    // it silently ignores "access_type", which was the root cause of refresh
+    // tokens never being issued to faculty accounts.
+    accessType:     role === 'faculty' ? 'offline' : 'online',
+    prompt:         role === 'faculty' ? 'consent' : undefined,
   };
 
   if (loginHint) {
