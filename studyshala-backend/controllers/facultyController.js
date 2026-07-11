@@ -169,6 +169,39 @@ const uploadFiles = async (req, res) => {
         : null;
     }
 
+    // AUTO-HEAL: materials/sub-folders created before the per-user Drive fix
+    // have a driveFolderId that lives in the OLD shared admin Drive account,
+    // not in this faculty member's own Drive. Using it as a parent will fail
+    // with "File not found" once uploads correctly target their own Drive.
+    // Detect that once per request and recreate the folder in the faculty's
+    // own Drive, then keep going.
+    if (parentDriveId) {
+      try {
+        await driveService.getFileMetadata(parentDriveId, req.user);
+      } catch (checkErr) {
+        logger.warn(`Stored Drive folder ${parentDriveId} not found in ${req.user.email}'s Drive — recreating (auto-heal)`);
+        try {
+          const rebuilt = await driveService.createFolder(
+            targetSubFolder ? targetSubFolder.name : folder.subjectName,
+            null,
+            req.user
+          );
+          parentDriveId = rebuilt.folderId;
+          if (targetSubFolder) {
+            targetSubFolder.driveSubFolderId = rebuilt.folderId;
+          } else {
+            folder.driveFolderId = rebuilt.folderId;
+            folder.driveUrl      = rebuilt.folderUrl;
+          }
+          await folder.save();
+          logger.info(`Auto-healed Drive folder for "${folder.subjectName}" → ${parentDriveId}`);
+        } catch (healErr) {
+          logger.error(`Auto-heal failed, uploading to Drive root instead: ${healErr.message}`);
+          parentDriveId = null; // fall back to the root of their Drive rather than failing the upload
+        }
+      }
+    }
+
     const uploaded = [];
 
     for (const file of req.files) {
