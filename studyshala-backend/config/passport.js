@@ -23,7 +23,7 @@ passport.use(
       callbackURL:       process.env.GOOGLE_CALLBACK_URL,
       passReqToCallback: true,
     },
-    async (req, accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, params, profile, done) => {
       try {
         // state is "role|platform" e.g. "student|mobile" or "faculty|web"
         const rawState   = req.query.state || 'student';
@@ -52,15 +52,24 @@ passport.use(
           }
 
           // FIX: actually persist the Drive tokens for faculty on every login.
-          if (role === 'faculty') {
-            user.driveAccessToken = accessToken;
+          
             // Google only sends a refreshToken on first consent / when
             // prompt=consent forces it. Keep the previous one if this
             // particular response didn't include a new one.
-            if (refreshToken) {
-              user.driveRefreshToken = refreshToken;
-            }
+          
+
+          if (role === 'faculty') {
+            user.driveAccessToken = accessToken;
+              if (refreshToken) {
+                user.driveRefreshToken = refreshToken;
+              }
+            if (params?.expiry_date) {
+              user.driveTokenExpiry = params.expiry_date;
+           }
           }
+
+
+
 
           user.lastLogin = new Date();
           await user.save();
@@ -75,8 +84,9 @@ passport.use(
           role,
           profilePicture:    profile.photos[0]?.value,
           lastLogin:         new Date(),
-          driveAccessToken:  role === 'faculty' ? accessToken  : undefined,
-          driveRefreshToken: role === 'faculty' ? refreshToken : undefined,
+          driveAccessToken:  role === 'faculty' ? accessToken                   : undefined,
+          driveRefreshToken: role === 'faculty' ? refreshToken                  : undefined,
+          driveTokenExpiry:  role === 'faculty' ? (params?.expiry_date || null) : undefined,
         });
         await user.save();
         logger.info(`New user: ${email} as ${role} (driveRefreshToken ${user.driveRefreshToken ? 'present' : 'MISSING'})`);

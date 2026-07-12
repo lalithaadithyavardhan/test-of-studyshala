@@ -51,6 +51,7 @@ const userSchema = new mongoose.Schema({
   // their own Drive instead of the shared admin fallback account.
   driveAccessToken:  { type: String, default: null },
   driveRefreshToken: { type: String, default: null },
+  driveTokenExpiry:  { type: Number, default: null },
 
   
   // Student-specific fields

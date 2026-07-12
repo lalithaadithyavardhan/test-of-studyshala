@@ -163,13 +163,13 @@ export default function UploadFilesScreen({ route, navigation }) {
       };
 
       let uploadedFileObjects = [];
+      let res;
 
       if (selectedSfId) {
-        const res = await uploadFilesToSubFolder(material._id, selectedSfId, files, onUploadProgress);
-        // Try to get the uploaded file list back from the API response
+        res = await uploadFilesToSubFolder(material._id, selectedSfId, files, onUploadProgress);
         uploadedFileObjects = res?.data?.files || res?.data?.uploadedFiles || [];
       } else {
-        const res = await uploadFiles(material._id, files, null, onUploadProgress);
+        res = await uploadFiles(material._id, files, null, onUploadProgress);
         uploadedFileObjects = res?.data?.files || res?.data?.uploadedFiles || [];
       }
 
@@ -178,8 +178,6 @@ export default function UploadFilesScreen({ route, navigation }) {
         setSubFolders((prev) =>
           prev.map((sf) => {
             if (sf._id !== selectedSfId) return sf;
-            // If the API returned real file objects use them, otherwise
-            // append lightweight stubs so the count is never stale.
             const appended = uploadedFileObjects.length > 0
               ? uploadedFileObjects
               : files.map((f) => ({ name: f.name, size: f.size, mimeType: f.mimeType }));

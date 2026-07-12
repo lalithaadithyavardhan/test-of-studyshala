@@ -71,22 +71,39 @@ class DriveService {
    * that originally issued it.
    */
   _getDriveForUser (user) {
-    if (user && user.driveRefreshToken) {
-      const oauth2 = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_CALLBACK_URL
-      );
-      oauth2.setCredentials({
-        access_token:  user.driveAccessToken  || undefined,
-        refresh_token: user.driveRefreshToken,
-      });
-      logger.info(`Using faculty Drive account: ${user.email}`);
-      return google.drive({ version: 'v3', auth: oauth2 });
-    }
-    logger.warn(`No Drive tokens for user ${user?.email || 'unknown'} — using app fallback`);
-    return google.drive({ version: 'v3', auth: this.appOauth2Client });
+  if (user && user.driveRefreshToken) {
+    const oauth2 = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_CALLBACK_URL
+    );
+    oauth2.setCredentials({
+      access_token:  user.driveAccessToken  || undefined,
+      refresh_token: user.driveRefreshToken,
+      expiry_date:   user.driveTokenExpiry  || undefined,
+    });
+
+    // When Google auto-refreshes the access token, save the new one
+    // back to MongoDB so it persists across server restarts.
+    oauth2.on('tokens', async (tokens) => {
+      try {
+        const User = require('../models/User');
+        const update = { driveAccessToken: tokens.access_token };
+        if (tokens.expiry_date)   update.driveTokenExpiry  = tokens.expiry_date;
+        if (tokens.refresh_token) update.driveRefreshToken = tokens.refresh_token;
+        await User.findByIdAndUpdate(user._id, update);
+        logger.info(`Drive tokens auto-refreshed and saved for ${user.email}`);
+      } catch (e) {
+        logger.warn(`Failed to persist refreshed Drive token for ${user.email}: ${e.message}`);
+      }
+    });
+
+    logger.info(`Using faculty Drive account: ${user.email}`);
+    return google.drive({ version: 'v3', auth: oauth2 });
   }
+  logger.warn(`No Drive tokens for user ${user?.email || 'unknown'} — using app fallback`);
+  return google.drive({ version: 'v3', auth: this.appOauth2Client });
+}
 
   // ── Folder operations ───────────────────────────────────────────────────
 
